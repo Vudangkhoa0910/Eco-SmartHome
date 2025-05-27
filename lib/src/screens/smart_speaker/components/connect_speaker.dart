@@ -26,11 +26,11 @@ class ConnectSpeaker extends StatelessWidget {
           ),
           Text(
             'Kakao Mini C',
-            style: Theme.of(context).textTheme.headline1,
+            style: Theme.of(context).textTheme.titleLarge,  // Chuyển từ headline1
           ),
           Text(
             'Smart Speaker',
-            style: Theme.of(context).textTheme.headline3,
+            style: Theme.of(context).textTheme.titleMedium,  // Chuyển từ headline3
           ),
           SizedBox(
             height: getProportionateScreenHeight(40),
@@ -51,7 +51,7 @@ class ConnectSpeaker extends StatelessWidget {
             onPressed: () {},
             child: Text(
               'Connect',
-              style: Theme.of(context).textTheme.headline3,
+              style: Theme.of(context).textTheme.titleMedium,  // Chuyển từ headline3
             ),
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.symmetric(
