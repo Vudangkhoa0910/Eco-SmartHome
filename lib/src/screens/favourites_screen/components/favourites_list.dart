@@ -1,11 +1,11 @@
-import 'package:domus/src/screens/favourites_screen/components/favourite_tile.dart';
-import 'package:domus/src/screens/smart_ac/smart_ac.dart';
-import 'package:domus/src/screens/smart_fan/smart_fan.dart';
-import 'package:domus/src/screens/smart_light/smart_light.dart';
-import 'package:domus/src/screens/smart_speaker/smart_speaker.dart';
+import 'package:smart_home/src/screens/favourites_screen/components/favourite_tile.dart';
+import 'package:smart_home/src/screens/smart_ac/smart_ac.dart';
+import 'package:smart_home/src/screens/smart_fan/smart_fan.dart';
+import 'package:smart_home/src/screens/smart_light/smart_light.dart';
+import 'package:smart_home/src/screens/smart_speaker/smart_speaker.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/view/home_screen_view_model.dart';
-import 'package:domus/src/screens/favourites_screen/components/body.dart';
+import 'package:smart_home/view/home_screen_view_model.dart';
+import 'package:smart_home/src/screens/favourites_screen/components/body.dart';
 class FavouriteList extends StatefulWidget {
   const FavouriteList({Key? key, required this.model}) : super(key: key);
   final HomeScreenViewModel model;

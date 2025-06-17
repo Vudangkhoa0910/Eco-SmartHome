@@ -1,7 +1,7 @@
-import 'package:domus/provider/base_model.dart';
+import 'package:smart_home/provider/base_model.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/src/screens/my_list_screen/my_list_screen.dart';
+import 'package:smart_home/src/screens/my_list_screen/my_list_screen.dart';
 
 
 class SmartTvViewModel extends BaseModel {

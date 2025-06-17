@@ -1,4 +1,4 @@
-import 'package:domus/src/screens/edit_profile/components/body.dart';
+import 'package:smart_home/src/screens/edit_profile/components/body.dart';
 import 'package:flutter/material.dart';
 
 class EditProfile extends StatelessWidget {

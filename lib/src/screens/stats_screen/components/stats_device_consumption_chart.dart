@@ -1,4 +1,4 @@
-import 'package:domus/src/screens/stats_screen/components.dart';
+import 'package:smart_home/src/screens/stats_screen/components.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 

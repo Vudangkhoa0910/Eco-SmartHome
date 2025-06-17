@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:domus/provider/base_model.dart';
+import 'package:smart_home/provider/base_model.dart';
 import 'package:flutter/cupertino.dart';
 
 class HomeScreenViewModel extends BaseModel {

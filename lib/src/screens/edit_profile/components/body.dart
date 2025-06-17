@@ -1,5 +1,5 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/src/screens/edit_profile/components/image_picker.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/screens/edit_profile/components/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:dotted_border/dotted_border.dart';
 

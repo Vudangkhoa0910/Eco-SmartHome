@@ -1,6 +1,6 @@
-import 'package:domus/src/screens/savings_screen/components/savings_widget.dart';
+import 'package:smart_home/src/screens/savings_screen/components/savings_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/config/size_config.dart';
+import 'package:smart_home/config/size_config.dart';
 import 'package:flutter_svg/svg.dart';
 
 class Body extends StatelessWidget {

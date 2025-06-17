@@ -1,4 +1,4 @@
-import 'package:domus/provider/base_model.dart';
+import 'package:smart_home/provider/base_model.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 class SmartSpeakerViewModel extends BaseModel {

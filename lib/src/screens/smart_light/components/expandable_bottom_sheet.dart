@@ -1,8 +1,8 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/src/screens/smart_light/components/date_container.dart';
-import 'package:domus/src/screens/smart_light/components/reusable_buttons.dart';
-import 'package:domus/src/screens/smart_light/components/time_container.dart';
-import 'package:domus/view/smart_light_view_model.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/screens/smart_light/components/date_container.dart';
+import 'package:smart_home/src/screens/smart_light/components/reusable_buttons.dart';
+import 'package:smart_home/src/screens/smart_light/components/time_container.dart';
+import 'package:smart_home/view/smart_light_view_model.dart';
 import 'package:flutter/material.dart';
 
 import 'advance_setting_container.dart';

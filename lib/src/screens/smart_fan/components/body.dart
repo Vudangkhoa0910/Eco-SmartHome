@@ -1,5 +1,5 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/view/smart_fan_view_model.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/view/smart_fan_view_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';

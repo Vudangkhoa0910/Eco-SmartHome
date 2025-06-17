@@ -1,5 +1,5 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/src/screens/login_screen/login_screen.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/screens/login_screen/login_screen.dart';
 import 'package:flutter/material.dart';
 
 class Body extends StatelessWidget {

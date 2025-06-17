@@ -1,8 +1,8 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/src/screens/smart_tv/components/mood_toggle_buttons.dart';
-import 'package:domus/view/smart_tv_view_model.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/screens/smart_tv/components/mood_toggle_buttons.dart';
+import 'package:smart_home/view/smart_tv_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/src/screens/smart_tv/components/intensity_slider.dart';
+import 'package:smart_home/src/screens/smart_tv/components/intensity_slider.dart';
 
 class Body extends StatelessWidget {
   final SmartTvViewModel model;

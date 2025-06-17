@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:domus/src/screens/savings_screen/components/body.dart';
+import 'package:smart_home/src/screens/savings_screen/components/body.dart';
 
 class SavingsScreen extends StatelessWidget {
   static String routeName = '/savings-screen';

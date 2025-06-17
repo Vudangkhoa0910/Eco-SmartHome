@@ -1,4 +1,4 @@
-import 'package:domus/config/size_config.dart';
+import 'package:smart_home/config/size_config.dart';
 import 'package:flutter/material.dart';
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);

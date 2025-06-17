@@ -1,4 +1,4 @@
-import 'package:domus/src/screens/login_screen/components/body.dart';
+import 'package:smart_home/src/screens/login_screen/components/body.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen  extends StatelessWidget {

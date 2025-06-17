@@ -1,7 +1,7 @@
-import 'package:domus/provider/getit.dart';
-import 'package:domus/routes/routes.dart';
-import 'package:domus/service/navigation_service.dart';
-import 'package:domus/src/screens/splash_screen/splash_screen.dart';
+import 'package:smart_home/provider/getit.dart';
+import 'package:smart_home/routes/routes.dart';
+import 'package:smart_home/service/navigation_service.dart';
+import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
 import 'package:flutter/material.dart';
 
 void main() async {

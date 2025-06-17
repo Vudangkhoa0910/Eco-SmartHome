@@ -1,4 +1,4 @@
-import 'package:domus/popups/popup_state.dart';
+import 'package:smart_home/popups/popup_state.dart';
 import 'package:flutter/material.dart';
 
 class PopupSuccess extends PopupState {

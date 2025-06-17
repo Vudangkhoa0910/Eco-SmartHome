@@ -1,6 +1,6 @@
-import 'package:domus/config/size_config.dart';
+import 'package:smart_home/config/size_config.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/view/smart_tv_view_model.dart';
+import 'package:smart_home/view/smart_tv_view_model.dart';
 
 class MoodToggleButtons extends StatelessWidget {
   const MoodToggleButtons({Key? key, required this.model})

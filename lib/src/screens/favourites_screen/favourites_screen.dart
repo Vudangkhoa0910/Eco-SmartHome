@@ -1,8 +1,8 @@
-import 'package:domus/config/size_config.dart';
-import 'package:domus/src/screens/favourites_screen/components/favourites_list.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/screens/favourites_screen/components/favourites_list.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:domus/view/home_screen_view_model.dart';
+import 'package:smart_home/view/home_screen_view_model.dart';
 
 class Favourites extends StatefulWidget {
   final HomeScreenViewModel model;
