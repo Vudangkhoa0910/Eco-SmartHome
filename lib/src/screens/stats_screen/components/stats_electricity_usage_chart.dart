@@ -21,7 +21,7 @@ class StatsElectricityUsageChart extends StatelessWidget {
           fontFamily: 'ABeeZee',
         ),
       ),
-      plotOffset: -35,
+      plotOffset: 0,
       content: SplineAreaSeries<Consumption, String>(
         // Plots Spline curves for smooth transitions
         borderColor: const Color(0xFF464646),

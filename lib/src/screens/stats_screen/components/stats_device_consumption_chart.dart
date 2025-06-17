@@ -20,7 +20,7 @@ class StatsDeviceConsumptionChart extends StatelessWidget {
           Text('Check level 240'),
         ],
       ),
-      plotOffset: -40,
+      plotOffset: 0,
       content: ColumnSeries<Consumption, String>(
         // Plots Columns / Bar chart
         dataLabelSettings: const DataLabelSettings(

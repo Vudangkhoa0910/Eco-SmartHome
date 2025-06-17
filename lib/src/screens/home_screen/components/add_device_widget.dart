@@ -8,14 +8,15 @@ class AddNewDevice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DottedBorder(
-      borderType: BorderType.RRect,
-      radius: const Radius.circular(12),
-      padding: EdgeInsets.all(
-        getProportionateScreenHeight(5),
+      options: RoundedRectDottedBorderOptions(
+        dashPattern: const [9, 3],
+        strokeWidth: 2,
+        radius: const Radius.circular(12),
+        color: const Color(0xFFBDBDBD),
+        padding: EdgeInsets.all(
+          getProportionateScreenHeight(5),
+        ),
       ),
-      color: const Color(0xFFBDBDBD),
-      strokeWidth: 2,
-      dashPattern: const [9, 3],
       child: ClipRRect(
         borderRadius: const BorderRadius.all(Radius.circular(15)),
         child: Container(

@@ -81,17 +81,17 @@ class _BodyState extends State<Body> {
                     height: getProportionateScreenHeight(15),
                   ),
                   DottedBorder(
-                    borderType: BorderType.RRect,
-                    radius: const Radius.circular(20),
-                    dashPattern: const [7, 7],
-                    color: Colors.black38,
-                    strokeWidth: 2,
-                    // padding: EdgeInsets.fromLTRB(115, 37, 115, 37),
-                    padding: EdgeInsets.fromLTRB(
-                        getProportionateScreenWidth(75),
-                        getProportionateScreenHeight(25),
-                        getProportionateScreenWidth(75),
-                        getProportionateScreenHeight(25)),
+                    options: RoundedRectDottedBorderOptions(
+                      radius: const Radius.circular(20),
+                      dashPattern: const [7, 7],
+                      strokeWidth: 2,
+                      color: Colors.black38,
+                      padding: EdgeInsets.fromLTRB(
+                          getProportionateScreenWidth(75),
+                          getProportionateScreenHeight(25),
+                          getProportionateScreenWidth(75),
+                          getProportionateScreenHeight(25)),
+                    ),
                     child: const UploadImage(),
                   )
                 ],
@@ -157,8 +157,8 @@ class _BodyState extends State<Body> {
                   controller: usernameController,
                   autofocus: false,
                   keyboardType: TextInputType.text,
-                  validator: (value){
-                    if(value!.isEmpty || value.trim().isEmpty){
+                  validator: (value) {
+                    if (value!.isEmpty || value.trim().isEmpty) {
                       return 'Username is required';
                     }
                     return null;
@@ -202,8 +202,8 @@ class _BodyState extends State<Body> {
                   controller: emailController,
                   autofocus: false,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value){
-                    if(value!.isEmpty || value.trim().isEmpty){
+                  validator: (value) {
+                    if (value!.isEmpty || value.trim().isEmpty) {
                       return 'Email is required';
                     }
                     return null;
@@ -248,7 +248,7 @@ class _BodyState extends State<Body> {
                   autofocus: false,
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if(value!.isEmpty || value.trim().isEmpty) {
+                    if (value!.isEmpty || value.trim().isEmpty) {
                       return 'Phone no. is required';
                     }
                     return null;
@@ -297,8 +297,13 @@ class _BodyState extends State<Body> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Center(
-                child: Text('Save Changes', style: TextStyle(fontSize: 18, color: Colors.white70, fontWeight: FontWeight.bold),)
-            ),
+                child: Text(
+              'Save Changes',
+              style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.bold),
+            )),
           ),
         ],
       ),
