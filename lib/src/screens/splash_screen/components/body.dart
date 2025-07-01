@@ -1,5 +1,5 @@
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/src/screens/login_screen/login_screen.dart';
+import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
 import 'package:flutter/material.dart';
 
 class Body extends StatelessWidget {
@@ -39,7 +39,7 @@ class Body extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pushReplacementNamed(LoginScreen.routeName);
+              Navigator.of(context).pushReplacementNamed(AuthScreen.routeName);
             },
             child: Text(
               'Get Started',

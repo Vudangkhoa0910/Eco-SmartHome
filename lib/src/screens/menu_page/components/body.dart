@@ -7,48 +7,79 @@ class Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: getProportionateScreenWidth(20),
-        right: getProportionateScreenWidth(20),
-        bottom: getProportionateScreenHeight(12),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: Theme.of(context).brightness == Brightness.dark ? [
+            const Color(0xFF2E3440),
+            const Color(0xFF3B4252),
+            const Color(0xFF434C5E),
+          ] : [
+            const Color(0xFFF7F9FC),
+            const Color(0xFFE6F0FA),
+            const Color(0xFFDDE7F5),
+          ],
+        ),
       ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: getProportionateScreenHeight(50),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: getProportionateScreenWidth(20),
+            vertical: getProportionateScreenHeight(20),
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 7, right: 7),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Menu',
-                      style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-                    ),
-                    const Spacer(),
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: const Icon(
-                        Icons.close,
-                        size: 35,
+          child: Column(
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Menu',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.displayLarge!.color,
+                        ),
                       ),
+                      Text(
+                        'Cài đặt và tùy chọn',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).textTheme.bodyMedium!.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Navigator.of(context).pushReplacementNamed('/home-screen');
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 28,
                     ),
-                  ],
-                ),
-                SizedBox(
-                  height: getProportionateScreenHeight(80),
-                ),
-                const MenuList(),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              SizedBox(height: getProportionateScreenHeight(30)),
+              // Menu List
+              Expanded(
+                child: const MenuList(),
+              ),
+            ],
           ),
-        ],
-      )
+        ),
+      ),
     );
   }
 }

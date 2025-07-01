@@ -33,8 +33,19 @@ class DarkContainer extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           color: itsOn
-              ? const Color.fromRGBO(0, 0, 0, 1)
-              : const Color(0xffededed),
+              ? (Theme.of(context).brightness == Brightness.dark 
+                  ? const Color(0xFF2D3748) 
+                  : const Color.fromRGBO(0, 0, 0, 1))
+              : Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(
@@ -53,21 +64,25 @@ class DarkContainer extends StatelessWidget {
                     height: 50,
                     decoration: BoxDecoration(
                       color: itsOn
-                          ? const Color.fromRGBO(45, 45, 45, 1)
-                          : const Color(0xffdadada),
+                          ? (Theme.of(context).brightness == Brightness.dark 
+                              ? const Color(0xFF4A5568) 
+                              : const Color.fromRGBO(45, 45, 45, 1))
+                          : (Theme.of(context).brightness == Brightness.dark 
+                              ? const Color(0xFF1A202C) 
+                              : const Color(0xffdadada)),
                       borderRadius:
                           const BorderRadius.all(Radius.elliptical(45, 45)),
                     ),
                     child: SvgPicture.asset(
                       iconAsset,
-                      color: itsOn ? Colors.amber : const Color(0xFF808080),
+                      color: itsOn ? Colors.amber : Theme.of(context).iconTheme.color,
                     ),
                   ),
                   GestureDetector(
                     onTap: switchFav,
                     child: Icon(
                       Icons.star_rounded,
-                      color: isFav ? Colors.amber : const Color(0xFF808080),
+                      color: isFav ? Colors.amber : Theme.of(context).iconTheme.color,
                     ),
                   ),
                 ],
@@ -79,14 +94,20 @@ class DarkContainer extends StatelessWidget {
                     device,
                     textAlign: TextAlign.left,
                     style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                          color: itsOn ? Colors.white : Colors.black,
+                          color: itsOn 
+                              ? (Theme.of(context).brightness == Brightness.dark 
+                                  ? Colors.white 
+                                  : Colors.white)
+                              : Theme.of(context).textTheme.displayMedium!.color,
                         ),
                   ),
                   Text(
                     deviceCount,
                     textAlign: TextAlign.left,
-                    style: const TextStyle(
-                        color: Color.fromRGBO(166, 166, 166, 1),
+                    style: TextStyle(
+                        color: itsOn 
+                            ? const Color.fromRGBO(166, 166, 166, 1)
+                            : Theme.of(context).textTheme.bodyMedium!.color,
                         fontSize: 13,
                         letterSpacing: 0,
                         fontWeight: FontWeight.normal,

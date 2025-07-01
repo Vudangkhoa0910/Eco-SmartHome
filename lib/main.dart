@@ -1,10 +1,31 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_home/firebase_options.dart';
 import 'package:smart_home/provider/getit.dart';
+import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/routes/routes.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
+import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
+import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
+import 'package:smart_home/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // Initialize date formatting
+  try {
+    await initializeDateFormatting('en_US', null);
+    print('✅ Date formatting initialized');
+  } catch (e) {
+    print('⚠️ Failed to initialize date formatting: $e');
+  }
+  
   setupLocator();
   runApp(const MyApp());
 }
@@ -12,73 +33,24 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
-  final ThemeMode themeMode = ThemeMode.system;
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Domus',
-      navigatorKey: getIt<NavigationService>().navigatorKey,
-      debugShowCheckedModeBanner: false,
-      themeMode: themeMode,
-      theme: ThemeData(
-        fontFamily: 'Noto Sans', // Sửa lỗi typo: 'Nato Sans' -> 'Noto Sans'
-        textSelectionTheme: const TextSelectionThemeData(
-          cursorColor: Colors.grey,
-          selectionColor: Colors.blueGrey,
-        ),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFFF2F2F2),
-          surface: Color(0xFFC4C4C4),
-          background: Color(0xFFFFFFFF),
-          error: Color(0xFFB00020),
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-          onSurface: Colors.black,
-          onBackground: Colors.black,
-          onError: Colors.white,
-          brightness: Brightness.light,
-        ),
-        textTheme: const TextTheme(
-          displayLarge: TextStyle( // Thay headline1
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.bold,
-            fontSize: 32,
-            color: Color(0xFF464646),
-          ),
-          displayMedium: TextStyle( // Thay headline2
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            color: Color(0xFF464646),
-          ),
-          displaySmall: TextStyle( // Thay headline3
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w400,
-            fontSize: 18,
-            color: Color(0xFF464646),
-          ),
-          headlineLarge: TextStyle( // Thay headline4
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w400,
-            fontSize: 18,
-            color: Color(0xFFBDBDBD),
-          ),
-          headlineMedium: TextStyle( // Thay headline5
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w400,
-            fontSize: 12,
-            color: Color(0xFFBDBDBD),
-          ),
-          headlineSmall: TextStyle( // Thay headline6
-            fontStyle: FontStyle.normal,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            color: Color(0xFF464646),
-          ),
-        ),
+    return ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Smart Home',
+            navigatorKey: getIt<NavigationService>().navigatorKey,
+            debugShowCheckedModeBanner: false,
+            themeMode: themeProvider.themeMode,
+            theme: ThemeProvider.lightTheme,
+            darkTheme: ThemeProvider.darkTheme,
+            routes: routes,
+            home: const SplashScreen(),
+          );
+        },
       ),
-      routes: routes,
-      home: const SplashScreen(),
     );
   }
 }

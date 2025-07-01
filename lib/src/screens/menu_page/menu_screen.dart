@@ -8,10 +8,12 @@ class Menu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Drawer(
+    return Drawer(
       child: Scaffold(
-        backgroundColor: Color(0xFFF2F2F2),
-        body: Body(),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? const Color(0xFF2E3440) 
+            : const Color(0xFFF7F9FC),
+        body: const Body(),
       ),
     );
   }

@@ -8,27 +8,27 @@ class SettingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-        color: const Color.fromRGBO(250, 250, 250, 1),
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: ListView(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 64, 48, 20),
               child: Row(
-                children: const [
+                children: [
                   Text(
                     "Settings",
                     style: TextStyle(
                         fontFamily: 'Lexend',
                         fontWeight: FontWeight.w600,
-                        color: Color.fromRGBO(0, 0, 0, 1),
+                        color: Theme.of(context).textTheme.displayLarge!.color,
                         fontSize: 36,
                         letterSpacing: -0.3199999928474426,
                         height: 0.5833333333333334),
                   ),
-                  SizedBox(width: 102),
+                  const SizedBox(width: 102),
                   Icon(
                     Icons.close_sharp,
-                    color: Colors.black,
+                    color: Theme.of(context).iconTheme.color,
                     size: 30,
                   )
                 ],

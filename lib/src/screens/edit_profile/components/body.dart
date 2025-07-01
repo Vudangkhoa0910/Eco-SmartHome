@@ -1,7 +1,5 @@
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/src/screens/edit_profile/components/image_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:dotted_border/dotted_border.dart';
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -11,299 +9,382 @@ class Body extends StatefulWidget {
 }
 
 class _BodyState extends State<Body> {
-  TextEditingController nameController = TextEditingController();
   TextEditingController usernameController = TextEditingController();
-  TextEditingController emailController = TextEditingController();
-  TextEditingController phoneController = TextEditingController();
+  TextEditingController oldPasswordController = TextEditingController();
+  TextEditingController newPasswordController = TextEditingController();
+  TextEditingController confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  bool _isOldPasswordVisible = false;
+  bool _isNewPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load current user data
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    // Giả lập lấy dữ liệu từ profile hiện tại
+    usernameController.text = 'vudangkhoa@gmail.com';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: getProportionateScreenWidth(20),
-        // top: getProportionateScreenHeight(15),
-        right: getProportionateScreenWidth(20),
-        bottom: getProportionateScreenHeight(15),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Theme.of(context).scaffoldBackgroundColor,
+            Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+          ],
+        ),
       ),
-      child: ListView(
-        // crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: getProportionateScreenHeight(40),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: getProportionateScreenWidth(20),
+            vertical: getProportionateScreenHeight(20),
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 7, right: 7),
-            child: Row(
-              children: [
-                const Text(
-                  'Edit Profile',
-                  // style: Theme.of(context).textTheme.headline1,
-                  style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Icon(
-                    Icons.close,
-                    size: 35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: getProportionateScreenHeight(25),
-          ),
-          Center(
-            child: Container(
-              width: 350,
-              decoration: BoxDecoration(
-                color: const Color(0xFFBDBDBD).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              padding: EdgeInsets.only(
-                left: getProportionateScreenWidth(15),
-                top: getProportionateScreenHeight(15),
-                right: getProportionateScreenWidth(15),
-                bottom: getProportionateScreenHeight(40),
-              ),
-              child: Column(
+          child: Column(
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Upload image',
-                    // style: Theme.of(context).textTheme.headline1,
-                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.arrow_back_ios, color: Theme.of(context).textTheme.bodyLarge!.color, size: 24),
                   ),
-                  SizedBox(
-                    height: getProportionateScreenHeight(15),
-                  ),
-                  DottedBorder(
-                    options: RoundedRectDottedBorderOptions(
-                      radius: const Radius.circular(20),
-                      dashPattern: const [7, 7],
-                      strokeWidth: 2,
-                      color: Colors.black38,
-                      padding: EdgeInsets.fromLTRB(
-                          getProportionateScreenWidth(75),
-                          getProportionateScreenHeight(25),
-                          getProportionateScreenWidth(75),
-                          getProportionateScreenHeight(25)),
+                  Text(
+                    'Chỉnh sửa hồ sơ',
+                    style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: const UploadImage(),
-                  )
+                  ),
+                  const SizedBox(width: 48), // Balance the row
                 ],
               ),
+              SizedBox(height: getProportionateScreenHeight(30)),
+              
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // Profile Avatar (read-only display)
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF6B73FF),
+                                const Color(0xFF9C88FF),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 50,
+                          ),
+                        ),
+                        SizedBox(height: getProportionateScreenHeight(10)),
+                        Text(
+                          'Vũ Đăng Khoa',
+                          style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: getProportionateScreenHeight(30)),
+                        
+                        // Account Section
+                        _buildSectionTitle('Thông tin tài khoản'),
+                        SizedBox(height: getProportionateScreenHeight(15)),
+                        
+                        _buildTextField(
+                          controller: usernameController,
+                          label: 'Tên đăng nhập / Email',
+                          icon: Icons.account_circle_outlined,
+                          enabled: false, // Không cho phép chỉnh sửa email
+                          validator: (value) {
+                            if (value!.isEmpty) {
+                              return 'Tên đăng nhập không được để trống';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        SizedBox(height: getProportionateScreenHeight(25)),
+                        
+                        // Password Section
+                        _buildSectionTitle('Đổi mật khẩu'),
+                        SizedBox(height: getProportionateScreenHeight(15)),
+                        
+                        _buildPasswordField(
+                          controller: oldPasswordController,
+                          label: 'Mật khẩu hiện tại',
+                          icon: Icons.lock_outline,
+                          isVisible: _isOldPasswordVisible,
+                          onVisibilityToggle: () {
+                            setState(() {
+                              _isOldPasswordVisible = !_isOldPasswordVisible;
+                            });
+                          },
+                          validator: (value) {
+                            if (value!.isEmpty) {
+                              return 'Vui lòng nhập mật khẩu hiện tại';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        SizedBox(height: getProportionateScreenHeight(15)),
+                        
+                        _buildPasswordField(
+                          controller: newPasswordController,
+                          label: 'Mật khẩu mới',
+                          icon: Icons.lock_outline,
+                          isVisible: _isNewPasswordVisible,
+                          onVisibilityToggle: () {
+                            setState(() {
+                              _isNewPasswordVisible = !_isNewPasswordVisible;
+                            });
+                          },
+                          validator: (value) {
+                            if (value!.isEmpty) {
+                              return 'Vui lòng nhập mật khẩu mới';
+                            }
+                            if (value.length < 6) {
+                              return 'Mật khẩu phải có ít nhất 6 ký tự';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        SizedBox(height: getProportionateScreenHeight(15)),
+                        
+                        _buildPasswordField(
+                          controller: confirmPasswordController,
+                          label: 'Xác nhận mật khẩu mới',
+                          icon: Icons.lock_outline,
+                          isVisible: _isConfirmPasswordVisible,
+                          onVisibilityToggle: () {
+                            setState(() {
+                              _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                            });
+                          },
+                          validator: (value) {
+                            if (value!.isEmpty) {
+                              return 'Vui lòng xác nhận mật khẩu mới';
+                            }
+                            if (value != newPasswordController.text) {
+                              return 'Mật khẩu xác nhận không khớp';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        SizedBox(height: getProportionateScreenHeight(40)),
+                        
+                        // Save Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: getProportionateScreenHeight(50),
+                          child: ElevatedButton(
+                            onPressed: _saveChanges,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 3,
+                            ),
+                            child: const Text(
+                              'Lưu thay đổi',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        SizedBox(height: getProportionateScreenHeight(20)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium!.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool enabled = true,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: enabled ? Theme.of(context).primaryColor : Colors.grey,
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: enabled ? Theme.of(context).primaryColor : Colors.grey,
+            size: 20,
+          ),
+          filled: true,
+          fillColor: enabled ? Theme.of(context).cardColor : Colors.grey.withOpacity(0.1),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool isVisible,
+    required VoidCallback onVisibilityToggle,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: !isVisible,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Theme.of(context).primaryColor,
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: Theme.of(context).primaryColor,
+            size: 20,
+          ),
+          suffixIcon: IconButton(
+            icon: Icon(
+              isVisible ? Icons.visibility : Icons.visibility_off,
+              color: Theme.of(context).primaryColor,
+              size: 20,
             ),
+            onPressed: onVisibilityToggle,
           ),
-          SizedBox(
-            height: getProportionateScreenHeight(20),
+          filled: true,
+          fillColor: Theme.of(context).cardColor,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
           ),
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  controller: nameController,
-                  autofocus: false,
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value!.isEmpty || value.trim().isEmpty) {
-                      return 'Name is required';
-                    }
-                    return null;
-                  },
-                  cursorColor: Colors.black12,
-                  decoration: InputDecoration(
-                    hintText: 'Your full name',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    icon: Container(
-                      height: 50,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                      ),
-                    ),
-                    // prefixIcon: Icon(Icons.person, size: 25, color: Colors.grey,),
-                    // contentPadding: EdgeInsets.only(left: 30),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    enabled: true,
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
-                    ),
-                    errorBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: getProportionateScreenHeight(20),
-                ),
-                TextFormField(
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  controller: usernameController,
-                  autofocus: false,
-                  keyboardType: TextInputType.text,
-                  validator: (value) {
-                    if (value!.isEmpty || value.trim().isEmpty) {
-                      return 'Username is required';
-                    }
-                    return null;
-                  },
-                  cursorColor: Colors.black12,
-                  decoration: InputDecoration(
-                    hintText: 'Username',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    icon: Container(
-                      height: 50,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                      ),
-                    ),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    enabled: true,
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
-                    ),
-                    errorBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: getProportionateScreenHeight(20),
-                ),
-                TextFormField(
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  controller: emailController,
-                  autofocus: false,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value!.isEmpty || value.trim().isEmpty) {
-                      return 'Email is required';
-                    }
-                    return null;
-                  },
-                  cursorColor: Colors.black12,
-                  decoration: InputDecoration(
-                    hintText: 'Your Email',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    icon: Container(
-                      height: 50,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                      ),
-                    ),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey),
-                    ),
-                    enabled: true,
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
-                    ),
-                    errorBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: getProportionateScreenHeight(20),
-                ),
-                TextFormField(
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  controller: phoneController,
-                  autofocus: false,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value!.isEmpty || value.trim().isEmpty) {
-                      return 'Phone no. is required';
-                    }
-                    return null;
-                  },
-                  cursorColor: Colors.black12,
-                  decoration: InputDecoration(
-                    hintText: 'Your Phone',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    icon: Container(
-                      height: 50,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                      ),
-                    ),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    enabled: true,
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black38),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.black),
-                    ),
-                    errorBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
           ),
-          SizedBox(
-            height: getProportionateScreenHeight(20),
+        ),
+      ),
+    );
+  }
+
+  void _saveChanges() {
+    if (_formKey.currentState!.validate()) {
+      // Validate old password
+      if (oldPasswordController.text.isNotEmpty && 
+          newPasswordController.text.isNotEmpty) {
+        // TODO: Implement password change logic
+        _showSuccessDialog();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng điền đầy đủ thông tin để đổi mật khẩu'),
+            backgroundColor: Colors.orange,
           ),
-          Container(
-            height: getProportionateScreenHeight(40),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Center(
-                child: Text(
-              'Save Changes',
-              style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.bold),
-            )),
+        );
+      }
+    }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Thành công'),
+        content: const Text('Mật khẩu đã được cập nhật thành công!'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text('OK'),
           ),
         ],
       ),
