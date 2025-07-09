@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class MockQRScannerScreen extends StatefulWidget {
   const MockQRScannerScreen({Key? key}) : super(key: key);
@@ -9,18 +9,9 @@ class MockQRScannerScreen extends StatefulWidget {
 }
 
 class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
+  MobileScannerController controller = MobileScannerController();
   String? result;
-
-  @override
-  void reassemble() {
-    super.reassemble();
-    if (Theme.of(context).platform == TargetPlatform.android) {
-      controller?.pauseCamera();
-    }
-    controller?.resumeCamera();
-  }
+  bool isScanning = true;
 
   @override
   Widget build(BuildContext context) {
@@ -53,16 +44,9 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
             flex: 4,
             child: Stack(
               children: [
-                QRView(
-                  key: qrKey,
-                  onQRViewCreated: _onQRViewCreated,
-                  overlay: QrScannerOverlayShape(
-                    borderColor: const Color(0xFF4CAF50),
-                    borderRadius: 20,
-                    borderLength: 40,
-                    borderWidth: 6,
-                    cutOutSize: 280,
-                  ),
+                MobileScanner(
+                  controller: controller,
+                  onDetect: _onQRViewCreated,
                 ),
                 Positioned(
                   bottom: 40,
@@ -71,7 +55,7 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
                   child: Center(
                     child: ElevatedButton(
                       onPressed: () async {
-                        await controller?.toggleFlash();
+                        await controller.toggleTorch();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
@@ -101,19 +85,20 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
     );
   }
 
-  void _onQRViewCreated(QRViewController controller) {
-    setState(() {
-      this.controller = controller;
-    });
-    controller.scannedDataStream.listen((scanData) {
-      if (result == null) {
+  void _onQRViewCreated(BarcodeCapture capture) {
+    if (!isScanning) return;
+
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isNotEmpty && result == null) {
+      final barcode = barcodes.first;
+      if (barcode.rawValue != null) {
         setState(() {
-          result = scanData.code;
+          result = barcode.rawValue;
+          isScanning = false;
         });
-        controller.pauseCamera();
-        _handleScanResult(scanData.code);
+        _handleScanResult(barcode.rawValue);
       }
-    });
+    }
   }
 
   void _handleScanResult(String? code) {
@@ -128,14 +113,17 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        controller?.resumeCamera();
+        setState(() {
+          result = null;
+          isScanning = true;
+        });
       }
     }
   }
 
   @override
   void dispose() {
-    controller?.dispose();
+    controller.dispose();
     super.dispose();
   }
 }
