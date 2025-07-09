@@ -426,13 +426,15 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
   void _toggleDevice(Zone zone, Device device, bool isOn) {
     switch (device.id) {
       case 'led1':
-        _mqttService.controlLed1(isOn);
+      case 'led_gate':
+        _mqttService.controlLedGate(isOn);
         break;
       case 'led2':
-        _mqttService.controlLed2(isOn);
+      case 'led_around':
+        _mqttService.controlLedAround(isOn);
         break;
       case 'motor':
-        _mqttService.controlMotor(isOn ? 'ON' : 'OFF');
+        _mqttService.controlMotor(isOn ? 'FORWARD' : 'OFF');
         break;
     }
     

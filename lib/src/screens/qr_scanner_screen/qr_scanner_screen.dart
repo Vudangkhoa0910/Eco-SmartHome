@@ -191,7 +191,18 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   void _handleScanResult(String? code) {
     if (code != null) {
-      Navigator.of(context).pop(code);
+      final validKeys = ['smarthome99', 'smarthome88', 'smarthome66'];
+      if (validKeys.contains(code)) {
+        Navigator.of(context).pop(code); // Return the scanned key
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Mã QR không hợp lệ: $code'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        controller?.resumeCamera();
+      }
     }
   }
 

@@ -303,7 +303,12 @@ class ThemeProvider extends ChangeNotifier {
 
   void _loadThemeFromPrefs() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool(_themeKey) ?? false;
+    final themeValue = prefs.get(_themeKey);
+    if (themeValue is bool) {
+      _isDarkMode = themeValue;
+    } else {
+      _isDarkMode = false; // Default to light mode if invalid value
+    }
     notifyListeners();
   }
 

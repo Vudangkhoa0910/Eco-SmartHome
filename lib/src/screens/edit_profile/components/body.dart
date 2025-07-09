@@ -1,5 +1,7 @@
 import 'package:smart_home/config/size_config.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -26,9 +28,18 @@ class _BodyState extends State<Body> {
     _loadUserData();
   }
 
-  void _loadUserData() {
-    // Giả lập lấy dữ liệu từ profile hiện tại
-    usernameController.text = 'vudangkhoa@gmail.com';
+  void _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          usernameController.text = userDoc['email'] ?? user.email ?? '';
+        });
+      } else {
+        usernameController.text = user.email ?? '';
+      }
+    }
   }
 
   @override
@@ -354,20 +365,31 @@ class _BodyState extends State<Body> {
     );
   }
 
-  void _saveChanges() {
+  void _saveChanges() async {
     if (_formKey.currentState!.validate()) {
-      // Validate old password
-      if (oldPasswordController.text.isNotEmpty && 
-          newPasswordController.text.isNotEmpty) {
-        // TODO: Implement password change logic
-        _showSuccessDialog();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng điền đầy đủ thông tin để đổi mật khẩu'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          if (oldPasswordController.text.isNotEmpty && newPasswordController.text.isNotEmpty) {
+            // Update password
+            await user.updatePassword(newPasswordController.text);
+            _showSuccessDialog();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Vui lòng điền đầy đủ thông tin để đổi mật khẩu'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

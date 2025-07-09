@@ -1,7 +1,6 @@
 import 'package:smart_home/src/screens/set_event_screen/set_event_screen.dart';
 import 'package:smart_home/src/screens/edit_profile/edit_profile.dart';
-import 'package:smart_home/src/screens/login_screen/login_screen.dart';
-import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
+ import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
 import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
 import 'package:smart_home/src/screens/settings_screen/settings_screen.dart';
 import 'package:smart_home/src/screens/electricity_settings/electricity_settings_screen.dart';
@@ -28,7 +27,6 @@ final Map<String, WidgetBuilder> routes = {
   EditProfile.routeName: (context) => const EditProfile(),
   ElectricitySettingsScreen.routeName: (context) => const ElectricitySettingsScreen(),
   HomeScreen.routeName: (context) => const HomeScreen(),
-  LoginScreen.routeName: (context) => const LoginScreen(),
   AuthScreen.routeName: (context) => const AuthScreen(),
   DeviceConnectionScreen.routeName: (context) => const DeviceConnectionScreen(),
   SavingsScreen.routeName: (context) => const SavingsScreen(),

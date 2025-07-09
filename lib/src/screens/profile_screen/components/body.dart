@@ -578,7 +578,10 @@ class Body extends StatelessWidget {
         horizontal: getProportionateScreenWidth(20),
       ),
       child: ElevatedButton(
-        onPressed: () => model.logout(context),
+        onPressed: () {
+          model.logout(context);
+          Navigator.of(context).pushReplacementNamed('/auth-screen'); // Chuyển về màn hình auth mới
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.red[50],
           foregroundColor: Colors.red,

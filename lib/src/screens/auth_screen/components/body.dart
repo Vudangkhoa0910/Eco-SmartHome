@@ -48,7 +48,7 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-      Navigator.of(context).pushReplacementNamed(DeviceConnectionScreen.routeName);
+      Navigator.of(context).pushReplacementNamed('/device-connection-screen');
     } on FirebaseAuthException catch (e) {
       String message = 'Đăng nhập thất bại';
       if (e.code == 'user-not-found') {
@@ -99,7 +99,7 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
       // Update display name
       await userCredential.user?.updateDisplayName(nameController.text.trim());
       
-      Navigator.of(context).pushReplacementNamed(DeviceConnectionScreen.routeName);
+      Navigator.of(context).pushReplacementNamed('/auth-screen');
     } on FirebaseAuthException catch (e) {
       String message = 'Đăng ký thất bại';
       if (e.code == 'email-already-in-use') {
@@ -221,9 +221,20 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
                         labelColor: Colors.white,
                         unselectedLabelColor: Colors.grey[600],
                         dividerColor: Colors.transparent,
+                        labelPadding: EdgeInsets.symmetric(horizontal: 20),
                         tabs: const [
-                          Tab(text: 'Đăng nhập'),
-                          Tab(text: 'Đăng ký'),
+                          Tab(
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Text('Đăng nhập'),
+                            ),
+                          ),
+                          Tab(
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Text('Đăng ký'),
+                            ),
+                          ),
                         ],
                       ),
                     ),

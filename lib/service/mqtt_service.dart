@@ -14,14 +14,14 @@ class MqttService {
   // InfluxDB toggle - enable để lưu dữ liệu thực tế
   static const bool _enableInfluxDB = true; // Bật để lưu dữ liệu lên cloud
 
-  // Topics from ESP32
+  // Topics from ESP32 - Updated to match ESP32 configuration
   static const String topicTemp = 'khoasmarthome/temperature';
   static const String topicHumid = 'khoasmarthome/humidity';
   static const String topicCurrent = 'khoasmarthome/current';
   static const String topicVoltage = 'khoasmarthome/voltage';
   static const String topicPower = 'khoasmarthome/power';
-  static const String topicLed1 = 'khoasmarthome/led1';
-  static const String topicLed2 = 'khoasmarthome/led2';
+  static const String topicLedGate = 'khoasmarthome/led_gate';     // đèn cổng
+  static const String topicLedAround = 'khoasmarthome/led_around'; // đèn xung quanh
   static const String topicMotor = 'khoasmarthome/motor';
 
   MqttServerClient? _client;
@@ -264,93 +264,94 @@ class MqttService {
     }
   }
 
-  void controlLed1(bool isOn) {
+  void controlLedGate(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
-    publishDeviceCommand(topicLed1, command);
+    publishDeviceCommand(topicLedGate, command);
     // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('led1', command, metadata: {'room': 'living_room', 'type': 'light', 'zone': 'courtyard'})
+    _influxDB.writeDeviceState('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
         .catchError((error) {
-          print('⚠️ InfluxDB LED1 error: $error');
+          print('⚠️ InfluxDB LED Gate error: $error');
           return false;
         });
     
-    // Write estimated power consumption for LED1 (assuming 10W when ON)
+    // Write estimated power consumption for LED Gate (assuming 10W when ON)
     if (_enableInfluxDB) {
       final estimatedPower = isOn ? 10.0 : 0.0;
       _influxDB.writePowerConsumption(
-        deviceId: 'led1',
+        deviceId: 'led_gate',
         power: estimatedPower,
         voltage: _currentData.voltage,
         current: isOn ? 2.0 : 0.0, // Estimated current for 10W LED
         timestamp: DateTime.now(),
         metadata: {
-          'room': 'living_room',
-          'type': 'light',
-          'zone': 'courtyard',
-          'state': command,
-        },
-      ).catchError((error) {
-        print('⚠️ InfluxDB LED1 power error: $error');
-        return false;
-      });
-    }
-  }
-
-  void controlLed2(bool isOn) {
-    final command = isOn ? 'ON' : 'OFF';
-    publishDeviceCommand(topicLed2, command);
-    // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('led2', command, metadata: {'room': 'living_room', 'type': 'light', 'zone': 'gate'})
-        .catchError((error) {
-          print('⚠️ InfluxDB LED2 error: $error');
-          return false;
-        });
-    
-    // Write estimated power consumption for LED2 (assuming 10W when ON)
-    if (_enableInfluxDB) {
-      final estimatedPower = isOn ? 10.0 : 0.0;
-      _influxDB.writePowerConsumption(
-        deviceId: 'led2',
-        power: estimatedPower,
-        voltage: _currentData.voltage,
-        current: isOn ? 2.0 : 0.0, // Estimated current for 10W LED
-        timestamp: DateTime.now(),
-        metadata: {
-          'room': 'living_room',
+          'room': 'entrance',
           'type': 'light',
           'zone': 'gate',
           'state': command,
         },
       ).catchError((error) {
-        print('⚠️ InfluxDB LED2 power error: $error');
+        print('⚠️ InfluxDB LED Gate power error: $error');
         return false;
       });
     }
   }
 
-  void controlMotor(String command) {
-    publishDeviceCommand(topicMotor, command);
+  void controlLedAround(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicLedAround, command);
     // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('motor', command, metadata: {'room': 'bedroom', 'type': 'motor'})
+    _influxDB.writeDeviceState('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
+        .catchError((error) {
+          print('⚠️ InfluxDB LED Around error: $error');
+          return false;
+        });
+    
+    // Write estimated power consumption for LED Around (assuming 15W when ON)
+    if (_enableInfluxDB) {
+      final estimatedPower = isOn ? 15.0 : 0.0;
+      _influxDB.writePowerConsumption(
+        deviceId: 'led_around',
+        power: estimatedPower,
+        voltage: _currentData.voltage,
+        current: isOn ? 3.0 : 0.0, // Estimated current for 15W LED
+        timestamp: DateTime.now(),
+        metadata: {
+          'room': 'garden',
+          'type': 'light',
+          'zone': 'around',
+          'state': command,
+        },
+      ).catchError((error) {
+        print('⚠️ InfluxDB LED Around power error: $error');
+        return false;
+      });
+    }
+  }
+
+  void controlMotor(String direction) {
+    // direction can be 'FORWARD', 'REVERSE', or 'OFF'
+    publishDeviceCommand(topicMotor, direction);
+    // Log device state to InfluxDB asynchronously
+    _influxDB.writeDeviceState('motor', direction, metadata: {'room': 'garage', 'type': 'motor', 'zone': 'entrance'})
         .catchError((error) {
           print('⚠️ InfluxDB Motor error: $error');
           return false;
         });
     
-    // Write estimated power consumption for Motor (assuming 50W when ON)
+    // Write estimated power consumption for Motor (assuming 50W when running)
     if (_enableInfluxDB) {
-      final isOn = command.toUpperCase() == 'ON';
-      final estimatedPower = isOn ? 50.0 : 0.0;
+      final estimatedPower = (direction == 'FORWARD' || direction == 'REVERSE') ? 50.0 : 0.0;
       _influxDB.writePowerConsumption(
         deviceId: 'motor',
         power: estimatedPower,
         voltage: _currentData.voltage,
-        current: isOn ? 10.0 : 0.0, // Estimated current for 50W motor
+        current: (direction == 'FORWARD' || direction == 'REVERSE') ? 10.0 : 0.0, // Estimated current for 50W Motor
         timestamp: DateTime.now(),
         metadata: {
-          'room': 'bedroom',
+          'room': 'garage',
           'type': 'motor',
-          'state': command,
+          'zone': 'entrance',
+          'state': direction,
         },
       ).catchError((error) {
         print('⚠️ InfluxDB Motor power error: $error');
@@ -358,6 +359,10 @@ class MqttService {
       });
     }
   }
+
+  // Compatibility methods for backward compatibility
+  void controlLed1(bool isOn) => controlLedGate(isOn);
+  void controlLed2(bool isOn) => controlLedAround(isOn);
 
   void disconnect() {
     _client?.disconnect();

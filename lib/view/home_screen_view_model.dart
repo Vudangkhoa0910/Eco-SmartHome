@@ -206,31 +206,31 @@ class HomeScreenViewModel extends BaseModel {
   
   void lightSwitch() {
     isLightOn = !isLightOn;
-    _mqttService.controlLed1(isLightOn);
+    _mqttService.controlLedGate(isLightOn);
     notifyListeners();
   }
   
   // Control methods for LED and Motor
   void toggleLed1() {
     isLightOn = !isLightOn;
-    _mqttService.controlLed1(isLightOn);
+    _mqttService.controlLedGate(isLightOn);
     notifyListeners();
   }
   
   void toggleLed2() {
     isACON = !isACON; // Use AC variable for LED2
-    _mqttService.controlLed2(isACON);
+    _mqttService.controlLedAround(isACON);
     notifyListeners();
   }
   
   void toggleMotor() {
     isFanON = !isFanON;
-    _mqttService.controlMotor(isFanON ? "ON" : "OFF");
+    _mqttService.controlMotor(isFanON ? "FORWARD" : "OFF");
     notifyListeners();
   }
   
   void controlLed2(bool isOn) {
-    _mqttService.controlLed2(isOn);
+    _mqttService.controlLedAround(isOn);
   }
 
   ///On tapping bottom nav bar items

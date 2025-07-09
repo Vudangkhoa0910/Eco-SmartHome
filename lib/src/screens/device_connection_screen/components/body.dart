@@ -529,59 +529,20 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                         ),
                         SizedBox(height: getProportionateScreenHeight(8)),
 
-                        // Suggestions
+                        // Instructions
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.blue[200]!),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.info_outline, color: Colors.blue[600], size: 16),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Mã thiết bị có sẵn:',
-                                    style: TextStyle(
-                                      color: Colors.blue[800],
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                children: validDeviceCodes.keys.map((code) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      deviceCodeController.text = code;
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue[100],
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.blue[300]!),
-                                      ),
-                                      child: Text(
-                                        code,
-                                        style: TextStyle(
-                                          color: Colors.blue[800],
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
+                          child: Text(
+                            'Hãy nhập mã in trên thân của thiết bị để kết nối.',
+                            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              color: Colors.blue[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
                         SizedBox(height: getProportionateScreenHeight(16)),
@@ -605,7 +566,6 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
-                                      color: Color(0xFF464646),
                                       strokeWidth: 2,
                                     ),
                                   )
