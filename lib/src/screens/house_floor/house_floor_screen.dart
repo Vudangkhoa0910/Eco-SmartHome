@@ -453,6 +453,12 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'khoasmarthome/awning', // Mái che
       'khoasmarthome/yard_main_light', // Đèn sân chính
       'khoasmarthome/fish_pond_light', // Đèn khu bể cá
+      'khoasmarthome/awning_light', // Đèn mái hiên
+      'khoasmarthome/living_room_light', // Đèn phòng khách
+      'khoasmarthome/kitchen_light', // Đèn phòng bếp
+      'khoasmarthome/bedroom_light', // Đèn phòng ngủ
+      'khoasmarthome/stairs_light', // Đèn cầu thang
+      'khoasmarthome/bathroom_light', // Đèn phòng vệ sinh
     ];
     return controllableTopics.contains(device.mqttTopic);
   }
@@ -475,6 +481,19 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.isFanON; // Sử dụng state fan cho đèn sân chính
       case 'khoasmarthome/fish_pond_light':
         return _model.isLightFav; // Sử dụng state favourite cho đèn bể cá
+      case 'khoasmarthome/awning_light':
+        return _model.isACFav; // Sử dụng AC favourite cho đèn mái hiên
+      case 'khoasmarthome/living_room_light':
+        return _model
+            .isSpeakerFav; // Sử dụng speaker favourite cho đèn phòng khách
+      case 'khoasmarthome/kitchen_light':
+        return _model.isFanFav; // Sử dụng fan favourite cho đèn bếp
+      case 'khoasmarthome/bedroom_light':
+        return _model.isLightOn; // Sử dụng light state cho đèn phòng ngủ
+      case 'khoasmarthome/stairs_light':
+        return _model.isACON; // Sử dụng AC state cho đèn cầu thang
+      case 'khoasmarthome/bathroom_light':
+        return _model.isSpeakerON; // Sử dụng speaker state cho đèn vệ sinh
       default:
         return device.isOn;
     }
@@ -512,6 +531,31 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       case 'khoasmarthome/fish_pond_light':
         // Điều khiển đèn khu bể cá
         _model.lightFav(); // Sử dụng light favourite toggle cho đèn bể cá
+        break;
+      case 'khoasmarthome/awning_light':
+        // Điều khiển đèn mái hiên
+        _model.acFav(); // Sử dụng AC favourite toggle cho đèn mái hiên
+        break;
+      case 'khoasmarthome/living_room_light':
+        // Điều khiển đèn phòng khách
+        _model
+            .speakerFav(); // Sử dụng speaker favourite toggle cho đèn phòng khách
+        break;
+      case 'khoasmarthome/kitchen_light':
+        // Điều khiển đèn phòng bếp
+        _model.fanFav(); // Sử dụng fan favourite toggle cho đèn bếp
+        break;
+      case 'khoasmarthome/bedroom_light':
+        // Điều khiển đèn phòng ngủ
+        _model.lightSwitch(); // Sử dụng light switch cho đèn phòng ngủ
+        break;
+      case 'khoasmarthome/stairs_light':
+        // Điều khiển đèn cầu thang
+        _model.acSwitch(); // Sử dụng AC switch cho đèn cầu thang
+        break;
+      case 'khoasmarthome/bathroom_light':
+        // Điều khiển đèn phòng vệ sinh
+        _model.speakerSwitch(); // Sử dụng speaker switch cho đèn vệ sinh
         break;
     }
     setState(() {}); // Refresh UI after toggle

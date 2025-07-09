@@ -150,6 +150,14 @@ class HouseData {
                 color: Colors.blue,
               ),
               SmartDevice(
+                name: 'Đèn mái hiên',
+                type: 'light',
+                isOn: false,
+                icon: Icons.wb_sunny,
+                mqttTopic: 'khoasmarthome/awning_light',
+                color: Colors.orange,
+              ),
+              SmartDevice(
                 name: 'Hệ thống tưới',
                 type: 'sprinkler',
                 isOn: false,
@@ -185,11 +193,11 @@ class HouseData {
                 color: Colors.amber,
               ),
               SmartDevice(
-                name: 'Đèn trang trí',
+                name: 'Đèn phòng khách',
                 type: 'light',
                 isOn: false,
                 icon: Icons.lightbulb_outline,
-                mqttTopic: 'khoasmarthome/led2',
+                mqttTopic: 'khoasmarthome/living_room_light',
                 color: Colors.amber,
               ),
               SmartDevice(
@@ -222,7 +230,7 @@ class HouseData {
                 type: 'light',
                 isOn: false,
                 icon: Icons.bedtime,
-                mqttTopic: 'khoasmarthome/bedroom1_light',
+                mqttTopic: 'khoasmarthome/bedroom_light',
                 color: Colors.amber,
               ),
               SmartDevice(
@@ -288,7 +296,7 @@ class HouseData {
                 type: 'light',
                 isOn: false,
                 icon: Icons.lightbulb,
-                mqttTopic: 'khoasmarthome/bathroom1_light',
+                mqttTopic: 'khoasmarthome/bathroom_light',
                 color: Colors.amber,
               ),
               SmartDevice(
@@ -313,7 +321,7 @@ class HouseData {
                 type: 'light',
                 isOn: false,
                 icon: Icons.lightbulb,
-                mqttTopic: 'khoasmarthome/stairs1_light',
+                mqttTopic: 'khoasmarthome/stairs_light',
                 color: Colors.amber,
               ),
             ],
