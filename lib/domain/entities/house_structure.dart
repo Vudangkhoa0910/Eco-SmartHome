@@ -97,7 +97,7 @@ class HouseData {
                 type: 'gate',
                 isOn: false,
                 icon: Icons.garage_outlined,
-                mqttTopic: 'khoasmarthome/gate',
+                mqttTopic: 'khoasmarthome/motor',
                 color: Colors.brown,
               ),
               SmartDevice(
@@ -105,7 +105,7 @@ class HouseData {
                 type: 'light',
                 isOn: false,
                 icon: Icons.lightbulb_outline,
-                mqttTopic: 'khoasmarthome/gate_light',
+                mqttTopic: 'khoasmarthome/led_gate',
                 color: Colors.amber,
               ),
             ],
@@ -122,8 +122,32 @@ class HouseData {
                 type: 'light',
                 isOn: false,
                 icon: Icons.lightbulb,
-                mqttTopic: 'khoasmarthome/yard_light',
+                mqttTopic: 'khoasmarthome/led_around',
                 color: Colors.amber,
+              ),
+              SmartDevice(
+                name: 'Mái che',
+                type: 'awning',
+                isOn: false,
+                icon: Icons.local_parking,
+                mqttTopic: 'khoasmarthome/awning',
+                color: Colors.brown,
+              ),
+              SmartDevice(
+                name: 'Đèn sân chính',
+                type: 'light',
+                isOn: false,
+                icon: Icons.wb_incandescent,
+                mqttTopic: 'khoasmarthome/yard_main_light',
+                color: Colors.amber,
+              ),
+              SmartDevice(
+                name: 'Đèn khu bể cá',
+                type: 'light',
+                isOn: false,
+                icon: Icons.waves,
+                mqttTopic: 'khoasmarthome/fish_pond_light',
+                color: Colors.blue,
               ),
               SmartDevice(
                 name: 'Hệ thống tưới',
@@ -137,7 +161,7 @@ class HouseData {
           ),
         ],
       ),
-      
+
       // Tầng 1
       HouseFloor(
         name: 'Tầng 1',
@@ -313,7 +337,7 @@ class HouseData {
           ),
         ],
       ),
-      
+
       // Tầng 2
       HouseFloor(
         name: 'Tầng 2',
