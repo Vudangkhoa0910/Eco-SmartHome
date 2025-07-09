@@ -96,7 +96,7 @@ class HomeScreenViewModel extends BaseModel {
     }
     
     // Initialize zone management service
-    _zoneService.initialize(_mqttService, getIt());
+    _zoneService.initialize(_mqttService);
     
     await _loadWeatherData();
     await _connectMqtt();

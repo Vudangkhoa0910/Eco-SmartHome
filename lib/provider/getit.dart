@@ -1,7 +1,7 @@
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/weather_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/electricity_bill_service.dart';
 import 'package:smart_home/service/zone_management_service.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
@@ -22,7 +22,7 @@ void setupLocator() {
   getIt.registerLazySingleton(() => NavigationService());
   getIt.registerLazySingleton(() => WeatherService());
   getIt.registerLazySingleton(() => MqttService());
-  getIt.registerLazySingleton(() => InfluxDBService());
+  getIt.registerLazySingleton(() => FirebaseDataService());
   getIt.registerLazySingleton(() => ElectricityBillService());
   getIt.registerLazySingleton(() => ZoneManagementService());
   

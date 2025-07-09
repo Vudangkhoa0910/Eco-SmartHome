@@ -3,7 +3,7 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/service/zone_management_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
 import 'package:smart_home/provider/getit.dart';
-import 'package:smart_home/src/screens/analytics_screen/influx_analytics_screen.dart';
+import 'package:smart_home/src/screens/analytics_screen/firebase_analytics_screen.dart';
 
 class ZoneManagementScreen extends StatefulWidget {
   const ZoneManagementScreen({Key? key}) : super(key: key);
@@ -19,7 +19,7 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _zoneService.initialize(_mqttService, getIt());
+    _zoneService.initialize(_mqttService);
   }
 
   @override
@@ -37,7 +37,7 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const InfluxAnalyticsScreen(),
+                  builder: (context) => const FirebaseAnalyticsScreen(),
                 ),
               );
             },
@@ -226,7 +226,7 @@ class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
                   () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const InfluxAnalyticsScreen(),
+                      builder: (context) => const FirebaseAnalyticsScreen(),
                     ),
                   ),
                 ),

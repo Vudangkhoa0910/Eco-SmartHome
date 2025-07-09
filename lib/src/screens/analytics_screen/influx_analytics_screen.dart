@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/src/utils/electricity_calculator.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -46,7 +46,7 @@ class InfluxAnalyticsScreen extends StatefulWidget {
 }
 
 class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
-  final InfluxDBService _influxDB = getIt<InfluxDBService>();
+  final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   
   List<Map<String, dynamic>>? _powerData;
   List<PowerConsumption> _areaConsumption = [];
@@ -82,17 +82,21 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
   Future<void> _testDataAvailability() async {
     try {
       print('🔍 Testing database connection and data availability...');
-      
-      final connectionTest = await _influxDB.testConnection();
-      print('� Database connection: ${connectionTest ? "✅ Connected" : "❌ Failed"}');
+      // Test Firebase connection by getting recent power data
+      final testData = await _firebaseData.getPowerConsumptionHistory(
+        startTime: DateTime.now().subtract(const Duration(hours: 1)),
+        endTime: DateTime.now(),
+      );
+      final connectionTest = testData.isNotEmpty;
+      print('🔥 Database connection: ${connectionTest ? "✅ Connected" : "❌ Failed"}');
       
       if (connectionTest) {
         // Test if we have recent data
-        final currentPower = await _influxDB.getCurrentPowerConsumption();
+        final currentPower = testData.isNotEmpty ? testData.last['power'] ?? 0.0 : 0.0;
         print('⚡ Current power consumption: ${currentPower}W');
         
         // Quick test for device data
-        final testStats = await _influxDB.getDeviceStats('', timeRange: '1h');
+        final testStats = await _firebaseData.getDeviceStats('', timeRange: '1h');
         print('🔌 Available devices: ${testStats.keys.toList()}');
       }
     } catch (e) {
@@ -114,14 +118,14 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
       print('🔄 Loading real analytics data for time range: $_selectedTimeRange');
       
       // Only get real data from database
-      final powerFuture = _influxDB.querySensorHistory(
+      final powerFuture = _firebaseData.querySensorHistory(
         timeRange: _selectedTimeRange,
         sensorType: 'power',
         aggregation: 'mean',
       );
       
       // Get all device stats in one call  
-      final allDeviceStatsFuture = _influxDB.getDeviceStats('', timeRange: _selectedTimeRange);
+      final allDeviceStatsFuture = _firebaseData.getDeviceStats('', timeRange: _selectedTimeRange);
       
       final results = await Future.wait([
         powerFuture,
@@ -143,8 +147,13 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
         await _checkAvailableData();
       }
       
-      // Get current power consumption directly for more accurate results
-      final currentPowerConsumption = await _influxDB.getCurrentPowerConsumption();
+      // Get current power consumption from recent data
+      final recentPowerData = await _firebaseData.getPowerConsumptionHistory(
+        startTime: DateTime.now().subtract(const Duration(minutes: 5)),
+        endTime: DateTime.now(),
+      );
+      final currentPowerConsumption = recentPowerData.isNotEmpty ? 
+        recentPowerData.last['power'] ?? 0.0 : 0.0;
       print('⚡ Current total power consumption: ${currentPowerConsumption}W');
       
       // Extract individual device stats from real data
@@ -171,14 +180,16 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
         // Fallback: Try to get device stats from power_consumption data (more reliable than device_state)
         try {
           // Get recent power consumption data for each device
-          final recentData = await _influxDB.getRecentDataSample();
-          final powerConsumptionData = recentData['power_consumption'] as List<Map<String, dynamic>>?;
+          final recentData = await _firebaseData.getPowerConsumptionHistory(
+            startTime: DateTime.now().subtract(const Duration(hours: 1)),
+            endTime: DateTime.now(),
+          );
         
-        if (powerConsumptionData != null && powerConsumptionData.isNotEmpty) {
+        if (recentData.isNotEmpty) {
           // Group by device and calculate average power
           final devicePowerMap = <String, List<double>>{};
           
-          for (final record in powerConsumptionData) {
+          for (final record in recentData) {
             final device = record['device']?.toString();
             final powerValue = double.tryParse(record['_value']?.toString() ?? '0');
             final field = record['_field']?.toString();
@@ -369,9 +380,14 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
   /// Update debug information
   void _updateDebugInfo() async {
     try {
-      final connectionTest = await _influxDB.testConnection();
-      final currentPower = await _influxDB.getCurrentPowerConsumption();
-      final deviceStats = await _influxDB.getDeviceStats('', timeRange: '1h');
+      // Test connection by getting recent data
+      final recentData = await _firebaseData.getPowerConsumptionHistory(
+        startTime: DateTime.now().subtract(const Duration(minutes: 5)),
+        endTime: DateTime.now(),
+      );
+      final connectionTest = recentData.isNotEmpty;
+      final currentPower = recentData.isNotEmpty ? recentData.last['power'] ?? 0.0 : 0.0;
+      final deviceStats = await _firebaseData.getDeviceStats('', timeRange: '1h');
       
       setState(() {
         _connectionStatus = connectionTest ? 'Kết nối thành công' : 'Kết nối thất bại';
@@ -388,31 +404,32 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
   /// Check what measurements and fields are available in InfluxDB
   Future<void> _checkAvailableData() async {
     try {
-      print('🔍 Checking available measurements in InfluxDB...');
+      print('🔍 Checking available data in Firestore...');
       
-      final connectionTest = await _influxDB.testConnection();
+      // Test connection by getting recent data
+      final recentData = await _firebaseData.getPowerConsumptionHistory(
+        startTime: DateTime.now().subtract(const Duration(hours: 1)),
+        endTime: DateTime.now(),
+      );
+      final connectionTest = recentData.isNotEmpty;
       if (!connectionTest) {
-        print('❌ Cannot connect to InfluxDB');
+        print('❌ Cannot connect to Firestore or no data available');
         return;
       }
       
-      // Get available measurements
-      final measurements = await _influxDB.getAvailableMeasurements();
-      print('📊 Available measurements: $measurements');
+      // Get available data
+      print('📊 Available power consumption data: ${recentData.length} records');
       
       // Get recent data samples
-      final samples = await _influxDB.getRecentDataSample();
+      final samples = recentData.take(5).toList();
       print('📊 Data samples:');
       
-      for (final entry in samples.entries) {
-        final measurement = entry.key;
-        final data = entry.value as List<Map<String, dynamic>>;
-        print('  � $measurement: ${data.length} records');
+      for (int i = 0; i < samples.length; i++) {
+        final data = samples[i];
+        print('  📊 Sample $i: $data');
         
-        if (data.isNotEmpty) {
-          final fields = data.first.keys.toList();
-          print('    Fields: $fields');
-        }
+        final fields = data.keys.toList();
+        print('    Fields: $fields');
       }
       
     } catch (e) {

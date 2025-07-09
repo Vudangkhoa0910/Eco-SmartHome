@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:smart_home/service/mqtt_service.dart';
-import 'package:smart_home/service/influxdb_service.dart';
 
 enum ZoneType {
   courtyard,
@@ -82,7 +81,7 @@ class ZoneManagementService {
   List<Zone> _zones = [];
   List<Zone> get zones => _zones;
 
-  void initialize(MqttService mqttService, InfluxDBService influxDB) {
+  void initialize(MqttService mqttService) {
     _initializeZones();
     _zonesController.add(_zones);
   }

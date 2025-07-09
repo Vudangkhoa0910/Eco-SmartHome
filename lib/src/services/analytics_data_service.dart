@@ -1,8 +1,8 @@
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/provider/getit.dart';
 
 class AnalyticsDataService {
-  static final InfluxDBService _influxDB = getIt<InfluxDBService>();
+  static final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   
   /// Test database connection and data availability
   static Future<Map<String, dynamic>> testDataAvailability() async {
@@ -15,17 +15,17 @@ class AnalyticsDataService {
     
     try {
       // Test connection
-      final connectionTest = await _influxDB.testConnection();
+      final connectionTest = await _firebaseData.testConnection();
       result['connection'] = connectionTest;
       
       if (!connectionTest) {
-        result['errors'].add('Không thể kết nối InfluxDB');
+        result['errors'].add('Không thể kết nối Firebase Firestore');
         return result;
       }
       
       // Test power data
       try {
-        final powerData = await _influxDB.querySensorHistory(
+        final powerData = await _firebaseData.querySensorHistory(
           timeRange: '24h',
           sensorType: 'power',
           aggregation: 'mean',
@@ -40,7 +40,7 @@ class AnalyticsDataService {
       
       // Test device stats
       try {
-        final deviceStats = await _influxDB.getDeviceStats('', timeRange: '24h');
+        final deviceStats = await _firebaseData.getDeviceStats('', timeRange: '24h');
         result['deviceStats'] = deviceStats.isNotEmpty;
         if (deviceStats.isEmpty) {
           result['errors'].add('Không có dữ liệu thống kê thiết bị');
@@ -59,13 +59,13 @@ class AnalyticsDataService {
   /// Get sample data for testing
   static Future<Map<String, dynamic>> getSampleData(String timeRange) async {
     try {
-      final powerDataFuture = _influxDB.querySensorHistory(
+      final powerDataFuture = _firebaseData.querySensorHistory(
         timeRange: timeRange,
         sensorType: 'power',
         aggregation: 'mean',
       );
       
-      final deviceStatsFuture = _influxDB.getDeviceStats('', timeRange: timeRange);
+      final deviceStatsFuture = _firebaseData.getDeviceStats('', timeRange: timeRange);
       
       final results = await Future.wait([powerDataFuture, deviceStatsFuture]);
       

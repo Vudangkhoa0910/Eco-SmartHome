@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smart_home/src/screens/analytics_screen/influx_analytics_screen.dart';
+import 'package:smart_home/src/screens/analytics_screen/firebase_analytics_screen.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   static String routeName = '/analytics-screen';
@@ -66,7 +66,7 @@ class AnalyticsScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: const InfluxAnalyticsScreen(),
+      body: const FirebaseAnalyticsScreen(),
     );
   }
 }

@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read/write all smart home data
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Sensor data collection - allow reading and writing for authenticated users
+    match /sensor_data/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && 
+                    resource == null &&
+                    request.resource.data.timestamp is timestamp;
+    }
+    
+    // Device states collection
+    match /device_states/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && 
+                    resource == null &&
+                    request.resource.data.timestamp is timestamp;
+    }
+    
+    // Power consumption collection
+    match /power_consumption/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && 
+                    resource == null &&
+                    request.resource.data.timestamp is timestamp;
+    }
+    
+    // Energy consumption collection  
+    match /energy_consumption/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && 
+                    resource == null &&
+                    request.resource.data.timestamp is timestamp;
+    }
+    
+    // Electricity bills collection
+    match /electricity_bills/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && 
+                    resource == null &&
+                    request.resource.data.timestamp is timestamp;
+    }
+    
+    // Analytics collection
+    match /analytics/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

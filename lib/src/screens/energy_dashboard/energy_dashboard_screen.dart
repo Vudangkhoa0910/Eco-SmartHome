@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
@@ -12,7 +12,7 @@ class EnergyDashboardScreen extends StatefulWidget {
 }
 
 class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
-  final InfluxDBService _influxDB = getIt<InfluxDBService>();
+  final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   
   List<Map<String, dynamic>>? _energyData;
   List<Map<String, dynamic>>? _powerData;
@@ -42,17 +42,15 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
       final startTime = _parseTimeRange(_selectedTimeRange, endTime);
       
       final results = await Future.wait([
-        _influxDB.querySensorHistory(
+        _firebaseData.querySensorHistory(
           sensorType: 'energy',
           timeRange: _selectedTimeRange,
-          aggregation: 'sum',
         ),
-        _influxDB.querySensorHistory(
+        _firebaseData.querySensorHistory(
           sensorType: 'power',
           timeRange: _selectedTimeRange,
-          aggregation: 'mean',
         ),
-        _influxDB.getEnergyConsumptionByZone(
+        _firebaseData.getEnergyConsumptionByZone(
           startTime: startTime,
           endTime: endTime,
         ),

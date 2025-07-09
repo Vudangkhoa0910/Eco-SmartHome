@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 
 class MqttService {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
@@ -11,8 +11,8 @@ class MqttService {
   static const String _password = 'U0ofxmA6rbhSp4_O'; // App Secret
   static const String _clientIdBase = 'Flutter_SmartHome';
   
-  // InfluxDB toggle - enable để lưu dữ liệu thực tế
-  static const bool _enableInfluxDB = true; // Bật để lưu dữ liệu lên cloud
+  // Firebase toggle - enable để lưu dữ liệu thực tế
+  static const bool _enableFirebase = true; // Bật để lưu dữ liệu lên Firebase
 
   // Topics from ESP32 - Updated to match ESP32 configuration
   static const String topicTemp = 'khoasmarthome/temperature';
@@ -31,8 +31,8 @@ class MqttService {
   final StreamController<SensorData> _sensorDataController = StreamController<SensorData>.broadcast();
   final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
 
-  // InfluxDB service instance
-  final InfluxDBService _influxDB = InfluxDBService();
+  // Firebase service instance
+  final FirebaseDataService _firebaseData = FirebaseDataService();
 
   Stream<SensorData> get sensorDataStream => _sensorDataController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -207,27 +207,27 @@ class MqttService {
       _currentData = _currentData.copyWith(lastUpdated: DateTime.now());
       _sensorDataController.add(_currentData);
       
-      // Send data to InfluxDB asynchronously (only if enabled)
-      if (_enableInfluxDB) {
+      // Send data to Firebase asynchronously (only if enabled)
+      if (_enableFirebase) {
         // Write basic sensor data
-        _influxDB.writeSensorData(_currentData).timeout(
+        _firebaseData.writeSensorData(_currentData).timeout(
           const Duration(seconds: 5),
         ).catchError((error) {
-          print('⚠️ InfluxDB write error: $error');
+          print('⚠️ Firebase write error: $error');
           return false; // Return a value assignable to bool
         });
         
         // Write detailed energy consumption data
-        _influxDB.writeEnergyConsumption(_currentData).timeout(
+        _firebaseData.writeEnergyConsumption(_currentData).timeout(
           const Duration(seconds: 5),
         ).catchError((error) {
-          print('⚠️ InfluxDB energy write error: $error');
+          print('⚠️ Firebase energy write error: $error');
           return false;
         });
         
         // Also write power consumption data for energy tracking
         if (_currentData.power > 0) {
-          _influxDB.writePowerConsumption(
+          _firebaseData.writePowerConsumption(
             deviceId: 'total_system',
             power: _currentData.power,
             voltage: _currentData.voltage,
@@ -242,7 +242,7 @@ class MqttService {
           ).timeout(
             const Duration(seconds: 5),
           ).catchError((error) {
-            print('⚠️ InfluxDB power consumption write error: $error');
+            print('⚠️ Firebase power consumption write error: $error');
             return false;
           });
         }
@@ -267,17 +267,17 @@ class MqttService {
   void controlLedGate(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedGate, command);
-    // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
+    // Log device state to Firebase asynchronously
+    _firebaseData.writeDeviceState('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
         .catchError((error) {
-          print('⚠️ InfluxDB LED Gate error: $error');
+          print('⚠️ Firebase LED Gate error: $error');
           return false;
         });
     
     // Write estimated power consumption for LED Gate (assuming 10W when ON)
-    if (_enableInfluxDB) {
+    if (_enableFirebase) {
       final estimatedPower = isOn ? 10.0 : 0.0;
-      _influxDB.writePowerConsumption(
+      _firebaseData.writePowerConsumption(
         deviceId: 'led_gate',
         power: estimatedPower,
         voltage: _currentData.voltage,
@@ -290,7 +290,7 @@ class MqttService {
           'state': command,
         },
       ).catchError((error) {
-        print('⚠️ InfluxDB LED Gate power error: $error');
+        print('⚠️ Firebase LED Gate power error: $error');
         return false;
       });
     }
@@ -299,17 +299,17 @@ class MqttService {
   void controlLedAround(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedAround, command);
-    // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
+    // Log device state to Firebase asynchronously
+    _firebaseData.writeDeviceState('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
         .catchError((error) {
-          print('⚠️ InfluxDB LED Around error: $error');
+          print('⚠️ Firebase LED Around error: $error');
           return false;
         });
     
     // Write estimated power consumption for LED Around (assuming 15W when ON)
-    if (_enableInfluxDB) {
+    if (_enableFirebase) {
       final estimatedPower = isOn ? 15.0 : 0.0;
-      _influxDB.writePowerConsumption(
+      _firebaseData.writePowerConsumption(
         deviceId: 'led_around',
         power: estimatedPower,
         voltage: _currentData.voltage,
@@ -322,7 +322,7 @@ class MqttService {
           'state': command,
         },
       ).catchError((error) {
-        print('⚠️ InfluxDB LED Around power error: $error');
+        print('⚠️ Firebase LED Around power error: $error');
         return false;
       });
     }
@@ -331,17 +331,17 @@ class MqttService {
   void controlMotor(String direction) {
     // direction can be 'FORWARD', 'REVERSE', or 'OFF'
     publishDeviceCommand(topicMotor, direction);
-    // Log device state to InfluxDB asynchronously
-    _influxDB.writeDeviceState('motor', direction, metadata: {'room': 'garage', 'type': 'motor', 'zone': 'entrance'})
+    // Log device state to Firebase asynchronously
+    _firebaseData.writeDeviceState('motor', direction, metadata: {'room': 'garage', 'type': 'motor', 'zone': 'entrance'})
         .catchError((error) {
-          print('⚠️ InfluxDB Motor error: $error');
+          print('⚠️ Firebase Motor error: $error');
           return false;
         });
     
     // Write estimated power consumption for Motor (assuming 50W when running)
-    if (_enableInfluxDB) {
+    if (_enableFirebase) {
       final estimatedPower = (direction == 'FORWARD' || direction == 'REVERSE') ? 50.0 : 0.0;
-      _influxDB.writePowerConsumption(
+      _firebaseData.writePowerConsumption(
         deviceId: 'motor',
         power: estimatedPower,
         voltage: _currentData.voltage,
@@ -354,7 +354,7 @@ class MqttService {
           'state': direction,
         },
       ).catchError((error) {
-        print('⚠️ InfluxDB Motor power error: $error');
+        print('⚠️ Firebase Motor power error: $error');
         return false;
       });
     }

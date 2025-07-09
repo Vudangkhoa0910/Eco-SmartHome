@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/service/influxdb_service.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
@@ -19,7 +19,7 @@ class InfluxAnalyticsScreen extends StatefulWidget {
 }
 
 class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
-  final InfluxDBService _influxDB = getIt<InfluxDBService>();
+  final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   
   List<Map<String, dynamic>>? _temperatureData;
   List<Map<String, dynamic>>? _powerData;
@@ -55,21 +55,21 @@ class _InfluxAnalyticsScreenState extends State<InfluxAnalyticsScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final tempFuture = _influxDB.querySensorHistory(
+      final tempFuture = _firebaseData.querySensorHistory(
         timeRange: _selectedTimeRange,
         sensorType: 'temperature',
         aggregation: 'mean',
       );
       
-      final powerFuture = _influxDB.querySensorHistory(
+      final powerFuture = _firebaseData.querySensorHistory(
         timeRange: _selectedTimeRange,
         sensorType: 'power',
         aggregation: 'mean',
       );
       
-      final led1StatsFuture = _influxDB.getDeviceStats('led1', timeRange: _selectedTimeRange);
-      final led2StatsFuture = _influxDB.getDeviceStats('led2', timeRange: _selectedTimeRange);
-      final motorStatsFuture = _influxDB.getDeviceStats('motor', timeRange: _selectedTimeRange);
+      final led1StatsFuture = _firebaseData.getDeviceStats('led1', timeRange: _selectedTimeRange);
+      final led2StatsFuture = _firebaseData.getDeviceStats('led2', timeRange: _selectedTimeRange);
+      final motorStatsFuture = _firebaseData.getDeviceStats('motor', timeRange: _selectedTimeRange);
       
       final results = await Future.wait([
         tempFuture,
