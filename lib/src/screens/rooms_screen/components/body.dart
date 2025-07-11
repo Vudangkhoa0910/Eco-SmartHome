@@ -4,8 +4,6 @@ import 'package:smart_home/view/rooms_view_model.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
 import 'room_card.dart';
-import 'room_detail_modal.dart';
-import 'yard_led_control.dart';
 
 class Body extends StatelessWidget {
   final RoomsViewModel model;
@@ -39,84 +37,41 @@ class Body extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatItem(context, 'Tổng số phòng', '${model.rooms.length}', Icons.home),
+                _buildStatItem(context, 'Tổng số phòng',
+                    '${model.rooms.length}', Icons.home),
                 _buildDivider(context),
-                _buildStatItem(context, 'Thiết bị hoạt động', '${model.totalActiveDevices}', Icons.power),
+                _buildStatItem(context, 'Thiết bị hoạt động',
+                    '${model.totalActiveDevices}', Icons.power),
                 _buildDivider(context),
-                _buildStatItem(context, 'Năng lượng', '${model.totalEnergyUsage}kW', Icons.bolt),
+                _buildStatItem(context, 'Năng lượng',
+                    '${model.totalEnergyUsage}kW', Icons.bolt),
               ],
             ),
           ),
-          
+
           SizedBox(height: getProportionateScreenHeight(20)),
-          
+
           // House Area Management - Đây là tính năng từ nút xanh được đưa ra trực tiếp
           Text(
             'Quản lý khu vực nhà',
             style: Theme.of(context).textTheme.displayMedium!.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          
-          SizedBox(height: getProportionateScreenHeight(15)),
-          
-          _buildHouseAreaManagement(context),
-          
-          SizedBox(height: getProportionateScreenHeight(20)),
-          
-          // Yard LED Controls
-          Text(
-            'Sân vườn',
-            style: Theme.of(context).textTheme.displayMedium!.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          
-          SizedBox(height: getProportionateScreenHeight(15)),
-          
-          const YardLedControlWidget(),
-          
-          SizedBox(height: getProportionateScreenHeight(20)),
-          
-          // Rooms Grid
-          Text(
-            'Các phòng trong nhà',
-            style: Theme.of(context).textTheme.displayMedium!.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          
-          SizedBox(height: getProportionateScreenHeight(15)),
-          
-          model.rooms.isEmpty
-              ? _buildEmptyState(context)
-              : GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.9,
-                    crossAxisSpacing: getProportionateScreenWidth(15),
-                    mainAxisSpacing: getProportionateScreenHeight(15),
-                  ),
-                  itemCount: model.rooms.length,
-                  itemBuilder: (context, index) {
-                    final room = model.rooms[index];
-                    return RoomCard(
-                      room: room,
-                      onTap: () => _showRoomDetail(context, room),
-                    );
-                  },
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
                 ),
+          ),
+
+          SizedBox(height: getProportionateScreenHeight(15)),
+
+          _buildHouseAreaManagement(context),
+
+          SizedBox(height: getProportionateScreenHeight(20)),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(BuildContext context, String title, String value, IconData icon) {
+  Widget _buildStatItem(
+      BuildContext context, String title, String value, IconData icon) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -125,15 +80,15 @@ class Body extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.displayMedium!.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
         ),
         Text(
           title,
           style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-            fontSize: 12,
-          ),
+                fontSize: 12,
+              ),
         ),
       ],
     );
@@ -147,46 +102,9 @@ class Body extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Container(
-      height: getProportionateScreenHeight(300),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.home_outlined,
-            size: 80,
-            color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
-          ),
-          SizedBox(height: getProportionateScreenHeight(20)),
-          Text(
-            'Chưa có phòng nào',
-            style: Theme.of(context).textTheme.displayMedium!.copyWith(
-              color: Theme.of(context).textTheme.bodyMedium!.color,
-            ),
-          ),
-          SizedBox(height: getProportionateScreenHeight(10)),
-          ElevatedButton(
-            onPressed: () => model.showAddRoomDialog(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF464646),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-            child: const Text(
-              'Thêm phòng đầu tiên',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHouseAreaManagement(BuildContext context) {
     final floors = HouseData.getHouseStructure();
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -200,7 +118,8 @@ class Body extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: floors.map((floor) => _buildFloorCard(context, floor)).toList(),
+        children:
+            floors.map((floor) => _buildFloorCard(context, floor)).toList(),
       ),
     );
   }
@@ -221,11 +140,11 @@ class Body extends StatelessWidget {
           padding: EdgeInsets.all(getProportionateScreenWidth(15)),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: floor.name.contains('Sân') 
-                ? [const Color(0xFF4CAF50), const Color(0xFF2E7D32)]
-                : floor.name.contains('Tầng 1')
-                ? [const Color(0xFF2196F3), const Color(0xFF1976D2)]
-                : [const Color(0xFF9C27B0), const Color(0xFF7B1FA2)],
+              colors: floor.name.contains('Sân')
+                  ? [const Color(0xFF4CAF50), const Color(0xFF2E7D32)]
+                  : floor.name.contains('Tầng 1')
+                      ? [const Color(0xFF2196F3), const Color(0xFF1976D2)]
+                      : [const Color(0xFF9C27B0), const Color(0xFF7B1FA2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -326,15 +245,6 @@ class Body extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  void _showRoomDetail(BuildContext context, room) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => RoomDetailModal(room: room, model: model),
     );
   }
 }

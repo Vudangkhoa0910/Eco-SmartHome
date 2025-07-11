@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_home/provider/base_model.dart';
 import 'package:smart_home/provider/theme_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileViewModel extends BaseModel {
-  String _userName = 'Vũ Đăng Khoa';
-  String _userEmail = 'vudangkhoa@gmail.com';
-  int _totalDevices = 15;
-  int _totalRooms = 6;
-  int _totalSavings = 2350; // in thousand VND
+  String _userName = 'Đang tải...';
+  String _userEmail = 'Đang tải...';
+  int _totalDevices = 0;
+  int _totalRooms = 0;
+  int _totalSavings = 0; // in thousand VND
   bool _isVoiceEnabled = true;
 
   String get userName => _userName;
@@ -18,55 +20,69 @@ class ProfileViewModel extends BaseModel {
   int get totalSavings => _totalSavings;
   bool get isVoiceEnabled => _isVoiceEnabled;
 
+  // Constructor
+  ProfileViewModel() {
+    loadProfile();
+  }
+
   bool isDarkMode(BuildContext context) {
     return Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
   }
 
-  void loadProfile() {
-    // Load user profile data
+  void loadProfile() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Load user basic info
+        _userEmail = user.email ?? 'Không có email';
+
+        // Load user document from Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          _userName = userData['displayName'] ??
+              user.displayName ??
+              userData['name'] ??
+              'Người dùng';
+
+          // Load statistics if available
+          _totalDevices = userData['totalDevices'] ?? 0;
+          _totalRooms = userData['totalRooms'] ?? 0;
+          _totalSavings = userData['totalSavings'] ?? 0;
+          _isVoiceEnabled = userData['isVoiceEnabled'] ?? true;
+        } else {
+          // If no document exists, use Firebase Auth data
+          _userName = user.displayName ?? 'Người dùng';
+          // Set default values for stats
+          _totalDevices = 0;
+          _totalRooms = 0;
+          _totalSavings = 0;
+        }
+      } else {
+        // No user logged in
+        _userName = 'Chưa đăng nhập';
+        _userEmail = '';
+        _totalDevices = 0;
+        _totalRooms = 0;
+        _totalSavings = 0;
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+      // Keep default values if error occurs
+      _userName = 'Lỗi tải dữ liệu';
+      _userEmail = 'Lỗi tải dữ liệu';
+    }
+
     notifyListeners();
   }
 
   void editProfile(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Chỉnh sửa hồ sơ'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Họ và tên',
-                border: OutlineInputBorder(),
-              ),
-              controller: TextEditingController(text: _userName),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
-              controller: TextEditingController(text: _userEmail),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Save profile logic
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
-      ),
-    );
+    // Navigate to the dedicated edit profile screen
+    Navigator.pushNamed(context, '/edit-profile');
   }
 
   void openSecurity(BuildContext context) {
@@ -88,12 +104,7 @@ class ProfileViewModel extends BaseModel {
   }
 
   void openDeviceManagement(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DeviceManagementScreen(),
-      ),
-    );
+    Navigator.pushNamed(context, '/rooms-screen');
   }
 
   void openAutomation(BuildContext context) {
@@ -106,12 +117,7 @@ class ProfileViewModel extends BaseModel {
   }
 
   void openEnergySettings(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const EnergySettingsScreen(),
-      ),
-    );
+    Navigator.pushNamed(context, '/analytics-screen');
   }
 
   void toggleDarkMode(bool value, BuildContext context) {
@@ -119,9 +125,47 @@ class ProfileViewModel extends BaseModel {
     notifyListeners();
   }
 
-  void toggleVoice(bool value) {
+  void toggleVoice(bool value) async {
     _isVoiceEnabled = value;
     notifyListeners();
+
+    // Save to Firebase
+    await _saveUserData();
+  }
+
+  // Method to save user data to Firebase
+  Future<void> _saveUserData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'displayName': _userName,
+          'email': _userEmail,
+          'totalDevices': _totalDevices,
+          'totalRooms': _totalRooms,
+          'totalSavings': _totalSavings,
+          'isVoiceEnabled': _isVoiceEnabled,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      print('Error saving user data: $e');
+    }
+  }
+
+  // Method to update statistics
+  void updateStats({int? devices, int? rooms, int? savings}) async {
+    if (devices != null) _totalDevices = devices;
+    if (rooms != null) _totalRooms = rooms;
+    if (savings != null) _totalSavings = savings;
+
+    notifyListeners();
+    await _saveUserData();
+  }
+
+  // Method to reload profile data
+  void reloadProfile() {
+    loadProfile();
   }
 
   void changeLanguage(BuildContext context) {
@@ -161,7 +205,8 @@ class ProfileViewModel extends BaseModel {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hỗ trợ'),
-        content: const Text('Liên hệ với chúng tôi qua email: support@smarthome.vn hoặc hotline: 1900-1234'),
+        content: const Text(
+            'Liên hệ với chúng tôi qua email: support@smarthome.vn hoặc hotline: 1900-1234'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -224,17 +269,32 @@ class ProfileViewModel extends BaseModel {
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // Navigate to login screen
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login-screen',
-                (route) => false,
-              );
+
+              try {
+                // Sign out from Firebase
+                await FirebaseAuth.instance.signOut();
+
+                // Navigate to auth screen
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/auth-screen',
+                  (route) => false,
+                );
+              } catch (e) {
+                print('Error signing out: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi đăng xuất: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

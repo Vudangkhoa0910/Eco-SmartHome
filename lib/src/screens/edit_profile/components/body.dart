@@ -21,6 +21,8 @@ class _BodyState extends State<Body> {
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
+  String displayName = 'Đang tải...'; // Thêm biến để lưu tên hiển thị
+
   @override
   void initState() {
     super.initState();
@@ -31,13 +33,25 @@ class _BodyState extends State<Body> {
   void _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (userDoc.exists) {
         setState(() {
           usernameController.text = userDoc['email'] ?? user.email ?? '';
+          // Lấy tên hiển thị từ Firestore hoặc Firebase Auth
+          displayName = userDoc['displayName'] ??
+              user.displayName ??
+              userDoc['name'] ??
+              'Người dùng';
         });
       } else {
-        usernameController.text = user.email ?? '';
+        setState(() {
+          usernameController.text = user.email ?? '';
+          // Nếu không có document trong Firestore, lấy từ Firebase Auth
+          displayName = user.displayName ?? 'Người dùng';
+        });
       }
     }
   }
@@ -69,20 +83,22 @@ class _BodyState extends State<Body> {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.arrow_back_ios, color: Theme.of(context).textTheme.bodyLarge!.color, size: 24),
+                    icon: Icon(Icons.arrow_back_ios,
+                        color: Theme.of(context).textTheme.bodyLarge!.color,
+                        size: 24),
                   ),
                   Text(
                     'Chỉnh sửa hồ sơ',
                     style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(width: 48), // Balance the row
                 ],
               ),
               SizedBox(height: getProportionateScreenHeight(30)),
-              
+
               Expanded(
                 child: SingleChildScrollView(
                   child: Form(
@@ -112,17 +128,20 @@ class _BodyState extends State<Body> {
                         ),
                         SizedBox(height: getProportionateScreenHeight(10)),
                         Text(
-                          'Vũ Đăng Khoa',
-                          style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          displayName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall!
+                              .copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                         SizedBox(height: getProportionateScreenHeight(30)),
-                        
+
                         // Account Section
                         _buildSectionTitle('Thông tin tài khoản'),
                         SizedBox(height: getProportionateScreenHeight(15)),
-                        
+
                         _buildTextField(
                           controller: usernameController,
                           label: 'Tên đăng nhập / Email',
@@ -135,13 +154,13 @@ class _BodyState extends State<Body> {
                             return null;
                           },
                         ),
-                        
+
                         SizedBox(height: getProportionateScreenHeight(25)),
-                        
+
                         // Password Section
                         _buildSectionTitle('Đổi mật khẩu'),
                         SizedBox(height: getProportionateScreenHeight(15)),
-                        
+
                         _buildPasswordField(
                           controller: oldPasswordController,
                           label: 'Mật khẩu hiện tại',
@@ -159,9 +178,9 @@ class _BodyState extends State<Body> {
                             return null;
                           },
                         ),
-                        
+
                         SizedBox(height: getProportionateScreenHeight(15)),
-                        
+
                         _buildPasswordField(
                           controller: newPasswordController,
                           label: 'Mật khẩu mới',
@@ -182,9 +201,9 @@ class _BodyState extends State<Body> {
                             return null;
                           },
                         ),
-                        
+
                         SizedBox(height: getProportionateScreenHeight(15)),
-                        
+
                         _buildPasswordField(
                           controller: confirmPasswordController,
                           label: 'Xác nhận mật khẩu mới',
@@ -192,7 +211,8 @@ class _BodyState extends State<Body> {
                           isVisible: _isConfirmPasswordVisible,
                           onVisibilityToggle: () {
                             setState(() {
-                              _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                              _isConfirmPasswordVisible =
+                                  !_isConfirmPasswordVisible;
                             });
                           },
                           validator: (value) {
@@ -205,9 +225,9 @@ class _BodyState extends State<Body> {
                             return null;
                           },
                         ),
-                        
+
                         SizedBox(height: getProportionateScreenHeight(40)),
-                        
+
                         // Save Button
                         SizedBox(
                           width: double.infinity,
@@ -231,7 +251,7 @@ class _BodyState extends State<Body> {
                             ),
                           ),
                         ),
-                        
+
                         SizedBox(height: getProportionateScreenHeight(20)),
                       ],
                     ),
@@ -251,9 +271,9 @@ class _BodyState extends State<Body> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium!.copyWith(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
       ),
     );
   }
@@ -293,7 +313,9 @@ class _BodyState extends State<Body> {
             size: 20,
           ),
           filled: true,
-          fillColor: enabled ? Theme.of(context).cardColor : Colors.grey.withOpacity(0.1),
+          fillColor: enabled
+              ? Theme.of(context).cardColor
+              : Colors.grey.withOpacity(0.1),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide.none,
@@ -370,7 +392,8 @@ class _BodyState extends State<Body> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
-          if (oldPasswordController.text.isNotEmpty && newPasswordController.text.isNotEmpty) {
+          if (oldPasswordController.text.isNotEmpty &&
+              newPasswordController.text.isNotEmpty) {
             // Update password
             await user.updatePassword(newPasswordController.text);
             _showSuccessDialog();
