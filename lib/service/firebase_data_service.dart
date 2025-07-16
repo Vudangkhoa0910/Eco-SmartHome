@@ -11,6 +11,9 @@ class FirebaseDataService {
   static const String _energyConsumptionCollection = 'energy_consumption';
   static const String _electricityBillCollection = 'electricity_bills';
   static const String _analyticsCollection = 'analytics';
+  static const String _chatHistoryCollection = 'chat_history';
+  static const String _customCommandsCollection = 'custom_commands';
+  static const String _userSettingsCollection = 'user_settings';
   
   static final FirebaseDataService _instance = FirebaseDataService._internal();
   factory FirebaseDataService() => _instance;
@@ -553,6 +556,330 @@ class FirebaseDataService {
     } catch (e) {
       print('❌ Error getting data samples: $e');
       return {};
+    }
+  }
+
+  /// Write chat message to Firestore
+  Future<bool> writeChatMessage({
+    required String userId,
+    required String message,
+    required bool isUser,
+    required DateTime timestamp,
+    String? response,
+    String? deviceAction,
+  }) async {
+    try {
+      final data = <String, Object>{
+        'user_id': userId,
+        'message': message,
+        'is_user': isUser,
+        'timestamp': Timestamp.fromDate(timestamp),
+        'created_at': DateTime.now(),
+      };
+
+      if (response != null) {
+        data['response'] = response;
+      }
+
+      if (deviceAction != null) {
+        data['device_action'] = deviceAction;
+      }
+
+      await _firestore.collection(_chatHistoryCollection).add(data);
+      
+      print('✅ Firebase: Chat message saved successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase chat message write error: $e');
+      return false;
+    }
+  }
+
+  /// Get chat history for a user
+  Future<List<Map<String, dynamic>>> getChatHistory({
+    required String userId,
+    int limit = 50,
+    DateTime? startAfter,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection(_chatHistoryCollection)
+          .where('user_id', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfter([Timestamp.fromDate(startAfter)]);
+      }
+
+      final QuerySnapshot snapshot = await query.get();
+      
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Firebase chat history query error: $e');
+      return [];
+    }
+  }
+
+  /// Save custom command
+  Future<bool> saveCustomCommand({
+    required String userId,
+    required String commandText,
+    required String deviceId,
+    required String action,
+    required String zone,
+    String? description,
+    List<String>? aliases,
+  }) async {
+    try {
+      final data = <String, Object>{
+        'user_id': userId,
+        'command_text': commandText,
+        'device_id': deviceId,
+        'action': action,
+        'zone': zone,
+        'is_active': true,
+        'created_at': DateTime.now(),
+        'updated_at': DateTime.now(),
+      };
+
+      if (description != null) {
+        data['description'] = description;
+      }
+
+      if (aliases != null && aliases.isNotEmpty) {
+        data['aliases'] = aliases;
+      }
+
+      await _firestore.collection(_customCommandsCollection).add(data);
+      
+      print('✅ Firebase: Custom command saved successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase custom command save error: $e');
+      return false;
+    }
+  }
+
+  /// Get custom commands for a user
+  Future<List<Map<String, dynamic>>> getCustomCommands({
+    required String userId,
+    String? zone,
+    String? deviceId,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection(_customCommandsCollection)
+          .where('user_id', isEqualTo: userId)
+          .where('is_active', isEqualTo: true);
+
+      if (zone != null) {
+        query = query.where('zone', isEqualTo: zone);
+      }
+
+      if (deviceId != null) {
+        query = query.where('device_id', isEqualTo: deviceId);
+      }
+
+      final QuerySnapshot snapshot = await query.get();
+      
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('❌ Firebase custom commands query error: $e');
+      return [];
+    }
+  }
+
+  /// Update custom command
+  Future<bool> updateCustomCommand({
+    required String commandId,
+    String? commandText,
+    String? deviceId,
+    String? action,
+    String? zone,
+    String? description,
+    List<String>? aliases,
+    bool? isActive,
+  }) async {
+    try {
+      final data = <String, Object>{
+        'updated_at': DateTime.now(),
+      };
+
+      if (commandText != null) data['command_text'] = commandText;
+      if (deviceId != null) data['device_id'] = deviceId;
+      if (action != null) data['action'] = action;
+      if (zone != null) data['zone'] = zone;
+      if (description != null) data['description'] = description;
+      if (aliases != null) data['aliases'] = aliases;
+      if (isActive != null) data['is_active'] = isActive;
+
+      await _firestore.collection(_customCommandsCollection).doc(commandId).update(data);
+      
+      print('✅ Firebase: Custom command updated successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase custom command update error: $e');
+      return false;
+    }
+  }
+
+  /// Delete custom command
+  Future<bool> deleteCustomCommand(String commandId) async {
+    try {
+      await _firestore.collection(_customCommandsCollection).doc(commandId).update({
+        'is_active': false,
+        'updated_at': DateTime.now(),
+      });
+      
+      print('✅ Firebase: Custom command deleted successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase custom command delete error: $e');
+      return false;
+    }
+  }
+
+  /// Get available zones and devices
+  Future<Map<String, dynamic>> getAvailableZonesAndDevices() async {
+    try {
+      final QuerySnapshot deviceSnapshot = await _firestore
+          .collection(_deviceStateCollection)
+          .orderBy('created_at', descending: true)
+          .limit(100)
+          .get();
+
+      final Set<String> zones = {};
+      final Set<String> devices = {};
+
+      for (final doc in deviceSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final zone = data['zone']?.toString();
+        final device = data['device']?.toString();
+
+        if (zone != null && zone.isNotEmpty) {
+          zones.add(zone);
+        }
+        if (device != null && device.isNotEmpty) {
+          devices.add(device);
+        }
+      }
+
+      return {
+        'zones': zones.toList(),
+        'devices': devices.toList(),
+      };
+    } catch (e) {
+      print('❌ Firebase zones and devices query error: $e');
+      return {
+        'zones': ['entrance', 'living_room', 'bedroom', 'kitchen', 'garden'],
+        'devices': ['led_gate', 'led_around', 'motor'],
+      };
+    }
+  }
+
+  /// Save user AI settings
+  Future<bool> saveUserSettings({
+    required String userId,
+    required Map<String, dynamic> settings,
+  }) async {
+    try {
+      await _firestore.collection(_userSettingsCollection).doc(userId).set({
+        'settings': settings,
+        'updated_at': DateTime.now(),
+      }, SetOptions(merge: true));
+      
+      print('✅ Firebase: User settings saved successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase user settings save error: $e');
+      return false;
+    }
+  }
+
+  /// Get user AI settings
+  Future<Map<String, dynamic>> getUserSettings(String userId) async {
+    try {
+      final DocumentSnapshot doc = await _firestore
+          .collection(_userSettingsCollection)
+          .doc(userId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['settings'] as Map<String, dynamic>? ?? {};
+      }
+
+      return {};
+    } catch (e) {
+      print('❌ Firebase user settings query error: $e');
+      return {};
+    }
+  }
+
+  /// Search custom commands by text
+  Future<List<Map<String, dynamic>>> searchCustomCommands({
+    required String userId,
+    required String searchText,
+  }) async {
+    try {
+      final QuerySnapshot snapshot = await _firestore
+          .collection(_customCommandsCollection)
+          .where('user_id', isEqualTo: userId)
+          .where('is_active', isEqualTo: true)
+          .get();
+
+      final List<Map<String, dynamic>> results = [];
+      
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        
+        final commandText = data['command_text']?.toString().toLowerCase() ?? '';
+        final description = data['description']?.toString().toLowerCase() ?? '';
+        final aliases = data['aliases'] as List<dynamic>? ?? [];
+        
+        final search = searchText.toLowerCase();
+        
+        if (commandText.contains(search) || 
+            description.contains(search) ||
+            aliases.any((alias) => alias.toString().toLowerCase().contains(search))) {
+          results.add(data);
+        }
+      }
+
+      return results;
+    } catch (e) {
+      print('❌ Firebase custom commands search error: $e');
+      return [];
+    }
+  }
+
+  /// Clear chat history for a user
+  Future<bool> clearChatHistory(String userId) async {
+    try {
+      final QuerySnapshot snapshot = await _firestore
+          .collection(_chatHistoryCollection)
+          .where('user_id', isEqualTo: userId)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
+      
+      print('✅ Firebase: Chat history cleared successfully');
+      return true;
+    } catch (e) {
+      print('❌ Firebase clear chat history error: $e');
+      return false;
     }
   }
 }

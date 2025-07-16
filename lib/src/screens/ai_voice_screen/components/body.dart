@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/ai_voice_view_model.dart';
+import 'custom_commands_manager.dart';
 
 class Body extends StatelessWidget {
   final AIVoiceViewModel model;
@@ -27,8 +28,8 @@ class Body extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: getProportionateScreenWidth(20),
-            vertical: getProportionateScreenHeight(20),
+            horizontal: getProportionateScreenWidth(16),
+            vertical: getProportionateScreenHeight(12),
           ),
           child: Column(
             children: [
@@ -40,14 +41,14 @@ class Body extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: Icon(Icons.arrow_back_ios, 
                       color: Theme.of(context).textTheme.bodyLarge!.color, 
-                      size: 24),
+                      size: 22),
                   ),
                   Column(
                     children: [
                       Text(
                         'Trợ lý AI',
                         style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -55,150 +56,395 @@ class Body extends StatelessWidget {
                         'Smart Home Assistant',
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                           color: Theme.of(context).textTheme.bodySmall!.color,
-                          fontSize: 12,
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
-                  IconButton(
-                    onPressed: () => model.showSettings(context),
-                    icon: Icon(Icons.settings, 
-                      color: Theme.of(context).textTheme.bodyMedium!.color, 
-                      size: 24),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => model.toggleChatBox(),
+                        icon: Stack(
+                          children: [
+                            Icon(Icons.chat_bubble_outline, 
+                              color: Theme.of(context).textTheme.bodyMedium!.color, 
+                              size: 22),
+                            if (model.showChatBox)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _showCustomCommandsManager(context),
+                        icon: Icon(Icons.tune, 
+                          color: Theme.of(context).textTheme.bodyMedium!.color, 
+                          size: 22),
+                      ),
+                      IconButton(
+                        onPressed: () => model.showSettings(context),
+                        icon: Icon(Icons.settings, 
+                          color: Theme.of(context).textTheme.bodyMedium!.color, 
+                          size: 22),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              SizedBox(height: getProportionateScreenHeight(20)),
+              SizedBox(height: getProportionateScreenHeight(10)),
               // AI Status
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 500),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              Container(
+                margin: EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: model.isListening 
                       ? Colors.green.withOpacity(0.2)
                       : model.isProcessing 
                           ? Colors.orange.withOpacity(0.2)
-                          : Theme.of(context).cardColor.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(25),
+                          : model.showChatBox
+                              ? Colors.blue.withOpacity(0.2)
+                              : model.speechEnabled
+                                  ? Theme.of(context).cardColor.withOpacity(0.8)
+                                  : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: model.isListening 
                         ? Colors.green
                         : model.isProcessing 
                             ? Colors.orange
-                            : Colors.white30,
+                            : model.showChatBox
+                                ? Colors.blue
+                                : model.speechEnabled
+                                    ? Colors.white30
+                                    : Colors.red,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (model.isListening) ...[
-                      const Icon(Icons.mic, color: Colors.green, size: 16),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.mic, color: Colors.green, size: 14),
+                      const SizedBox(width: 6),
                     ] else if (model.isProcessing) ...[
                       const SizedBox(
-                        width: 16,
-                        height: 16,
+                        width: 14,
+                        height: 14,
                         child: CircularProgressIndicator(
                           color: Colors.orange,
                           strokeWidth: 2,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+                    ] else if (model.showChatBox) ...[
+                      const Icon(Icons.chat, color: Colors.blue, size: 14),
+                      const SizedBox(width: 6),
+                    ] else if (model.speechEnabled) ...[
+                      const Icon(Icons.mic_none, color: Colors.grey, size: 14),
+                      const SizedBox(width: 6),
                     ] else ...[
-                      const Icon(Icons.mic_none, color: Colors.grey, size: 16),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.mic_off, color: Colors.red, size: 14),
+                      const SizedBox(width: 6),
                     ],
                     Text(
                       model.isListening ? 'Đang nghe...' : 
-                      model.isProcessing ? 'Đang xử lý...' : 'Chạm để nói',
+                      model.isProcessing ? 'Đang xử lý...' : 
+                      model.showChatBox ? 'Chế độ chat' :
+                      model.speechEnabled ? 'Chạm để nói' : 'Giọng nói không khả dụng',
                       style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                         color: model.isListening 
                             ? Colors.green
                             : model.isProcessing 
                                 ? Colors.orange
-                                : Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.7),
-                        fontSize: 14,
+                                : model.showChatBox
+                                    ? Colors.blue
+                                    : model.speechEnabled
+                                        ? Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.7)
+                                        : Colors.red,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: getProportionateScreenHeight(5)),
-              // Voice Visualizer
-              Expanded(
-                flex: 2,
-                child: Center(
-                  child: GestureDetector(
-                    onTap: model.toggleListening,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: getProportionateScreenWidth(220),
-                      height: getProportionateScreenWidth(220),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: model.isListening ? [
-                            const Color(0xFF00D4AA).withOpacity(0.8),
-                            const Color(0xFF00D4AA).withOpacity(0.4),
-                            const Color(0xFF00D4AA).withOpacity(0.1),
-                            Colors.transparent,
-                          ] : model.isProcessing ? [
-                            const Color(0xFFFF6B6B).withOpacity(0.6),
-                            const Color(0xFFFF6B6B).withOpacity(0.3),
-                            const Color(0xFFFF6B6B).withOpacity(0.1),
-                            Colors.transparent,
-                          ] : [
-                            Colors.white.withOpacity(0.2),
-                            Colors.white.withOpacity(0.1),
-                            Colors.white.withOpacity(0.05),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                      child: Container(
-                        margin: const EdgeInsets.all(25),
+              // Voice Visualizer or Chat Box
+              if (!model.showChatBox) ...[
+                Flexible(
+                  flex: 3,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: model.speechEnabled ? model.toggleListening : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: getProportionateScreenWidth(180),
+                        height: getProportionateScreenWidth(180),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: model.isListening 
-                              ? const Color(0xFF00D4AA)
-                              : model.isProcessing 
-                                  ? const Color(0xFFFF6B6B)
-                                  : Colors.white.withOpacity(0.3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: model.isListening 
-                                  ? const Color(0xFF00D4AA).withOpacity(0.4)
-                                  : model.isProcessing
-                                      ? const Color(0xFFFF6B6B).withOpacity(0.4)
-                                      : Colors.white.withOpacity(0.2),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
+                          gradient: RadialGradient(
+                            colors: model.isListening ? [
+                              const Color(0xFF00D4AA).withOpacity(0.8),
+                              const Color(0xFF00D4AA).withOpacity(0.4),
+                              const Color(0xFF00D4AA).withOpacity(0.1),
+                              Colors.transparent,
+                            ] : model.isProcessing ? [
+                              Colors.orange.withOpacity(0.6),
+                              Colors.orange.withOpacity(0.3),
+                              Colors.orange.withOpacity(0.1),
+                              Colors.transparent,
+                            ] : [
+                              Theme.of(context).primaryColor.withOpacity(0.3),
+                              Theme.of(context).primaryColor.withOpacity(0.1),
+                              Colors.transparent,
+                            ],
+                          ),
                         ),
-                        child: Center(
-                          child: Icon(
-                            model.isListening 
-                                ? Icons.mic 
-                                : model.isProcessing
-                                    ? Icons.auto_awesome
-                                    : Icons.mic_none,
-                            color: Colors.white,
-                            size: 70,
+                        child: Container(
+                          margin: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: model.isListening 
+                                ? const Color(0xFF00D4AA)
+                                : model.isProcessing 
+                                    ? Colors.orange
+                                    : Theme.of(context).primaryColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: (model.isListening 
+                                    ? const Color(0xFF00D4AA)
+                                    : model.isProcessing 
+                                        ? Colors.orange
+                                        : Theme.of(context).primaryColor).withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: model.isProcessing 
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 3,
+                                  )
+                                : Icon(
+                                    model.isListening ? Icons.mic : Icons.mic_none,
+                                    color: Colors.white,
+                                    size: 60,
+                                  ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ] else ...[
+                // Chat Box
+                Flexible(
+                  flex: 3,
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: getProportionateScreenHeight(5)),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context).dividerColor,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        // Chat Header
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.chat, color: Theme.of(context).primaryColor, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Chat với AI',
+                                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                onPressed: model.clearChatMessages,
+                                icon: Icon(Icons.clear, 
+                                  color: Theme.of(context).textTheme.bodyMedium!.color, 
+                                  size: 18),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Chat Messages
+                        Expanded(
+                          child: model.chatMessages.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.chat_bubble_outline, 
+                                        color: Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.5),
+                                        size: 40),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Chưa có tin nhắn nào\nBắt đầu trò chuyện với AI!',
+                                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                          color: Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.5),
+                                          fontSize: 12,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  reverse: true,
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: model.chatMessages.length,
+                                  itemBuilder: (context, index) {
+                                    final message = model.chatMessages[index];
+                                    final isUser = message['isUser'] as bool;
+                                    
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        mainAxisAlignment: isUser 
+                                            ? MainAxisAlignment.end 
+                                            : MainAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (!isUser) ...[
+                                            Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF00D4AA),
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: const Icon(Icons.smart_toy, color: Colors.white, size: 14),
+                                            ),
+                                            const SizedBox(width: 6),
+                                          ],
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              decoration: BoxDecoration(
+                                                color: isUser 
+                                                    ? Theme.of(context).primaryColor
+                                                    : Theme.of(context).cardColor,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: isUser 
+                                                    ? null 
+                                                    : Border.all(color: Theme.of(context).dividerColor),
+                                              ),
+                                              child: Text(
+                                                message['message'] as String,
+                                                style: TextStyle(
+                                                  color: isUser 
+                                                      ? Colors.white 
+                                                      : Theme.of(context).textTheme.bodyMedium!.color,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          if (isUser) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).primaryColor,
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: const Icon(Icons.person, color: Colors.white, size: 14),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                        // Chat Input
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(16),
+                              bottomRight: Radius.circular(16),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: model.chatController,
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: 'Nhập tin nhắn...',
+                                    hintStyle: const TextStyle(fontSize: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(context).cardColor,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (text) {
+                                    if (text.trim().isNotEmpty) {
+                                      model.sendChatMessage(text);
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              FloatingActionButton(
+                                onPressed: () {
+                                  if (model.chatController.text.trim().isNotEmpty) {
+                                    model.sendChatMessage(model.chatController.text);
+                                  }
+                                },
+                                backgroundColor: Theme.of(context).primaryColor,
+                                mini: true,
+                                child: const Icon(Icons.send, color: Colors.white, size: 16),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               // Command Recognition Display
-              if (model.recognizedText.isNotEmpty)
+              if (model.recognizedText.isNotEmpty && !model.showChatBox)
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(getProportionateScreenWidth(16)),
-                  margin: EdgeInsets.symmetric(vertical: getProportionateScreenHeight(10)),
+                  padding: EdgeInsets.all(getProportionateScreenWidth(12)),
+                  margin: EdgeInsets.symmetric(vertical: getProportionateScreenHeight(4)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -206,7 +452,7 @@ class Body extends StatelessWidget {
                         Colors.purple.withOpacity(0.1),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.blue.withOpacity(0.3)),
                   ),
                   child: Column(
@@ -214,33 +460,34 @@ class Body extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.record_voice_over, color: Colors.blue, size: 18),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.record_voice_over, color: Colors.blue, size: 16),
+                          const SizedBox(width: 6),
                           Text(
                             'Bạn đã nói:',
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                               color: Colors.blue,
                               fontWeight: FontWeight.w600,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: getProportionateScreenHeight(8)),
+                      SizedBox(height: getProportionateScreenHeight(4)),
                       Text(
                         model.recognizedText,
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontSize: 16,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
                 ),
               // AI Response
-              if (model.aiResponse.isNotEmpty)
+              if (model.aiResponse.isNotEmpty && !model.showChatBox)
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(getProportionateScreenWidth(16)),
-                  margin: EdgeInsets.only(bottom: getProportionateScreenHeight(20)),
+                  padding: EdgeInsets.all(getProportionateScreenWidth(12)),
+                  margin: EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -248,7 +495,7 @@ class Body extends StatelessWidget {
                         const Color(0xFF00D4AA).withOpacity(0.05),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF00D4AA).withOpacity(0.3)),
                   ),
                   child: Column(
@@ -257,59 +504,61 @@ class Body extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: const Color(0xFF00D4AA),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.smart_toy, color: Colors.white, size: 16),
+                            child: const Icon(Icons.smart_toy, color: Colors.white, size: 14),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Text(
                             'Trợ lý AI:',
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                               color: const Color(0xFF00D4AA),
                               fontWeight: FontWeight.w600,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: getProportionateScreenHeight(12)),
+                      SizedBox(height: getProportionateScreenHeight(6)),
                       Text(
                         model.aiResponse,
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontSize: 15,
-                          height: 1.4,
+                          fontSize: 13,
+                          height: 1.3,
                         ),
                       ),
                     ],
                   ),
                 ),
               // Quick Commands
-              Expanded(
+              Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.flash_on, color: Colors.amber, size: 20),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.flash_on, color: Colors.amber, size: 18),
+                        const SizedBox(width: 6),
                         Text(
                           'Lệnh nhanh:',
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: getProportionateScreenHeight(12)),
-                    Expanded(
+                    SizedBox(height: getProportionateScreenHeight(8)),
+                    Flexible(
                       child: GridView.count(
                         crossAxisCount: 2,
-                        childAspectRatio: 2.2,
-                        crossAxisSpacing: getProportionateScreenWidth(10),
-                        mainAxisSpacing: getProportionateScreenHeight(10),
+                        childAspectRatio: 2.5,
+                        crossAxisSpacing: getProportionateScreenWidth(8),
+                        mainAxisSpacing: getProportionateScreenHeight(8),
+                        shrinkWrap: true,
                         children: [
                           _buildQuickCommand(context, 'Mở đèn phòng khách', Icons.lightbulb_outline, Colors.amber),
                           _buildQuickCommand(context, 'Bật quạt phòng ngủ', Icons.air, Colors.cyan),
@@ -325,22 +574,31 @@ class Body extends StatelessWidget {
               ),
               // Tip
               Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.all(10),
+                margin: EdgeInsets.only(top: getProportionateScreenHeight(6)),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.tips_and_updates, color: Colors.amber, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(
+                      model.speechEnabled ? Icons.tips_and_updates : Icons.warning,
+                      color: model.speechEnabled ? Colors.amber : Colors.orange,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Thử nói: "Mở đèn cổng", "Tắt quạt phòng bếp", "Đặt nhiệt độ 24 độ"',
+                        model.speechEnabled
+                            ? (model.showChatBox
+                                ? 'Chế độ chat: Nhập tin nhắn hoặc chuyển sang chế độ giọng nói'
+                                : 'Thử nói: "Mở đèn cổng", "Tắt quạt phòng bếp", "Đặt nhiệt độ 24 độ"')
+                            : 'Nhận diện giọng nói chưa khả dụng. Hãy sử dụng chế độ chat.',
                         style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                          fontSize: 11,
+                          fontSize: 10,
+                          color: model.speechEnabled ? null : Colors.orange,
                         ),
                       ),
                     ),
@@ -354,13 +612,22 @@ class Body extends StatelessWidget {
     );
   }
 
+  void _showCustomCommandsManager(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CustomCommandsManager(model: model),
+    );
+  }
+
   Widget _buildQuickCommand(BuildContext context, String command, IconData icon, Color color) {
     return GestureDetector(
       onTap: () => model.executeQuickCommand(command),
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: getProportionateScreenWidth(10),
-          vertical: getProportionateScreenHeight(8),
+          horizontal: getProportionateScreenWidth(8),
+          vertical: getProportionateScreenHeight(6),
         ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -369,19 +636,19 @@ class Body extends StatelessWidget {
               color.withOpacity(0.05),
             ],
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 24),
-            SizedBox(height: getProportionateScreenHeight(6)),
-            Expanded(
+            Icon(icon, color: color, size: 20),
+            SizedBox(height: getProportionateScreenHeight(4)),
+            Flexible(
               child: Text(
                 command,
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
