@@ -7,26 +7,28 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "flutterfire-ui-codelab-77ef3",
-          "appId": "1:660074262019:android:aed40eaaf001c6a8436836",
+          "projectId": "chatapp-54676",
+          "appId": "1:954956298567:android:83814e9a11c5bd6cf43462",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "ios": {
         "default": {
-          "projectId": "flutterfire-ui-codelab-77ef3",
-          "appId": "1:660074262019:ios:e10239a49cb1dd61436836",
+          "projectId": "chatapp-54676",
+          "appId": "1:954956298567:ios:7bede964f716da75f43462",
           "uploadDebugSymbols": false,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "flutterfire-ui-codelab-77ef3",
+          "projectId": "chatapp-54676",
           "configurations": {
-            "android": "1:660074262019:android:aed40eaaf001c6a8436836",
-            "ios": "1:660074262019:ios:e10239a49cb1dd61436836",
-            "web": "1:660074262019:web:f05e3c5c58e2ca26436836"
+            "android": "1:954956298567:android:83814e9a11c5bd6cf43462",
+            "ios": "1:954956298567:ios:7bede964f716da75f43462",
+            "macos": "1:954956298567:ios:7bede964f716da75f43462",
+            "web": "1:954956298567:web:a09911feb2904860f43462",
+            "windows": "1:954956298567:web:63de4f1656a51da2f43462"
           }
         }
       }

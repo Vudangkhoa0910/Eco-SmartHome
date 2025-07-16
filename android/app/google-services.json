@@ -1,76 +1,40 @@
 {
   "project_info": {
-    "project_number": "660074262019",
-    "project_id": "flutterfire-ui-codelab-77ef3",
-    "storage_bucket": "flutterfire-ui-codelab-77ef3.firebasestorage.app"
+    "project_number": "954956298567",
+    "project_id": "chatapp-54676",
+    "storage_bucket": "chatapp-54676.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:660074262019:android:aed40eaaf001c6a8436836",
+        "mobilesdk_app_id": "1:954956298567:android:83814e9a11c5bd6cf43462",
         "android_client_info": {
           "package_name": "com.example.app1"
         }
       },
       "oauth_client": [
         {
-          "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
+          "client_id": "954956298567-rnc9sds8b080d6q1mqcpa4qpasd514t0.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDw1qW-TufkYV_0_FjyLvkmWtNc3bRPz9I"
+          "current_key": "AIzaSyDk5qCUJ-zXJ0ekvgjb9abE1zRIxHEAsC8"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
+              "client_id": "954956298567-rnc9sds8b080d6q1mqcpa4qpasd514t0.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com",
+              "client_id": "954956298567-59qh1ihmrfglep4aria8bp6ne0mmc6fv.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.smarthome.khoa"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:660074262019:android:13a594424f25a698436836",
-        "android_client_info": {
-          "package_name": "com.smarthome.khoa"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDw1qW-TufkYV_0_FjyLvkmWtNc3bRPz9I"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.smarthome.khoa"
+                "bundle_id": "gorouter.demo.com"
               }
             }
           ]
