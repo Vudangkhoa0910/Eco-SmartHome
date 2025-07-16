@@ -1,42 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/service/firebase_data_service.dart';
-import 'package:smart_home/provider/getit.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:smart_home/service/firebase_data_service.dart';
 
 class ChartData {
   final DateTime time;
   final double value;
-  
+
   ChartData(this.time, this.value);
+}
+
+class DeviceUsageData {
+  final String device;
+  final double value;
+  final Color color;
+
+  DeviceUsageData(this.device, this.value, this.color);
+}
+
+class EnergyBarData {
+  final String day;
+  final double usage;
+  final double saved;
+
+  EnergyBarData(this.day, this.usage, this.saved);
 }
 
 class FirebaseAnalyticsScreen extends StatefulWidget {
   const FirebaseAnalyticsScreen({Key? key}) : super(key: key);
 
   @override
-  State<FirebaseAnalyticsScreen> createState() => _FirebaseAnalyticsScreenState();
+  State<FirebaseAnalyticsScreen> createState() =>
+      _FirebaseAnalyticsScreenState();
 }
 
 class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
-  final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
-  
-  List<Map<String, dynamic>>? _temperatureData;
-  List<Map<String, dynamic>>? _powerData;
-  Map<String, dynamic>? _led1Stats;
-  Map<String, dynamic>? _led2Stats;
-  Map<String, dynamic>? _motorStats;
-  
   bool _isLoading = true;
-  String _selectedTimeRange = '24h';
-  
-  final List<String> _timeRanges = [
-    '1h',
-    '6h', 
-    '24h',
-    '7d',
-    '30d'
-  ];
+  bool _aiEnergyModeEnabled = true;
+
+  // Firebase data variables
+  final FirebaseDataService _firebaseService = FirebaseDataService();
+  double _currentPowerConsumption = 0.0;
+  double _dailyEnergyConsumption = 0.0;
+  double _monthlyEnergyConsumption = 0.0;
+  double _monthlyCost = 0.0;
+  List<EnergyBarData> _dailyUsageData = [];
+  List<DeviceUsageData> _deviceUsageData = [];
+  Map<String, dynamic> _deviceStats = {};
 
   @override
   void initState() {
@@ -51,57 +61,238 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
 
   Future<void> _loadAnalyticsData() async {
     if (!mounted) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final tempFuture = _firebaseData.querySensorHistory(
-        timeRange: _selectedTimeRange,
-        sensorType: 'temperature',
-        aggregation: 'mean',
-      );
-      
-      final powerFuture = _firebaseData.querySensorHistory(
-        timeRange: _selectedTimeRange,
-        sensorType: 'power',
-        aggregation: 'mean',
-      );
-      
-      final led1StatsFuture = _firebaseData.getDeviceStats('led_gate', timeRange: _selectedTimeRange);
-      final led2StatsFuture = _firebaseData.getDeviceStats('led_around', timeRange: _selectedTimeRange);
-      final motorStatsFuture = _firebaseData.getDeviceStats('motor', timeRange: _selectedTimeRange);
-      
-      final results = await Future.wait([
-        tempFuture,
-        powerFuture,
-        led1StatsFuture,
-        led2StatsFuture,
-        motorStatsFuture,
-      ]);
-      
+      // Load real data from Firebase with timeout
+      await Future.wait([
+        _loadCurrentPowerConsumption(),
+        _loadDailyEnergyConsumption(),
+        _loadMonthlyEnergyConsumption(),
+        _loadDailyUsageData(),
+        _loadDeviceUsageData(),
+        _loadDeviceStats(),
+      ]).timeout(const Duration(seconds: 10));
+
       if (!mounted) return;
-      
+
       setState(() {
-        _temperatureData = results[0] as List<Map<String, dynamic>>?;
-        _powerData = results[1] as List<Map<String, dynamic>>?;
-        _led1Stats = results[2] as Map<String, dynamic>?;
-        _led2Stats = results[3] as Map<String, dynamic>?;
-        _motorStats = results[4] as Map<String, dynamic>?;
         _isLoading = false;
       });
-      
     } catch (e) {
       print('❌ Analytics Error: $e');
       if (!mounted) return;
-      setState(() => _isLoading = false);
+
+      // Set fallback values on error
+      setState(() {
+        _isLoading = false;
+        _currentPowerConsumption = 0.0;
+        _dailyEnergyConsumption = 0.0;
+        _monthlyEnergyConsumption = 0.0;
+        _monthlyCost = 0.0;
+      });
+    }
+  }
+
+  Future<void> _loadCurrentPowerConsumption() async {
+    try {
+      _currentPowerConsumption =
+          await _firebaseService.getCurrentPowerConsumption();
+    } catch (e) {
+      print('❌ Error loading current power: $e');
+      _currentPowerConsumption = 0.0;
+    }
+  }
+
+  Future<void> _loadDailyEnergyConsumption() async {
+    try {
+      _dailyEnergyConsumption =
+          await _firebaseService.getDailyEnergyConsumption();
+    } catch (e) {
+      print('❌ Error loading daily energy: $e');
+      _dailyEnergyConsumption = 0.0;
+    }
+  }
+
+  Future<void> _loadMonthlyEnergyConsumption() async {
+    try {
+      _monthlyEnergyConsumption =
+          await _firebaseService.getMonthlyEnergyConsumption();
+      // Calculate cost (1500 VND per kWh as default)
+      _monthlyCost = _monthlyEnergyConsumption * 1500;
+    } catch (e) {
+      print('❌ Error loading monthly energy: $e');
+      _monthlyEnergyConsumption = 0.0;
+      _monthlyCost = 0.0;
+    }
+  }
+
+  Future<void> _loadDailyUsageData() async {
+    try {
+      final endDate = DateTime.now();
+      final startDate = endDate.subtract(const Duration(days: 7));
+
+      final powerHistory = await _firebaseService.getPowerConsumptionHistory(
+        startTime: startDate,
+        endTime: endDate,
+      );
+
+      // Group data by day and calculate averages
+      final Map<String, List<double>> dailyPower = {};
+      final Map<String, List<double>> dailySaved = {};
+
+      for (final data in powerHistory) {
+        final timestampRaw = data['created_at'];
+        DateTime? timestamp;
+
+        // Handle both Timestamp and DateTime types
+        if (timestampRaw is DateTime) {
+          timestamp = timestampRaw;
+        } else if (timestampRaw != null) {
+          try {
+            // Firebase Timestamp - convert to DateTime
+            if (timestampRaw.runtimeType.toString().contains('Timestamp')) {
+              timestamp = (timestampRaw as dynamic).toDate() as DateTime?;
+            }
+          } catch (e) {
+            print('❌ Error converting timestamp: $e');
+            continue; // Skip this entry if conversion fails
+          }
+        }
+
+        if (timestamp != null) {
+          final dayKey = '${timestamp.month}/${timestamp.day}';
+          final power = (data['power'] as num?)?.toDouble() ?? 0.0;
+          final energyKwh = (data['energy_kwh'] as num?)?.toDouble() ?? 0.0;
+
+          dailyPower.putIfAbsent(dayKey, () => []);
+          dailyPower[dayKey]!.add(power / 1000); // Convert to kW
+
+          // Assume AI saving is 30% of actual usage
+          dailySaved.putIfAbsent(dayKey, () => []);
+          dailySaved[dayKey]!.add(energyKwh * 0.3);
+        }
+      }
+
+      _dailyUsageData = [];
+      final today = DateTime.now();
+      for (int i = 6; i >= 0; i--) {
+        final date = today.subtract(Duration(days: i));
+        final dayKey = '${date.month}/${date.day}';
+        final displayKey = i == 0 ? 'Hôm nay' : (i == 1 ? 'Hôm qua' : dayKey);
+
+        final avgPower = dailyPower[dayKey]?.isNotEmpty == true
+            ? dailyPower[dayKey]!.reduce((a, b) => a + b) /
+                dailyPower[dayKey]!.length
+            : (15 + i * 2).toDouble(); // Demo data fallback
+
+        final avgSaved = dailySaved[dayKey]?.isNotEmpty == true
+            ? dailySaved[dayKey]!.reduce((a, b) => a + b) /
+                dailySaved[dayKey]!.length
+            : (5 + i).toDouble(); // Demo data fallback
+
+        _dailyUsageData.add(EnergyBarData(displayKey, avgPower, avgSaved));
+      }
+    } catch (e) {
+      print('❌ Error loading daily usage data: $e');
+      // Fallback to demo data
+      _dailyUsageData = [
+        EnergyBarData('8/14', 15, 5),
+        EnergyBarData('15', 25, 8),
+        EnergyBarData('16', 12, 4),
+        EnergyBarData('17', 18, 6),
+        EnergyBarData('18', 20, 7),
+        EnergyBarData('19', 14, 5),
+        EnergyBarData('Hôm nay', 22, 8),
+      ];
+    }
+  }
+
+  Future<void> _loadDeviceUsageData() async {
+    try {
+      _deviceStats = await _firebaseService.getDeviceStats('');
+
+      // Convert to DeviceUsageData format
+      _deviceUsageData = [];
+      final colors = [
+        Colors.blue[300]!,
+        Colors.blue[600]!,
+        Colors.cyan,
+        Colors.purple,
+        Colors.green
+      ];
+      int colorIndex = 0;
+
+      for (final entry in _deviceStats.entries) {
+        final deviceName = entry.key;
+        final stats = entry.value as Map<String, dynamic>;
+        final usagePercent =
+            double.tryParse(stats['usage_percentage']?.toString() ?? '0') ??
+                0.0;
+
+        _deviceUsageData.add(DeviceUsageData(
+          deviceName,
+          usagePercent,
+          colors[colorIndex % colors.length],
+        ));
+        colorIndex++;
+      }
+
+      // Add some demo devices if no real data
+      if (_deviceUsageData.isEmpty) {
+        _deviceUsageData = [
+          DeviceUsageData('Máy điều hòa', 120, Colors.blue[300]!),
+          DeviceUsageData('Family Hub', 95, Colors.blue[600]!),
+          DeviceUsageData('TV', 78, Colors.cyan),
+          DeviceUsageData('Khác', 50, Colors.grey),
+        ];
+      }
+    } catch (e) {
+      print('❌ Error loading device usage data: $e');
+      // Fallback to demo data
+      _deviceUsageData = [
+        DeviceUsageData('Máy điều hòa', 120, Colors.blue[300]!),
+        DeviceUsageData('Family Hub', 95, Colors.blue[600]!),
+        DeviceUsageData('TV', 78, Colors.cyan),
+        DeviceUsageData('Khác', 50, Colors.grey),
+      ];
+    }
+  }
+
+  Future<void> _loadDeviceStats() async {
+    try {
+      _deviceStats = await _firebaseService.getDeviceStats('', timeRange: '7d');
+    } catch (e) {
+      print('❌ Error loading device stats: $e');
+      _deviceStats = {};
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _isLoading ? _buildLoadingScreen() : _buildContent(),
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios,
+                color: Theme.of(context).textTheme.titleLarge?.color),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Energy',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontSize: getProportionateScreenWidth(24),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: _isLoading ? _buildLoadingScreen() : _buildContent(),
+      ),
     );
   }
 
@@ -111,16 +302,19 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).primaryColor,
-            ),
+            valueColor:
+                AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
           Text(
-            'Đang tải dữ liệu phân tích...',
+            'Đang tải dữ liệu năng lượng...',
             style: TextStyle(
               fontSize: getProportionateScreenWidth(14),
-              color: Theme.of(context).textTheme.bodyMedium!.color,
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -129,160 +323,51 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   }
 
   Widget _buildContent() {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Container(
-            padding: EdgeInsets.all(getProportionateScreenWidth(16)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                SizedBox(height: getProportionateScreenHeight(20)),
-                _buildTimeRangeSelector(),
-                SizedBox(height: getProportionateScreenHeight(20)),
-                _buildStatsOverview(),
-                SizedBox(height: getProportionateScreenHeight(20)),
-                _buildChartsSection(),
-                SizedBox(height: getProportionateScreenHeight(20)),
-                _buildDeviceStatsSection(),
-              ],
-            ),
+    return RefreshIndicator(
+      onRefresh: _loadAnalyticsData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(getProportionateScreenWidth(16)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height -
+                AppBar().preferredSize.height -
+                MediaQuery.of(context).padding.top -
+                getProportionateScreenWidth(32), // Padding
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Phân Tích Thông Minh',
-                style: TextStyle(
-                  fontSize: getProportionateScreenWidth(24),
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).textTheme.displayLarge!.color,
-                ),
-              ),
-              SizedBox(height: getProportionateScreenHeight(4)),
-              Text(
-                'Dữ liệu từ Firebase Firestore',
-                style: TextStyle(
-                  fontSize: getProportionateScreenWidth(14),
-                  color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.7),
-                ),
-              ),
+              _buildAIEnergyModeCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildMonthlyCostCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildDailyUsageCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildDeviceUsageCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildCarbonFootprintCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildWaterUsageCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildEnergyConsumptionCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildSmartMeterCard(),
+              SizedBox(height: getProportionateScreenHeight(16)),
+              _buildSolarPowerCard(),
+              SizedBox(
+                  height: getProportionateScreenHeight(
+                      24)), // Extra padding at bottom
             ],
           ),
         ),
-        Container(
-          padding: EdgeInsets.all(getProportionateScreenWidth(12)),
-          decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.cloud_done,
-            color: Colors.green,
-            size: getProportionateScreenWidth(24),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimeRangeSelector() {
-    return Container(
-      height: getProportionateScreenHeight(40),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _timeRanges.length,
-        itemBuilder: (context, index) {
-          final timeRange = _timeRanges[index];
-          final isSelected = timeRange == _selectedTimeRange;
-          
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedTimeRange = timeRange;
-              });
-              _loadAnalyticsData();
-            },
-            child: Container(
-              margin: EdgeInsets.only(right: getProportionateScreenWidth(8)),
-              padding: EdgeInsets.symmetric(
-                horizontal: getProportionateScreenWidth(16),
-                vertical: getProportionateScreenHeight(8),
-              ),
-              decoration: BoxDecoration(
-                color: isSelected 
-                    ? Theme.of(context).primaryColor 
-                    : Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected 
-                      ? Theme.of(context).primaryColor 
-                      : Colors.grey.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                _getTimeRangeLabel(timeRange),
-                style: TextStyle(
-                  fontSize: getProportionateScreenWidth(12),
-                  fontWeight: FontWeight.w500,
-                  color: isSelected 
-                      ? Colors.white 
-                      : Theme.of(context).textTheme.bodyMedium!.color,
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
 
-  Widget _buildStatsOverview() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildOverviewCard(
-            title: 'Tiêu Thụ Điện',
-            value: _getCurrentPowerValue(),
-            unit: 'W',
-            icon: Icons.electric_bolt,
-            color: Colors.orange,
-          ),
-        ),
-        SizedBox(width: getProportionateScreenWidth(12)),
-        Expanded(
-          child: _buildOverviewCard(
-            title: 'Nhiệt Độ',
-            value: _getCurrentTemperatureValue(),
-            unit: '°C',
-            icon: Icons.thermostat,
-            color: Colors.blue,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOverviewCard({
-    required String title,
-    required String value,
-    required String unit,
-    required IconData icon,
-    required Color color,
-  }) {
+  // AI Energy Mode Card
+  Widget _buildAIEnergyModeCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -290,7 +375,81 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           BoxShadow(
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.04),
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.teal.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.auto_awesome,
+              color: Colors.teal,
+              size: 20,
+            ),
+          ),
+          SizedBox(width: getProportionateScreenWidth(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI Energy Mode',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  _currentPowerConsumption > 0
+                      ? 'Hiện tại: ${_currentPowerConsumption.toStringAsFixed(1)}W'
+                      : 'Luôn tiết kiệm',
+                  style: TextStyle(
+                    color: Colors.blue[300],
+                    fontSize: getProportionateScreenWidth(14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _aiEnergyModeEnabled,
+            onChanged: (value) {
+              setState(() {
+                _aiEnergyModeEnabled = value;
+              });
+            },
+            activeColor: Colors.blue,
+            inactiveThumbColor: Colors.grey,
+            inactiveTrackColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[800]
+                : Colors.grey[300],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Monthly Cost Card
+  Widget _buildMonthlyCostCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -299,97 +458,140 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Ch.phí SD năng lượng tháng này',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontSize: getProportionateScreenWidth(16),
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          SizedBox(height: getProportionateScreenHeight(16)),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const Spacer(),
               Text(
-                _getTimeRangeLabel(_selectedTimeRange),
+                '${(_monthlyCost > 0 ? _monthlyCost : 551338).toStringAsFixed(0)}',
                 style: TextStyle(
-                  fontSize: getProportionateScreenWidth(10),
-                  color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.6),
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                  fontSize: getProportionateScreenWidth(28),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(width: getProportionateScreenWidth(4)),
+              Text(
+                'đ',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                  fontSize: getProportionateScreenWidth(20),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          SizedBox(height: getProportionateScreenHeight(12)),
-          Text(
-            '$value $unit',
-            style: TextStyle(
-              fontSize: getProportionateScreenWidth(18),
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).textTheme.displayLarge!.color,
-            ),
+          SizedBox(height: getProportionateScreenHeight(8)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.teal, size: 16),
+              SizedBox(width: getProportionateScreenWidth(4)),
+              Expanded(
+                child: Text(
+                  'Tiết kiệm 178.877 đ với AI Energy Mode',
+                  style: TextStyle(
+                    color: Colors.teal,
+                    fontSize: getProportionateScreenWidth(12),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: getProportionateScreenHeight(4)),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: getProportionateScreenWidth(12),
-              color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.7),
-            ),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Divider(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey[700]
+                  : Colors.grey[300],
+              height: 1),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chi phí ước tính cả tháng',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.7),
+                        fontSize: getProportionateScreenWidth(12),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    Text(
+                      'Chi phí của tháng trước',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.7),
+                        fontSize: getProportionateScreenWidth(12),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.65).toStringAsFixed(0) : '909.710')} đ',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(12),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    Text(
+                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.1).toStringAsFixed(0) : '606.474')} đ',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(12),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChartsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Biểu Đồ Theo Dõi',
-          style: TextStyle(
-            fontSize: getProportionateScreenWidth(18),
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).textTheme.displayLarge!.color,
-          ),
-        ),
-        SizedBox(height: getProportionateScreenHeight(16)),
-        _buildChart(
-          'Công Suất Tiêu Thụ (W)', 
-          _powerData ?? [], 
-          Colors.orange,
-          Icons.electric_bolt,
-        ),
-        SizedBox(height: getProportionateScreenHeight(16)),
-        _buildChart(
-          'Nhiệt Độ (°C)', 
-          _temperatureData ?? [], 
-          Colors.blue,
-          Icons.thermostat,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChart(String title, List<Map<String, dynamic>> data, Color color, IconData icon) {
-    // Convert Firebase data to chart data
-    final chartData = data.map((item) {
-      final timeStr = item['_time']?.toString() ?? '';
-      final valueStr = item['_value']?.toString() ?? '0';
-      final value = double.tryParse(valueStr) ?? 0;
-      
-      DateTime? time;
-      try {
-        time = DateTime.parse(timeStr);
-      } catch (e) {
-        time = DateTime.now();
-      }
-      
-      return ChartData(time, value);
-    }).toList();
-
+  // Daily Usage Card with Bar Chart
+  Widget _buildDailyUsageCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -397,7 +599,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           BoxShadow(
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.04),
+                : Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -410,108 +612,156 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                title,
+                'Sử dụng năng lượng',
                 style: TextStyle(
-                  fontSize: getProportionateScreenWidth(14),
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                  fontSize: getProportionateScreenWidth(16),
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).textTheme.displayLarge!.color,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-              Icon(icon, color: color, size: 20),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7)),
             ],
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
-          SizedBox(
-            height: getProportionateScreenHeight(200),
-            child: chartData.isEmpty
-                ? Center(
-                    child: Text(
-                      'Không có dữ liệu',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  )
-                : SfCartesianChart(
-                    primaryXAxis: DateTimeAxis(
-                      axisLabelFormatter: (axisLabelRenderArgs) {
-                        final DateTime date = DateTime.fromMillisecondsSinceEpoch(
-                          axisLabelRenderArgs.value.toInt(),
-                        );
-                        return ChartAxisLabel(
-                          '${date.hour}:${date.minute.toString().padLeft(2, '0')}',
-                          TextStyle(
-                            fontSize: getProportionateScreenWidth(10),
-                            color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.7),
-                          ),
-                        );
-                      },
-                    ),
-                    primaryYAxis: NumericAxis(
-                      axisLabelFormatter: (axisLabelRenderArgs) {
-                        return ChartAxisLabel(
-                          axisLabelRenderArgs.value.toStringAsFixed(1),
-                          TextStyle(
-                            fontSize: getProportionateScreenWidth(10),
-                            color: Theme.of(context).textTheme.bodyMedium!.color?.withValues(alpha: 0.7),
-                          ),
-                        );
-                      },
-                    ),
-                    series: <CartesianSeries>[
-                      LineSeries<ChartData, DateTime>(
-                        dataSource: chartData,
-                        xValueMapper: (ChartData data, _) => data.time,
-                        yValueMapper: (ChartData data, _) => data.value,
-                        color: color,
-                        width: 2,
-                        markerSettings: MarkerSettings(
-                          isVisible: true,
-                          color: color,
-                          borderColor: Colors.white,
-                          borderWidth: 2,
-                          height: 4,
-                          width: 4,
-                        ),
-                      ),
-                    ],
-                    plotAreaBorderWidth: 0,
-                    borderWidth: 0,
+          Text(
+            '${(_monthlyEnergyConsumption > 0 ? _monthlyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontSize: getProportionateScreenWidth(24),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            'Tiêu thụ ít hơn ${(_monthlyEnergyConsumption > 0 ? (_monthlyEnergyConsumption * 0.1).toStringAsFixed(2) : '29.39')} kWh so với cùng kỳ tháng trước.',
+            style: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withValues(alpha: 0.7),
+              fontSize: getProportionateScreenWidth(12),
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+          SizedBox(height: getProportionateScreenHeight(20)),
+          Container(
+            height: getProportionateScreenHeight(120),
+            child: SfCartesianChart(
+              backgroundColor: Colors.transparent,
+              plotAreaBorderWidth: 0,
+              primaryXAxis: CategoryAxis(
+                axisLine: AxisLine(width: 0),
+                majorTickLines: MajorTickLines(size: 0),
+                labelStyle: TextStyle(
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7),
+                  fontSize: getProportionateScreenWidth(10),
+                ),
+              ),
+              primaryYAxis: NumericAxis(
+                isVisible: false,
+                minimum: 0,
+                maximum: 30,
+              ),
+              series: <CartesianSeries>[
+                ColumnSeries<EnergyBarData, String>(
+                  dataSource: _dailyUsageData,
+                  xValueMapper: (EnergyBarData data, _) => data.day,
+                  yValueMapper: (EnergyBarData data, _) => data.usage,
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(4),
                   ),
+                ),
+                ColumnSeries<EnergyBarData, String>(
+                  dataSource: _dailyUsageData,
+                  xValueMapper: (EnergyBarData data, _) => data.day,
+                  yValueMapper: (EnergyBarData data, _) => data.saved,
+                  color: Colors.teal,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Text(
+                '1',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: 10),
+              ),
+              Spacer(),
+              Text(
+                'Hôm nay',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: 10),
+              ),
+              Spacer(),
+              Text(
+                '31',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: 10),
+              ),
+            ],
+          ),
+          SizedBox(height: getProportionateScreenHeight(8)),
+          Row(
+            children: [
+              Text(
+                '— tháng 7',
+                style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: 10),
+              ),
+              SizedBox(width: getProportionateScreenWidth(20)),
+              Text(
+                '— tháng 8',
+                style: TextStyle(color: Colors.blue, fontSize: 10),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDeviceStatsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Thống Kê Thiết Bị',
-          style: TextStyle(
-            fontSize: getProportionateScreenWidth(18),
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).textTheme.displayLarge!.color,
-          ),
-        ),
-        SizedBox(height: getProportionateScreenHeight(16)),
-        _buildDeviceStatsCard('Đèn Cổng', _led1Stats?['led_gate'], Colors.amber, Icons.lightbulb),
-        SizedBox(height: getProportionateScreenHeight(12)),
-        _buildDeviceStatsCard('Đèn Xung Quanh', _led2Stats?['led_around'], Colors.green, Icons.lightbulb_outline),
-        SizedBox(height: getProportionateScreenHeight(12)),
-        _buildDeviceStatsCard('Motor', _motorStats?['motor'], Colors.purple, Icons.settings),
-      ],
-    );
-  }
-
-  Widget _buildDeviceStatsCard(String deviceName, Map<String, dynamic>? stats, Color color, IconData icon) {
-    final usagePercentage = stats != null ? 
-      double.tryParse(stats['usage_percentage']?.toString() ?? '0') ?? 0 : 0;
-    
+  // Device Usage Card with Donut Chart
+  Widget _buildDeviceUsageCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -519,7 +769,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           BoxShadow(
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.04),
+                : Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -529,78 +779,817 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
+              Expanded(
+                child: Text(
+                  'Mức sử dụng năng lượng của thiết bị',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-                child: Icon(icon, color: color, size: 16),
               ),
               SizedBox(width: getProportionateScreenWidth(8)),
-              Text(
-                deviceName,
-                style: TextStyle(
-                  fontSize: getProportionateScreenWidth(14),
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).textTheme.displayLarge!.color,
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7)),
+            ],
+          ),
+          SizedBox(height: getProportionateScreenHeight(8)),
+          Text(
+            'Tiết kiệm 24.5% với AI Energy Mode',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontSize: getProportionateScreenWidth(14),
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          Text(
+            'Máy điều hòa trong phòng đang tiêu thụ nhiều năng lượng nhất',
+            style: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withValues(alpha: 0.7),
+              fontSize: getProportionateScreenWidth(12),
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+          SizedBox(height: getProportionateScreenHeight(20)),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.electric_bolt, color: Colors.blue, size: 16),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Tổng mức sử dụng',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontSize: getProportionateScreenWidth(12),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${(_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(20),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: getProportionateScreenHeight(12)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome, color: Colors.teal, size: 16),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Khoản tiết kiệm',
+                            style: TextStyle(
+                              color: Colors.teal,
+                              fontSize: getProportionateScreenWidth(12),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${((_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption : 95.35) * 0.3).toStringAsFixed(2)} kWh',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(20),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Text(
-                '${usagePercentage.toStringAsFixed(1)}%',
-                style: TextStyle(
-                  fontSize: getProportionateScreenWidth(12),
-                  fontWeight: FontWeight.w500,
-                  color: color,
+              Container(
+                width: getProportionateScreenWidth(100),
+                height: getProportionateScreenWidth(100),
+                child: SfCircularChart(
+                  backgroundColor: Colors.transparent,
+                  series: <CircularSeries>[
+                    DoughnutSeries<DeviceUsageData, String>(
+                      dataSource: _deviceUsageData,
+                      xValueMapper: (DeviceUsageData data, _) => data.device,
+                      yValueMapper: (DeviceUsageData data, _) => data.value,
+                      pointColorMapper: (DeviceUsageData data, _) => data.color,
+                      innerRadius: '60%',
+                      radius: '80%',
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: getProportionateScreenHeight(8)),
-          LinearProgressIndicator(
-            value: usagePercentage / 100,
-            backgroundColor: Colors.grey.withValues(alpha: 0.2),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
+          SizedBox(height: getProportionateScreenHeight(20)),
+          // Show real device data or demo data
+          ..._buildDeviceUsageItems(),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Center(
+            child: Text(
+              'Xem tất cả',
+              style: TextStyle(
+                color: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.color
+                    ?.withValues(alpha: 0.7),
+                fontSize: getProportionateScreenWidth(14),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _getCurrentPowerValue() {
-    if (_powerData != null && _powerData!.isNotEmpty) {
-      final lastValue = _powerData!.last['_value']?.toString() ?? '0';
-      final power = double.tryParse(lastValue) ?? 0;
-      return power.toStringAsFixed(1);
+  List<Widget> _buildDeviceUsageItems() {
+    if (_deviceUsageData.isEmpty) {
+      return [
+        _buildDeviceUsageItem('Máy điều hòa trong phòng', '34.98 kWh',
+            '14.25 kWh', Colors.blue, Colors.teal),
+        SizedBox(height: getProportionateScreenHeight(8)),
+        _buildDeviceUsageItem(
+            'Family Hub', '27.41 kWh', '7.52 kWh', Colors.blue, Colors.teal),
+        SizedBox(height: getProportionateScreenHeight(8)),
+        _buildDeviceUsageItem(
+            'TV', '25.23 kWh', '8.78 kWh', Colors.blue, Colors.teal),
+      ];
     }
-    return '0.0';
+
+    final items = <Widget>[];
+    for (int i = 0; i < _deviceUsageData.length && i < 3; i++) {
+      final device = _deviceUsageData[i];
+      final usage = '${device.value.toStringAsFixed(2)} kWh';
+      final saved = '${(device.value * 0.3).toStringAsFixed(2)} kWh';
+
+      if (i > 0) items.add(SizedBox(height: getProportionateScreenHeight(8)));
+      items.add(_buildDeviceUsageItem(
+        device.device,
+        usage,
+        saved,
+        device.color,
+        Colors.teal,
+      ));
+    }
+    return items;
   }
 
-  String _getCurrentTemperatureValue() {
-    if (_temperatureData != null && _temperatureData!.isNotEmpty) {
-      final lastValue = _temperatureData!.last['_value']?.toString() ?? '0';
-      final temp = double.tryParse(lastValue) ?? 0;
-      return temp.toStringAsFixed(1);
-    }
-    return '0.0';
+  Widget _buildDeviceUsageItem(String deviceName, String usage, String saved,
+      Color usageColor, Color savedColor) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: usageColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        SizedBox(width: getProportionateScreenWidth(8)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                deviceName,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                  fontSize: getProportionateScreenWidth(12),
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+              Text(
+                '$usage | $saved',
+                style: TextStyle(
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7),
+                  fontSize: getProportionateScreenWidth(10),
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: getProportionateScreenWidth(60),
+              height: 6,
+              decoration: BoxDecoration(
+                color: usageColor,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            SizedBox(width: 4),
+            Container(
+              width: getProportionateScreenWidth(20),
+              height: 6,
+              decoration: BoxDecoration(
+                color: savedColor,
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: savedColor, width: 1),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
-  String _getTimeRangeLabel(String range) {
-    switch (range) {
-      case '1h':
-        return '1 Giờ';
-      case '6h':
-        return '6 Giờ';
-      case '24h':
-        return '24 Giờ';
-      case '7d':
-        return '7 Ngày';
-      case '30d':
-        return '30 Ngày';
-      default:
-        return range;
-    }
+  // Carbon Footprint Card
+  Widget _buildCarbonFootprintCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Nhận thức ph.thải carbon',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              SizedBox(width: getProportionateScreenWidth(8)),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7)),
+            ],
+          ),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.cloud, color: Colors.white, size: 24),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Khí thải',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.7),
+                        fontSize: getProportionateScreenWidth(12),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      '87.6 kg',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(16),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: getProportionateScreenWidth(20)),
+              Expanded(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.park, color: Colors.white, size: 24),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Cắt giảm',
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.7),
+                        fontSize: getProportionateScreenWidth(12),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      '1.2 kg',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleLarge?.color,
+                        fontSize: getProportionateScreenWidth(16),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Water Usage Card
+  Widget _buildWaterUsageCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Mức tiêu thụ nước',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              SizedBox(width: getProportionateScreenWidth(8)),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withValues(alpha: 0.7)),
+            ],
+          ),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Text(
+            '3.49 t',
+            style: TextStyle(
+              color: Theme.of(context).textTheme.titleLarge?.color,
+              fontSize: getProportionateScreenWidth(24),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            'Tiêu thụ nhiều hơn 0.23 t so với cùng kỳ tháng trước.',
+            style: TextStyle(
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withValues(alpha: 0.7),
+              fontSize: getProportionateScreenWidth(12),
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+          SizedBox(height: getProportionateScreenHeight(16)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                width: getProportionateScreenWidth(80),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey[700]
+                            : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.grey[800],
+                            borderRadius: BorderRadius.only(
+                              bottomLeft: Radius.circular(4),
+                              bottomRight: Radius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Container(
+                      width: 30,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.cyan,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text('Th7',
+                  style: TextStyle(
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withValues(alpha: 0.7),
+                      fontSize: 10)),
+              SizedBox(width: 20),
+              Text('Th8',
+                  style: TextStyle(
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withValues(alpha: 0.7),
+                      fontSize: 10)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Energy Consumption Recommendation Card
+  Widget _buildEnergyConsumptionCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ptích mức tiêu thụ năng lượng',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                SizedBox(height: getProportionateScreenHeight(8)),
+                Text(
+                  'Hãy xem kiểu tiêu thụ năng lượng của Virtual Home.',
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: getProportionateScreenWidth(12),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: getProportionateScreenWidth(60),
+            height: getProportionateScreenWidth(60),
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[300]
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(Icons.bar_chart, color: Colors.white, size: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Smart Meter Card
+  Widget _buildSmartMeterCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đồng hồ thông minh',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                SizedBox(height: getProportionateScreenHeight(8)),
+                Text(
+                  'Tìm hiểu cách kiểm tra tổng mức tiêu thụ năng lượng trong nhà của bạn.',
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: getProportionateScreenWidth(12),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                width: getProportionateScreenWidth(40),
+                height: getProportionateScreenWidth(50),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[600]
+                      : Colors.grey[400],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 2,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.grey[800],
+                    ),
+                    SizedBox(height: 4),
+                    Container(
+                      width: 15,
+                      height: 2,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.grey[800],
+                    ),
+                    SizedBox(height: 4),
+                    Container(
+                      width: 20,
+                      height: 2,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.grey[800],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                width: getProportionateScreenWidth(30),
+                height: getProportionateScreenWidth(30),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(Icons.electric_bolt, color: Colors.white, size: 16),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Solar Power Card
+  Widget _buildSolarPowerCard() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tấm năng lượng mặt trời',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(16),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                SizedBox(height: getProportionateScreenHeight(8)),
+                Text(
+                  'Tìm hiểu cách hiện thực hóa một ngôi nhà cân bằng khí thải.',
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.color
+                        ?.withValues(alpha: 0.7),
+                    fontSize: getProportionateScreenWidth(12),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: getProportionateScreenWidth(60),
+            height: getProportionateScreenWidth(60),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  child: Container(
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[300],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[300]
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.cloud_download,
+                        color: Colors.teal, size: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
