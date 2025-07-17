@@ -5,9 +5,11 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:smart_home/core/permission_helper.dart';
 
 class AIVoiceViewModel extends BaseModel {
   bool _isListening = false;
@@ -101,6 +103,7 @@ class AIVoiceViewModel extends BaseModel {
     await _loadUserData();
     
     print('AI Voice Assistant initialized - Speech enabled: $_speechEnabled');
+    notifyListeners(); // Notify listeners after initialization
   }
   
   Future<void> _loadUserData() async {
@@ -136,13 +139,22 @@ class AIVoiceViewModel extends BaseModel {
   
   Future<void> _initializeSpeech() async {
     try {
-      // Request microphone permission
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        print('Microphone permission denied');
+      print('=== Initializing Speech Recognition ===');
+      
+      // Check microphone permission first without requesting
+      final micPermission = await Permission.microphone.status;
+      print('Current microphone permission status: $micPermission');
+      
+      if (!micPermission.isGranted) {
+        print('Microphone permission not granted - will request when needed');
+        _speechEnabled = false;
+        notifyListeners();
         return;
       }
       
+      print('Microphone permission granted, initializing speech recognition...');
+      
+      // Initialize speech recognition
       _speechEnabled = await _speechToText.initialize(
         onStatus: (status) {
           print('Speech recognition status: $status');
@@ -156,12 +168,34 @@ class AIVoiceViewModel extends BaseModel {
           _isListening = false;
           notifyListeners();
         },
+        debugLogging: true,
+        finalTimeout: const Duration(milliseconds: 5000),
       );
       
-      print('Speech recognition initialized: $_speechEnabled');
+      if (_speechEnabled) {
+        // Check available locales for debugging
+        final locales = await _speechToText.locales();
+        print('Available speech locales: ${locales.map((e) => "${e.localeId} - ${e.name}").join(", ")}');
+        
+        // Check if Vietnamese is available
+        final viLocales = locales.where((locale) => 
+          locale.localeId.startsWith('vi') || 
+          locale.name.toLowerCase().contains('vietnam')
+        );
+        
+        if (viLocales.isNotEmpty) {
+          print('Vietnamese locales found: ${viLocales.map((e) => "${e.localeId} - ${e.name}").join(", ")}');
+        } else {
+          print('No Vietnamese locales found');
+        }
+      }
+      
+      print('Speech recognition initialized successfully: $_speechEnabled');
+      notifyListeners();
     } catch (e) {
       print('Failed to initialize speech recognition: $e');
       _speechEnabled = false;
+      notifyListeners();
     }
   }
   
@@ -187,8 +221,45 @@ class AIVoiceViewModel extends BaseModel {
   }
 
   void startListening() async {
+    print('=== Starting Speech Recognition ===');
+    
     if (!_speechEnabled) {
-      print('Speech recognition not enabled');
+      print('Speech recognition not enabled, checking permissions...');
+      
+      // Check current permission status
+      final micStatus = await Permission.microphone.status;
+      print('Current microphone permission status: $micStatus');
+      
+      if (!micStatus.isGranted) {
+        print('Microphone permission not granted, requesting...');
+        final micPermission = await Permission.microphone.request();
+        print('Microphone permission request result: $micPermission');
+        
+        if (!micPermission.isGranted) {
+          print('Permission denied, showing dialog');
+          _showSettingsDialog();
+          return;
+        }
+      }
+      
+      // Try to reinitialize speech recognition
+      print('Attempting to reinitialize speech recognition...');
+      await _initializeSpeech();
+      
+      if (!_speechEnabled) {
+        print('Speech still not enabled after reinitialization');
+        _showSettingsDialog();
+        return;
+      }
+    }
+    
+    // Double-check permissions before starting
+    final micPermission = await Permission.microphone.isGranted;
+    print('Final microphone permission check: $micPermission');
+    
+    if (!micPermission) {
+      print('Microphone permission denied at final check');
+      _showSettingsDialog();
       return;
     }
     
@@ -198,8 +269,30 @@ class AIVoiceViewModel extends BaseModel {
     notifyListeners();
     
     try {
+      // Get available locales
+      final locales = await _speechToText.locales();
+      String viLocale = 'vi_VN';
+      
+      // Look for a Vietnamese locale if the exact one isn't available
+      if (!locales.any((locale) => locale.localeId == 'vi_VN')) {
+        final viLocales = locales.where((locale) => 
+          locale.localeId.startsWith('vi') || 
+          locale.name.toLowerCase().contains('vietnam')
+        );
+        
+        if (viLocales.isNotEmpty) {
+          viLocale = viLocales.first.localeId;
+          print('Using Vietnamese locale: $viLocale');
+        } else {
+          print('No Vietnamese locale found, using default');
+        }
+      }
+      
+      print('Starting speech recognition with locale: $viLocale');
+      
       await _speechToText.listen(
         onResult: (result) {
+          print('Speech recognition result: ${result.recognizedWords}');
           _recognizedText = result.recognizedWords;
           notifyListeners();
           
@@ -208,12 +301,14 @@ class AIVoiceViewModel extends BaseModel {
             _processCommand(_recognizedText);
           }
         },
-        listenFor: const Duration(seconds: 10),
+        listenFor: const Duration(seconds: 15),
         pauseFor: const Duration(seconds: 3),
-        cancelOnError: true,
+        cancelOnError: false,
         partialResults: true,
-        localeId: 'vi_VN',
+        localeId: viLocale,
       );
+      
+      print('Speech recognition started successfully');
     } catch (e) {
       print('Error starting speech recognition: $e');
       _isListening = false;
@@ -865,7 +960,72 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                     _speechEnabled ? 'Hoạt động' : 'Không khả dụng',
                     style: TextStyle(color: _speechEnabled ? Colors.green : Colors.red),
                   ),
-                  onTap: () {},
+                  onTap: () async {
+                    if (!_speechEnabled) {
+                      await _initializeSpeech();
+                    } else {
+                      // Test speech recognition
+                      if (_speechToText.isAvailable) {
+                        _showTestSpeechDialog(context);
+                      }
+                    }
+                  },
+                ),
+                const Divider(color: Colors.white24),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: Colors.white70),
+                  title: const Text('Quyền Camera', style: TextStyle(color: Colors.white)),
+                  trailing: FutureBuilder<PermissionStatus>(
+                    future: Permission.camera.status,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        final isGranted = snapshot.data!.isGranted;
+                        return Text(
+                          isGranted ? 'Đã cấp' : 'Chưa cấp',
+                          style: TextStyle(color: isGranted ? Colors.green : Colors.red),
+                        );
+                      }
+                      return const Text('Đang kiểm tra...', style: TextStyle(color: Colors.grey));
+                    },
+                  ),
+                  onTap: () async {
+                    final granted = await PermissionHelper.requestCameraPermission();
+                    if (!granted) {
+                      await PermissionHelper.showPermissionDialog(context, 'Camera');
+                    }
+                    // Refresh UI after permission change
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      (context as Element).markNeedsBuild();
+                    });
+                  },
+                ),
+                const Divider(color: Colors.white24),
+                ListTile(
+                  leading: const Icon(Icons.mic, color: Colors.white70),
+                  title: const Text('Quyền Microphone', style: TextStyle(color: Colors.white)),
+                  trailing: FutureBuilder<PermissionStatus>(
+                    future: Permission.microphone.status,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        final isGranted = snapshot.data!.isGranted;
+                        return Text(
+                          isGranted ? 'Đã cấp' : 'Chưa cấp',
+                          style: TextStyle(color: isGranted ? Colors.green : Colors.red),
+                        );
+                      }
+                      return const Text('Đang kiểm tra...', style: TextStyle(color: Colors.grey));
+                    },
+                  ),
+                  onTap: () async {
+                    final granted = await PermissionHelper.requestMicrophonePermission();
+                    if (!granted) {
+                      await PermissionHelper.showPermissionDialog(context, 'Microphone');
+                    }
+                    // Refresh UI after permission change
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      (context as Element).markNeedsBuild();
+                    });
+                  },
                 ),
               ],
             ),
@@ -1189,5 +1349,159 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     _speechToText.cancel();
     _flutterTts.stop();
     super.dispose();
+  }
+
+  void _showTestSpeechDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Test nhận diện giọng nói'),
+        content: const Text('Nhận diện giọng nói đã được kích hoạt. Bạn có thể thử nói "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đóng'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              toggleListening();
+            },
+            child: const Text('Thử ngay'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPermissionRequiredDialog() {
+    BuildContext? context = getActiveContext();
+    if (context != null) {
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: const Text('Cần cấp quyền Microphone'),
+          content: const Text(
+            'Để sử dụng chức năng nhận diện giọng nói, ứng dụng cần được cấp quyền truy cập microphone. '
+            'Bạn có muốn cấp quyền ngay bây giờ không?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Để sau'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                // Request microphone permission
+                final permission = await Permission.microphone.request();
+                if (permission.isGranted) {
+                  // Try to initialize speech recognition again
+                  await _initializeSpeech();
+                } else {
+                  // Open app settings if permission is permanently denied
+                  if (permission.isPermanentlyDenied) {
+                    await openAppSettings();
+                  }
+                }
+              },
+              child: const Text('Cấp quyền'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      print('No context available to show permission dialog');
+    }
+  }
+
+  void _showSettingsDialog() {
+    BuildContext? context = getActiveContext();
+    if (context != null) {
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) => AlertDialog(
+          title: const Text('Cần cấp quyền Microphone'),
+          content: const Text(
+            'Quyền microphone đã bị từ chối vĩnh viễn. Để sử dụng chức năng nhận diện giọng nói, '
+            'bạn cần vào Cài đặt > Quyền riêng tư & Bảo mật > Microphone và bật quyền cho ứng dụng KhoaSmart.\n\n'
+            'Sau khi cấp quyền, vui lòng quay lại ứng dụng.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Để sau'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                try {
+                  await openAppSettings();
+                } catch (e) {
+                  print('Error opening app settings: $e');
+                }
+              },
+              child: const Text('Mở Cài đặt'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      print('No context available to show settings dialog');
+    }
+  }
+
+  // Get context from NavigationService instead of static GlobalKey
+  BuildContext? getActiveContext() {
+    return getIt<NavigationService>().navigatorKey.currentContext;
+  }
+
+  // Manual permission request that can be called from UI
+  Future<bool> requestMicrophonePermission() async {
+    try {
+      print('=== Manual Microphone Permission Request ===');
+      
+      // Check current status first
+      final currentStatus = await Permission.microphone.status;
+      print('Current microphone permission status: $currentStatus');
+      
+      if (currentStatus.isGranted) {
+        print('Permission already granted');
+        await _initializeSpeech();
+        return _speechEnabled;
+      }
+      
+      if (currentStatus.isPermanentlyDenied) {
+        print('Permission permanently denied, need to go to settings');
+        _showSettingsDialog();
+        return false;
+      }
+      
+      print('Requesting microphone permission...');
+      final permission = await Permission.microphone.request();
+      print('Permission request result: $permission');
+      
+      if (permission.isGranted) {
+        print('Permission granted! Reinitializing speech...');
+        await _initializeSpeech();
+        print('Speech enabled after manual request: $_speechEnabled');
+        return _speechEnabled;
+      } else if (permission.isPermanentlyDenied) {
+        print('Permission permanently denied after request');
+        _showSettingsDialog();
+        return false;
+      } else {
+        print('Permission denied but not permanently');
+        return false;
+      }
+    } catch (e) {
+      print('Error requesting microphone permission: $e');
+      return false;
+    }
+  }
+
+  // Force re-initialize speech (useful after permission granted)
+  Future<void> forceInitializeSpeech() async {
+    await _initializeSpeech();
   }
 }

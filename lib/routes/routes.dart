@@ -15,6 +15,7 @@ import 'package:smart_home/src/screens/ai_voice_screen/ai_voice_screen.dart';
 import 'package:smart_home/src/screens/analytics_screen/analytics_screen.dart';
 import 'package:smart_home/src/screens/profile_screen/profile_screen.dart';
 import 'package:smart_home/src/screens/about_screen/about_us_screen.dart';
+import 'package:smart_home/src/screens/qr_scanner_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:smart_home/src/screens/home_screen/home_screen.dart';
 import 'package:smart_home/src/screens/my_list_screen/my_list_screen.dart';
@@ -45,4 +46,5 @@ final Map<String, WidgetBuilder> routes = {
   AnalyticsScreen.routeName: (context) => const AnalyticsScreen(),
   ProfileScreen.routeName: (context) => const ProfileScreen(),
   AboutUs.routeName: (context) => const AboutUs(),
+  '/qr-scanner': (context) => const QRScannerScreen(),
 };

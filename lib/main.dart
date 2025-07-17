@@ -21,9 +21,9 @@ void main() async {
   // Initialize date formatting
   try {
     await initializeDateFormatting('en_US', null);
-    print('✅ Date formatting initialized');
+    print('Date formatting initialized');
   } catch (e) {
-    print('⚠️ Failed to initialize date formatting: $e');
+    print('Failed to initialize date formatting: $e');
   }
   
   setupLocator();
