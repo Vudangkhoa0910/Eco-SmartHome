@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 
 class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({Key? key}) : super(key: key);
@@ -9,10 +10,27 @@ class QRScannerScreen extends StatefulWidget {
   State<QRScannerScreen> createState() => _QRScannerScreenState();
 }
 
-class _QRScannerScreenState extends State<QRScannerScreen> {
+class _QRScannerScreenState extends State<QRScannerScreen> with TickerProviderStateMixin {
   MobileScannerController controller = MobileScannerController();
   String? result;
   bool isScanning = true;
+  final ImagePicker _imagePicker = ImagePicker();
+  
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.repeat(reverse: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +78,30 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                       cutOutSize: 280,
                     ),
                   ),
+                ),
+                
+                // Animated scanning line
+                AnimatedBuilder(
+                  animation: _animation,
+                  builder: (context, child) {
+                    return Positioned(
+                      left: MediaQuery.of(context).size.width / 2 - 140,
+                      top: MediaQuery.of(context).size.height / 2 - 140 + (_animation.value * 280),
+                      child: Container(
+                        width: 280,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              const Color(0xFF4CAF50).withOpacity(0.8),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 // Instructions overlay
                 Positioned(
@@ -120,6 +162,13 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                           },
                         ),
                         _buildControlButton(
+                          icon: Icons.photo_library,
+                          label: 'Thư viện',
+                          onTap: () async {
+                            await _pickImageFromGallery();
+                          },
+                        ),
+                        _buildControlButton(
                           icon: Icons.flip_camera_ios,
                           label: 'Đổi camera',
                           onTap: () async {
@@ -170,6 +219,57 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
     );
   }
 
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxHeight: 1024,
+        maxWidth: 1024,
+      );
+
+      if (image != null) {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Đang phân tích hình ảnh...'),
+              ],
+            ),
+          ),
+        );
+
+        // For now, we'll show a message that this feature is coming soon
+        // In a real implementation, you'd use an image processing library
+        // like google_ml_kit or similar to detect QR codes in the image
+        await Future.delayed(const Duration(seconds: 1));
+        
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Show info message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chức năng phân tích QR từ hình ảnh đang được phát triển'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lỗi khi chọn hình ảnh'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _onQRViewCreated(BarcodeCapture capture) {
     if (!isScanning) return;
 
@@ -208,6 +308,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   @override
   void dispose() {
+    _animationController.dispose();
     controller.dispose();
     super.dispose();
   }

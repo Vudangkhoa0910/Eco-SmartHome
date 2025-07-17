@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/ai_voice_view_model.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'custom_commands_manager.dart';
 
 class Body extends StatelessWidget {
@@ -14,15 +15,17 @@ class Body extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: Theme.of(context).brightness == Brightness.dark ? [
-            const Color(0xFF2E3440),
-            const Color(0xFF3B4252),
-            const Color(0xFF434C5E),
-          ] : [
-            const Color(0xFFF7F9FC),
-            const Color(0xFFE6F0FA),
-            const Color(0xFFDDE7F5),
-          ],
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? [
+                  const Color(0xFF2E3440),
+                  const Color(0xFF3B4252),
+                  const Color(0xFF434C5E),
+                ]
+              : [
+                  const Color(0xFFF7F9FC),
+                  const Color(0xFFE6F0FA),
+                  const Color(0xFFDDE7F5),
+                ],
         ),
       ),
       child: SafeArea(
@@ -39,25 +42,27 @@ class Body extends StatelessWidget {
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.arrow_back_ios, 
-                      color: Theme.of(context).textTheme.bodyLarge!.color, 
-                      size: 22),
+                    icon: Icon(
+                      Icons.arrow_back_ios,
+                      color: Theme.of(context).textTheme.bodyLarge!.color,
+                      size: 22,
+                    ),
                   ),
                   Column(
                     children: [
                       Text(
                         'Trợ lý AI',
                         style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       Text(
                         'Smart Home Assistant',
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          color: Theme.of(context).textTheme.bodySmall!.color,
-                          fontSize: 11,
-                        ),
+                              color: Theme.of(context).textTheme.bodySmall!.color,
+                              fontSize: 11,
+                            ),
                       ),
                     ],
                   ),
@@ -68,9 +73,11 @@ class Body extends StatelessWidget {
                         onPressed: () => model.toggleChatBox(),
                         icon: Stack(
                           children: [
-                            Icon(Icons.chat_bubble_outline, 
-                              color: Theme.of(context).textTheme.bodyMedium!.color, 
-                              size: 22),
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              color: Theme.of(context).textTheme.bodyMedium!.color,
+                              size: 22,
+                            ),
                             if (model.showChatBox)
                               Positioned(
                                 right: 0,
@@ -89,15 +96,19 @@ class Body extends StatelessWidget {
                       ),
                       IconButton(
                         onPressed: () => _showCustomCommandsManager(context),
-                        icon: Icon(Icons.tune, 
-                          color: Theme.of(context).textTheme.bodyMedium!.color, 
-                          size: 22),
+                        icon: Icon(
+                          Icons.tune,
+                          color: Theme.of(context).textTheme.bodyMedium!.color,
+                          size: 22,
+                        ),
                       ),
                       IconButton(
                         onPressed: () => model.showSettings(context),
-                        icon: Icon(Icons.settings, 
-                          color: Theme.of(context).textTheme.bodyMedium!.color, 
-                          size: 22),
+                        icon: Icon(
+                          Icons.settings,
+                          color: Theme.of(context).textTheme.bodyMedium!.color,
+                          size: 22,
+                        ),
                       ),
                     ],
                   ),
@@ -109,9 +120,9 @@ class Body extends StatelessWidget {
                 margin: EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: model.isListening 
+                  color: model.isListening
                       ? Colors.green.withOpacity(0.2)
-                      : model.isProcessing 
+                      : model.isProcessing
                           ? Colors.orange.withOpacity(0.2)
                           : model.showChatBox
                               ? Colors.blue.withOpacity(0.2)
@@ -120,9 +131,9 @@ class Body extends StatelessWidget {
                                   : Colors.red.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: model.isListening 
+                    color: model.isListening
                         ? Colors.green
-                        : model.isProcessing 
+                        : model.isProcessing
                             ? Colors.orange
                             : model.showChatBox
                                 ? Colors.blue
@@ -158,23 +169,28 @@ class Body extends StatelessWidget {
                       const SizedBox(width: 6),
                     ],
                     Text(
-                      model.isListening ? 'Đang nghe...' : 
-                      model.isProcessing ? 'Đang xử lý...' : 
-                      model.showChatBox ? 'Chế độ chat' :
-                      model.speechEnabled ? 'Chạm để nói' : 'Giọng nói không khả dụng',
+                      model.isListening
+                          ? 'Đang nghe...'
+                          : model.isProcessing
+                              ? 'Đang xử lý...'
+                              : model.showChatBox
+                                  ? 'Chế độ chat'
+                                  : model.speechEnabled
+                                      ? 'Chạm để nói'
+                                      : 'Giọng nói không khả dụng',
                       style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                        color: model.isListening 
-                            ? Colors.green
-                            : model.isProcessing 
-                                ? Colors.orange
-                                : model.showChatBox
-                                    ? Colors.blue
-                                    : model.speechEnabled
-                                        ? Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.7)
-                                        : Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                            color: model.isListening
+                                ? Colors.green
+                                : model.isProcessing
+                                    ? Colors.orange
+                                    : model.showChatBox
+                                        ? Colors.blue
+                                        : model.speechEnabled
+                                            ? Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.7)
+                                            : Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                   ],
                 ),
@@ -185,71 +201,104 @@ class Body extends StatelessWidget {
                   flex: 3,
                   child: Center(
                     child: GestureDetector(
-                      onTap: model.speechEnabled ? model.toggleListening : null,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: getProportionateScreenWidth(180),
-                        height: getProportionateScreenWidth(180),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: model.isListening ? [
-                              const Color(0xFF00D4AA).withOpacity(0.8),
-                              const Color(0xFF00D4AA).withOpacity(0.4),
-                              const Color(0xFF00D4AA).withOpacity(0.1),
-                              Colors.transparent,
-                            ] : model.isProcessing ? [
-                              Colors.orange.withOpacity(0.6),
-                              Colors.orange.withOpacity(0.3),
-                              Colors.orange.withOpacity(0.1),
-                              Colors.transparent,
-                            ] : [
-                              Theme.of(context).primaryColor.withOpacity(0.3),
-                              Theme.of(context).primaryColor.withOpacity(0.1),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: model.isListening 
-                                ? const Color(0xFF00D4AA)
-                                : model.isProcessing 
-                                    ? Colors.orange
-                                    : Theme.of(context).primaryColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: (model.isListening 
-                                    ? const Color(0xFF00D4AA)
-                                    : model.isProcessing 
-                                        ? Colors.orange
-                                        : Theme.of(context).primaryColor).withOpacity(0.3),
-                                blurRadius: 15,
-                                spreadRadius: 3,
+                      onTap: model.speechEnabled
+                          ? model.toggleListening
+                          : () => _requestPermissions(context),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (!model.speechEnabled)
+                            Positioned(
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade700,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.mic_off, color: Colors.white, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Chạm để cấp quyền',
+                                      style: TextStyle(color: Colors.white, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ],
-                          ),
-                          child: Center(
-                            child: model.isProcessing 
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 3,
-                                  )
-                                : Icon(
-                                    model.isListening ? Icons.mic : Icons.mic_none,
-                                    color: Colors.white,
-                                    size: 60,
+                            ),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            width: getProportionateScreenWidth(180),
+                            height: getProportionateScreenWidth(180),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: model.isListening
+                                    ? [
+                                        const Color(0xFF00D4AA).withOpacity(0.8),
+                                        const Color(0xFF00D4AA).withOpacity(0.4),
+                                        const Color(0xFF00D4AA).withOpacity(0.1),
+                                        Colors.transparent,
+                                      ]
+                                    : model.isProcessing
+                                        ? [
+                                            Colors.orange.withOpacity(0.6),
+                                            Colors.orange.withOpacity(0.3),
+                                            Colors.orange.withOpacity(0.1),
+                                            Colors.transparent,
+                                          ]
+                                        : [
+                                            Theme.of(context).primaryColor.withOpacity(0.3),
+                                            Theme.of(context).primaryColor.withOpacity(0.1),
+                                            Colors.transparent,
+                                          ],
+                              ),
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: model.isListening
+                                    ? const Color(0xFF00D4AA)
+                                    : model.isProcessing
+                                        ? Colors.orange
+                                        : Theme.of(context).primaryColor,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (model.isListening
+                                            ? const Color(0xFF00D4AA)
+                                            : model.isProcessing
+                                                ? Colors.orange
+                                                : Theme.of(context).primaryColor)
+                                        .withOpacity(0.3),
+                                    blurRadius: 15,
+                                    spreadRadius: 3,
                                   ),
+                                ],
+                              ),
+                              child: Center(
+                                child: model.isProcessing
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 3,
+                                      )
+                                    : Icon(
+                                        model.isListening ? Icons.mic : Icons.mic_none,
+                                        color: Colors.white,
+                                        size: 60,
+                                      ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ] else ...[
-                // Chat Box
                 Flexible(
                   flex: 3,
                   child: Container(
@@ -280,16 +329,18 @@ class Body extends StatelessWidget {
                               Text(
                                 'Chat với AI',
                                 style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                               const Spacer(),
                               IconButton(
                                 onPressed: model.clearChatMessages,
-                                icon: Icon(Icons.clear, 
-                                  color: Theme.of(context).textTheme.bodyMedium!.color, 
-                                  size: 18),
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Theme.of(context).textTheme.bodyMedium!.color,
+                                  size: 18,
+                                ),
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 padding: EdgeInsets.zero,
                               ),
@@ -303,16 +354,26 @@ class Body extends StatelessWidget {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.chat_bubble_outline, 
-                                        color: Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.5),
-                                        size: 40),
+                                      Icon(
+                                        Icons.chat_bubble_outline,
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium!
+                                            .color!
+                                            .withOpacity(0.5),
+                                        size: 40,
+                                      ),
                                       const SizedBox(height: 12),
                                       Text(
                                         'Chưa có tin nhắn nào\nBắt đầu trò chuyện với AI!',
                                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                          color: Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.5),
-                                          fontSize: 12,
-                                        ),
+                                              color: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium!
+                                                  .color!
+                                                  .withOpacity(0.5),
+                                              fontSize: 12,
+                                            ),
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
@@ -325,12 +386,12 @@ class Body extends StatelessWidget {
                                   itemBuilder: (context, index) {
                                     final message = model.chatMessages[index];
                                     final isUser = message['isUser'] as bool;
-                                    
+
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
                                       child: Row(
-                                        mainAxisAlignment: isUser 
-                                            ? MainAxisAlignment.end 
+                                        mainAxisAlignment: isUser
+                                            ? MainAxisAlignment.end
                                             : MainAxisAlignment.start,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -341,27 +402,36 @@ class Body extends StatelessWidget {
                                                 color: const Color(0xFF00D4AA),
                                                 borderRadius: BorderRadius.circular(16),
                                               ),
-                                              child: const Icon(Icons.smart_toy, color: Colors.white, size: 14),
+                                              child: const Icon(
+                                                Icons.smart_toy,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
                                             ),
                                             const SizedBox(width: 6),
                                           ],
                                           Flexible(
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
                                               decoration: BoxDecoration(
-                                                color: isUser 
+                                                color: isUser
                                                     ? Theme.of(context).primaryColor
                                                     : Theme.of(context).cardColor,
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: isUser 
-                                                    ? null 
-                                                    : Border.all(color: Theme.of(context).dividerColor),
+                                                border: isUser
+                                                    ? null
+                                                    : Border.all(
+                                                        color: Theme.of(context).dividerColor,
+                                                      ),
                                               ),
                                               child: Text(
                                                 message['message'] as String,
                                                 style: TextStyle(
-                                                  color: isUser 
-                                                      ? Colors.white 
+                                                  color: isUser
+                                                      ? Colors.white
                                                       : Theme.of(context).textTheme.bodyMedium!.color,
                                                   fontSize: 12,
                                                 ),
@@ -376,7 +446,11 @@ class Body extends StatelessWidget {
                                                 color: Theme.of(context).primaryColor,
                                                 borderRadius: BorderRadius.circular(16),
                                               ),
-                                              child: const Icon(Icons.person, color: Colors.white, size: 14),
+                                              child: const Icon(
+                                                Icons.person,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
                                             ),
                                           ],
                                         ],
@@ -410,7 +484,10 @@ class Body extends StatelessWidget {
                                     ),
                                     filled: true,
                                     fillColor: Theme.of(context).cardColor,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     isDense: true,
                                   ),
                                   onSubmitted: (text) {
@@ -429,7 +506,11 @@ class Body extends StatelessWidget {
                                 },
                                 backgroundColor: Theme.of(context).primaryColor,
                                 mini: true,
-                                child: const Icon(Icons.send, color: Colors.white, size: 16),
+                                child: const Icon(
+                                  Icons.send,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                               ),
                             ],
                           ),
@@ -465,10 +546,10 @@ class Body extends StatelessWidget {
                           Text(
                             'Bạn đã nói:',
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
                           ),
                         ],
                       ),
@@ -476,8 +557,8 @@ class Body extends StatelessWidget {
                       Text(
                         model.recognizedText,
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontSize: 14,
-                        ),
+                              fontSize: 14,
+                            ),
                       ),
                     ],
                   ),
@@ -509,16 +590,20 @@ class Body extends StatelessWidget {
                               color: const Color(0xFF00D4AA),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.smart_toy, color: Colors.white, size: 14),
+                            child: const Icon(
+                              Icons.smart_toy,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             'Trợ lý AI:',
                             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                              color: const Color(0xFF00D4AA),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
+                                  color: const Color(0xFF00D4AA),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
                           ),
                         ],
                       ),
@@ -526,9 +611,9 @@ class Body extends StatelessWidget {
                       Text(
                         model.aiResponse,
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontSize: 13,
-                          height: 1.3,
-                        ),
+                              fontSize: 13,
+                              height: 1.3,
+                            ),
                       ),
                     ],
                   ),
@@ -545,9 +630,9 @@ class Body extends StatelessWidget {
                         Text(
                           'Lệnh nhanh:',
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ],
                     ),
@@ -559,13 +644,44 @@ class Body extends StatelessWidget {
                         crossAxisSpacing: getProportionateScreenWidth(8),
                         mainAxisSpacing: getProportionateScreenHeight(8),
                         shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _buildQuickCommand(context, 'Mở đèn phòng khách', Icons.lightbulb_outline, Colors.amber),
-                          _buildQuickCommand(context, 'Bật quạt phòng ngủ', Icons.air, Colors.cyan),
-                          _buildQuickCommand(context, 'Đặt điều hòa 25°C', Icons.ac_unit, Colors.blue),
-                          _buildQuickCommand(context, 'Tắt tất cả đèn', Icons.lightbulb, Colors.orange),
-                          _buildQuickCommand(context, 'Chế độ đi ngủ', Icons.bedtime, Colors.purple),
-                          _buildQuickCommand(context, 'Chế độ về nhà', Icons.home, Colors.green),
+                          _buildQuickCommand(
+                            context,
+                            'Mở đèn phòng khách',
+                            Icons.lightbulb_outline,
+                            Colors.amber,
+                          ),
+                          _buildQuickCommand(
+                            context,
+                            'Bật quạt phòng ngủ',
+                            Icons.air,
+                            Colors.cyan,
+                          ),
+                          _buildQuickCommand(
+                            context,
+                            'Đặt điều hòa 25°C',
+                            Icons.ac_unit,
+                            Colors.blue,
+                          ),
+                          _buildQuickCommand(
+                            context,
+                            'Tắt tất cả đèn',
+                            Icons.lightbulb,
+                            Colors.orange,
+                          ),
+                          _buildQuickCommand(
+                            context,
+                            'Chế độ đi ngủ',
+                            Icons.bedtime,
+                            Colors.purple,
+                          ),
+                          _buildQuickCommand(
+                            context,
+                            'Chế độ về nhà',
+                            Icons.home,
+                            Colors.green,
+                          ),
                         ],
                       ),
                     ),
@@ -597,9 +713,9 @@ class Body extends StatelessWidget {
                                 : 'Thử nói: "Mở đèn cổng", "Tắt quạt phòng bếp", "Đặt nhiệt độ 24 độ"')
                             : 'Nhận diện giọng nói chưa khả dụng. Hãy sử dụng chế độ chat.',
                         style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                          fontSize: 10,
-                          color: model.speechEnabled ? null : Colors.orange,
-                        ),
+                              fontSize: 10,
+                              color: model.speechEnabled ? null : Colors.orange,
+                            ),
                       ),
                     ),
                   ],
@@ -621,7 +737,54 @@ class Body extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickCommand(BuildContext context, String command, IconData icon, Color color) {
+  void _requestPermissions(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cần cấp quyền Microphone'),
+        content: const Text(
+          'Để sử dụng trợ lý giọng nói, ứng dụng cần quyền truy cập microphone. '
+          'Vui lòng cấp quyền để tiếp tục.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Để sau'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Request permissions using ViewModel method
+              final success = await model.requestMicrophonePermission();
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã cấp quyền microphone thành công!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng cấp quyền microphone trong cài đặt ứng dụng.'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            child: const Text('Cấp quyền'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCommand(
+    BuildContext context,
+    String command,
+    IconData icon,
+    Color color,
+  ) {
     return GestureDetector(
       onTap: () => model.executeQuickCommand(command),
       child: Container(
@@ -648,9 +811,9 @@ class Body extends StatelessWidget {
               child: Text(
                 command,
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
