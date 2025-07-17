@@ -130,71 +130,69 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF2E3440),
-            Color(0xFF3B4252),
-            Color(0xFF434C5E),
-          ],
-        ),
-      ),
-      child: SafeArea(
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF2E3440),
+              Color(0xFF3B4252),
+              Color(0xFF434C5E),
+            ],
+          ),
+        ),      child: SafeArea(
         child: Column(
           children: [
-            // Header with Smart Home branding - 1/3 của màn hình
-            Expanded(
-              flex: 1,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: getProportionateScreenWidth(20),
-                  vertical: getProportionateScreenHeight(20),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)),
-                      ),
-                      child: const Icon(
-                        Icons.home_rounded,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: getProportionateScreenHeight(20)),
-                    Text(
-                      'SMART HOME',
-                      style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                          ),
-                    ),
-                    SizedBox(height: getProportionateScreenHeight(8)),
-                    Text(
-                      'Quản lý ngôi nhà thông minh của bạn',
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                            color: Colors.white.withOpacity(0.8),
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+            // Header with Smart Home branding - flexible height
+            Container(
+              height: MediaQuery.of(context).size.height * 0.25, // Fixed height for header
+              padding: EdgeInsets.symmetric(
+                horizontal: getProportionateScreenWidth(20),
+                vertical: getProportionateScreenHeight(20),
               ),
-            ),
-
-            // Tab container - 2/3 của màn hình
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: const Icon(
+                      Icons.home_rounded,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: getProportionateScreenHeight(20)),
+                  Text(
+                    'SMART HOME',
+                    style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
+                  ),
+                  SizedBox(height: getProportionateScreenHeight(8)),
+                  Text(
+                    'Quản lý ngôi nhà thông minh của bạn',
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),            // Tab container - flexible height
             Expanded(
-              flex: 2,
               child: Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -253,7 +251,8 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -262,6 +261,7 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
   Widget _buildLoginTab() {
     return SingleChildScrollView(
       padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -338,60 +338,69 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
                     ),
             ),
           ),
+          // Add some bottom padding for keyboard
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 20),
         ],
       ),
     );
   }
 
   Widget _buildRegisterTab() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tạo tài khoản mới',
-            style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2E3440),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - getProportionateScreenHeight(40),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tạo tài khoản mới',
+                  style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2E3440),
+                      ),
                 ),
-          ),
-          SizedBox(height: getProportionateScreenHeight(8)),
-          Text(
-            'Đăng ký để bắt đầu trải nghiệm Smart Home',
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: Colors.grey[600],
+                SizedBox(height: getProportionateScreenHeight(8)),
+                Text(
+                  'Đăng ký để bắt đầu trải nghiệm Smart Home',
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Colors.grey[600],
+                      ),
                 ),
-          ),
-          SizedBox(height: getProportionateScreenHeight(30)),
+                SizedBox(height: getProportionateScreenHeight(30)),
 
-          // Name field
-          _buildTextField(
-            controller: nameController,
-            hintText: 'Họ và tên',
-            icon: Icons.person_outline,
-          ),
-          SizedBox(height: getProportionateScreenHeight(16)),
+                // Name field
+                _buildTextField(
+                  controller: nameController,
+                  hintText: 'Họ và tên',
+                  icon: Icons.person_outline,
+                ),
+                SizedBox(height: getProportionateScreenHeight(16)),
 
-          // Email field
-          _buildTextField(
-            controller: emailController,
-            hintText: 'Email',
-            icon: Icons.email_outlined,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          SizedBox(height: getProportionateScreenHeight(16)),
+                // Email field
+                _buildTextField(
+                  controller: emailController,
+                  hintText: 'Email',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                SizedBox(height: getProportionateScreenHeight(16)),
 
-          // Password field
-          _buildTextField(
-            controller: passwordController,
-            hintText: 'Mật khẩu',
-            icon: Icons.lock_outline,
-            obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey[600],
+                // Password field
+                _buildTextField(
+                  controller: passwordController,
+                  hintText: 'Mật khẩu',
+                  icon: Icons.lock_outline,
+                  obscureText: _obscurePassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.grey[600],
               ),
               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
@@ -444,10 +453,13 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -469,6 +481,7 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        scrollPadding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(color: Colors.grey[500]),

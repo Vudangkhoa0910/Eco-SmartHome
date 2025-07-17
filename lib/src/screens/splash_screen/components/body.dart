@@ -22,6 +22,7 @@ class Body extends StatelessWidget {
             height: getProportionateScreenHeight(20),
           ),
           Material(
+            // child: Image.asset('assets/images/splash_img.png'),
             child: Image.asset('assets/images/splash_img.png'),
             color: Colors.transparent,
           ),

@@ -9,7 +9,7 @@ class AuthScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true, // Thay đổi thành true để cho phép màn hình tự resize khi bàn phím hiện lên
       body: const Body(),
     );
   }
