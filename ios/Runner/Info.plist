@@ -49,6 +49,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Ứng dụng cần quyền truy cập camera để quét mã QR kết nối thiết bị smart home</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh chứa mã QR</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập microphone để nhận diện giọng nói điều khiển thiết bị smart home</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
