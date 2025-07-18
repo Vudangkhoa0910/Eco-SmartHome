@@ -274,23 +274,6 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios,
-                color: Theme.of(context).textTheme.titleLarge?.color),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text(
-            'Energy',
-            style: TextStyle(
-              color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(24),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
         body: _isLoading ? _buildLoadingScreen() : _buildContent(),
       ),
     );
@@ -307,7 +290,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
           Text(
-            'Đang tải dữ liệu năng lượng...',
+            'Đang tải dữ liệu...',
             style: TextStyle(
               fontSize: getProportionateScreenWidth(14),
               color: Theme.of(context)
@@ -315,6 +298,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   .bodyMedium
                   ?.color
                   ?.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -338,25 +322,21 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           child: Column(
             children: [
               _buildAIEnergyModeCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildMonthlyCostCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildDailyUsageCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildDeviceUsageCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
-              _buildCarbonFootprintCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
-              _buildWaterUsageCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildEnergyConsumptionCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildSmartMeterCard(),
-              SizedBox(height: getProportionateScreenHeight(16)),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildSolarPowerCard(),
               SizedBox(
                   height: getProportionateScreenHeight(
-                      24)), // Extra padding at bottom
+                      16)), // Extra padding at bottom
             ],
           ),
         ),
@@ -367,7 +347,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // AI Energy Mode Card
   Widget _buildAIEnergyModeCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -401,7 +381,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'AI Energy Mode',
+                  'Chế độ AI',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
                     fontSize: getProportionateScreenWidth(16),
@@ -411,10 +391,11 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                 Text(
                   _currentPowerConsumption > 0
                       ? 'Hiện tại: ${_currentPowerConsumption.toStringAsFixed(1)}W'
-                      : 'Luôn tiết kiệm',
+                      : 'Đang tiết kiệm',
                   style: TextStyle(
                     color: Colors.blue[300],
                     fontSize: getProportionateScreenWidth(14),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -441,7 +422,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // Monthly Cost Card
   Widget _buildMonthlyCostCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -459,24 +440,24 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Ch.phí SD năng lượng tháng này',
+            'Chi phí điện tháng này',
             style: TextStyle(
               color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(16),
+              fontSize: getProportionateScreenWidth(14),
               fontWeight: FontWeight.w600,
             ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
           Row(
             children: [
-              Text(
-                '${(_monthlyCost > 0 ? _monthlyCost : 551338).toStringAsFixed(0)}',
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.titleLarge?.color,
-                  fontSize: getProportionateScreenWidth(28),
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  '${(_monthlyCost > 0 ? _monthlyCost : 551338).toStringAsFixed(0)}',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(14),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               SizedBox(width: getProportionateScreenWidth(4)),
@@ -484,7 +465,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                 'đ',
                 style: TextStyle(
                   color: Theme.of(context).textTheme.titleLarge?.color,
-                  fontSize: getProportionateScreenWidth(20),
+                  fontSize: getProportionateScreenWidth(12),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -492,19 +473,17 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           ),
           SizedBox(height: getProportionateScreenHeight(8)),
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.auto_awesome, color: Colors.teal, size: 16),
               SizedBox(width: getProportionateScreenWidth(4)),
-              Expanded(
+              Flexible(
                 child: Text(
-                  'Tiết kiệm 178.877 đ với AI Energy Mode',
+                  'Tiết kiệm 178.877đ với AI',
                   style: TextStyle(
                     color: Colors.teal,
-                    fontSize: getProportionateScreenWidth(12),
+                    fontSize: getProportionateScreenWidth(10),
+                    fontWeight: FontWeight.w500,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ),
             ],
@@ -525,30 +504,28 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Chi phí ước tính cả tháng',
+                      'Ước tính cả tháng',
                       style: TextStyle(
                         color: Theme.of(context)
                             .textTheme
                             .bodyMedium
                             ?.color
                             ?.withValues(alpha: 0.7),
-                        fontSize: getProportionateScreenWidth(12),
+                        fontSize: getProportionateScreenWidth(10),
+                        fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                     Text(
-                      'Chi phí của tháng trước',
+                      'Tháng trước',
                       style: TextStyle(
                         color: Theme.of(context)
                             .textTheme
                             .bodyMedium
                             ?.color
                             ?.withValues(alpha: 0.7),
-                        fontSize: getProportionateScreenWidth(12),
+                        fontSize: getProportionateScreenWidth(10),
+                        fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                   ],
                 ),
@@ -562,21 +539,17 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       '${(_monthlyCost > 0 ? (_monthlyCost * 1.65).toStringAsFixed(0) : '909.710')} đ',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(12),
+                        fontSize: getProportionateScreenWidth(10),
                         fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                     Text(
                       '${(_monthlyCost > 0 ? (_monthlyCost * 1.1).toStringAsFixed(0) : '606.474')} đ',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(12),
+                        fontSize: getProportionateScreenWidth(10),
                         fontWeight: FontWeight.w500,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                   ],
                 ),
@@ -591,7 +564,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // Daily Usage Card with Bar Chart
   Widget _buildDailyUsageCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -615,10 +588,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                 'Sử dụng năng lượng',
                 style: TextStyle(
                   color: Theme.of(context).textTheme.titleLarge?.color,
-                  fontSize: getProportionateScreenWidth(16),
+                  fontSize: getProportionateScreenWidth(13),
                   fontWeight: FontWeight.w600,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
               Icon(Icons.chevron_right,
                   color: Theme.of(context)
@@ -633,7 +605,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
             '${(_monthlyEnergyConsumption > 0 ? _monthlyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
             style: TextStyle(
               color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(24),
+              fontSize: getProportionateScreenWidth(16),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -645,10 +617,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   .bodyMedium
                   ?.color
                   ?.withValues(alpha: 0.7),
-              fontSize: getProportionateScreenWidth(12),
+              fontSize: getProportionateScreenWidth(10),
             ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
           ),
           SizedBox(height: getProportionateScreenHeight(20)),
           Container(
@@ -707,7 +677,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: 10),
+                    fontSize: getProportionateScreenWidth(12)),
               ),
               Spacer(),
               Text(
@@ -718,7 +688,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: 10),
+                    fontSize: getProportionateScreenWidth(12)),
               ),
               Spacer(),
               Text(
@@ -729,27 +699,33 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: 10),
+                    fontSize: getProportionateScreenWidth(12)),
               ),
             ],
           ),
           SizedBox(height: getProportionateScreenHeight(8)),
           Row(
             children: [
-              Text(
-                '— tháng 7',
-                style: TextStyle(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color
-                        ?.withValues(alpha: 0.7),
-                    fontSize: 10),
+              Flexible(
+                child: Text(
+                  '— tháng 7',
+                  style: TextStyle(
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withValues(alpha: 0.7),
+                      fontSize: getProportionateScreenWidth(12)),
+                ),
               ),
-              SizedBox(width: getProportionateScreenWidth(20)),
-              Text(
-                '— tháng 8',
-                style: TextStyle(color: Colors.blue, fontSize: 10),
+              SizedBox(width: getProportionateScreenWidth(16)),
+              Flexible(
+                child: Text(
+                  '— tháng 8',
+                  style: TextStyle(
+                      color: Colors.blue,
+                      fontSize: getProportionateScreenWidth(12)),
+                ),
               ),
             ],
           ),
@@ -761,7 +737,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // Device Usage Card with Donut Chart
   Widget _buildDeviceUsageCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -783,14 +759,12 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Mức sử dụng năng lượng của thiết bị',
+                  'Mức sử dụng năng lượng thiết bị',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
+                    fontSize: getProportionateScreenWidth(13),
                     fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
               ),
               SizedBox(width: getProportionateScreenWidth(8)),
@@ -804,27 +778,23 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           ),
           SizedBox(height: getProportionateScreenHeight(8)),
           Text(
-            'Tiết kiệm 24.5% với AI Energy Mode',
+            'Tiết kiệm 24.5% với AI',
             style: TextStyle(
               color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(14),
+              fontSize: getProportionateScreenWidth(11),
               fontWeight: FontWeight.w500,
             ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
           ),
           Text(
-            'Máy điều hòa trong phòng đang tiêu thụ nhiều năng lượng nhất',
+            'Máy điều hòa tiêu thụ nhiều năng lượng nhất',
             style: TextStyle(
               color: Theme.of(context)
                   .textTheme
                   .bodyMedium
                   ?.color
                   ?.withValues(alpha: 0.7),
-              fontSize: getProportionateScreenWidth(12),
+              fontSize: getProportionateScreenWidth(9),
             ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
           ),
           SizedBox(height: getProportionateScreenHeight(20)),
           Row(
@@ -834,7 +804,6 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.electric_bolt, color: Colors.blue, size: 16),
                         SizedBox(width: 4),
@@ -843,10 +812,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                             'Tổng mức sử dụng',
                             style: TextStyle(
                               color: Colors.blue,
-                              fontSize: getProportionateScreenWidth(12),
+                              fontSize: getProportionateScreenWidth(11),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -855,13 +822,12 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       '${(_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(20),
+                        fontSize: getProportionateScreenWidth(14),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     SizedBox(height: getProportionateScreenHeight(12)),
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.auto_awesome, color: Colors.teal, size: 16),
                         SizedBox(width: 4),
@@ -870,10 +836,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                             'Khoản tiết kiệm',
                             style: TextStyle(
                               color: Colors.teal,
-                              fontSize: getProportionateScreenWidth(12),
+                              fontSize: getProportionateScreenWidth(10),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -882,7 +846,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       '${((_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption : 95.35) * 0.3).toStringAsFixed(2)} kWh',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(20),
+                        fontSize: getProportionateScreenWidth(14),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -983,10 +947,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                 deviceName,
                 style: TextStyle(
                   color: Theme.of(context).textTheme.titleLarge?.color,
-                  fontSize: getProportionateScreenWidth(12),
+                  fontSize: getProportionateScreenWidth(11),
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
               ),
               Text(
                 '$usage | $saved',
@@ -996,316 +958,45 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       .bodyMedium
                       ?.color
                       ?.withValues(alpha: 0.7),
-                  fontSize: getProportionateScreenWidth(10),
+                  fontSize: getProportionateScreenWidth(9),
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
               ),
             ],
           ),
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: getProportionateScreenWidth(60),
-              height: 6,
-              decoration: BoxDecoration(
-                color: usageColor,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            SizedBox(width: 4),
-            Container(
-              width: getProportionateScreenWidth(20),
-              height: 6,
-              decoration: BoxDecoration(
-                color: savedColor,
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: savedColor, width: 1),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // Carbon Footprint Card
-  Widget _buildCarbonFootprintCard() {
-    return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Nhận thức ph.thải carbon',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              SizedBox(width: getProportionateScreenWidth(8)),
-              Icon(Icons.chevron_right,
-                  color: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.color
-                      ?.withValues(alpha: 0.7)),
-            ],
-          ),
-          SizedBox(height: getProportionateScreenHeight(16)),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.cloud, color: Colors.white, size: 24),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Khí thải',
-                      style: TextStyle(
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.color
-                            ?.withValues(alpha: 0.7),
-                        fontSize: getProportionateScreenWidth(12),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      '87.6 kg',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(16),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: getProportionateScreenWidth(20)),
-              Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.park, color: Colors.white, size: 24),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Cắt giảm',
-                      style: TextStyle(
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.color
-                            ?.withValues(alpha: 0.7),
-                        fontSize: getProportionateScreenWidth(12),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      '1.2 kg',
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.titleLarge?.color,
-                        fontSize: getProportionateScreenWidth(16),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Water Usage Card
-  Widget _buildWaterUsageCard() {
-    return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Mức tiêu thụ nước',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              SizedBox(width: getProportionateScreenWidth(8)),
-              Icon(Icons.chevron_right,
-                  color: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.color
-                      ?.withValues(alpha: 0.7)),
-            ],
-          ),
-          SizedBox(height: getProportionateScreenHeight(16)),
-          Text(
-            '3.49 t',
-            style: TextStyle(
-              color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(24),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            'Tiêu thụ nhiều hơn 0.23 t so với cùng kỳ tháng trước.',
-            style: TextStyle(
-              color: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.color
-                  ?.withValues(alpha: 0.7),
-              fontSize: getProportionateScreenWidth(12),
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-          SizedBox(height: getProportionateScreenHeight(16)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: getProportionateScreenWidth(80),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey[700]
-                            : Colors.grey[300],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.white
-                                    : Colors.grey[800],
-                            borderRadius: BorderRadius.only(
-                              bottomLeft: Radius.circular(4),
-                              bottomRight: Radius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Container(
-                      width: 30,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.cyan,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
+                width: getProportionateScreenWidth(40),
+                height: 6,
+                decoration: BoxDecoration(
+                  color: usageColor,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              SizedBox(width: 3),
+              Container(
+                width: getProportionateScreenWidth(12),
+                height: 6,
+                decoration: BoxDecoration(
+                  color: savedColor,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: savedColor, width: 1),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text('Th7',
-                  style: TextStyle(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.7),
-                      fontSize: 10)),
-              SizedBox(width: 20),
-              Text('Th8',
-                  style: TextStyle(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.7),
-                      fontSize: 10)),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   // Energy Consumption Recommendation Card
   Widget _buildEnergyConsumptionCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -1326,28 +1017,24 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ptích mức tiêu thụ năng lượng',
+                  'Phân tích mức tiêu thụ năng lượng',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
+                    fontSize: getProportionateScreenWidth(15),
                     fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
                 SizedBox(height: getProportionateScreenHeight(8)),
                 Text(
-                  'Hãy xem kiểu tiêu thụ năng lượng của Virtual Home.',
+                  'Xem kiểu tiêu thụ năng lượng của Virtual Home.',
                   style: TextStyle(
                     color: Theme.of(context)
                         .textTheme
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(12),
+                    fontSize: getProportionateScreenWidth(11),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
                 ),
               ],
             ),
@@ -1394,7 +1081,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // Smart Meter Card
   Widget _buildSmartMeterCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -1418,25 +1105,21 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   'Đồng hồ thông minh',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
+                    fontSize: getProportionateScreenWidth(15),
                     fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
                 SizedBox(height: getProportionateScreenHeight(8)),
                 Text(
-                  'Tìm hiểu cách kiểm tra tổng mức tiêu thụ năng lượng trong nhà của bạn.',
+                  'Kiểm tra tổng mức tiêu thụ năng lượng trong nhà.',
                   style: TextStyle(
                     color: Theme.of(context)
                         .textTheme
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(12),
+                    fontSize: getProportionateScreenWidth(11),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
                 ),
               ],
             ),
@@ -1501,7 +1184,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   // Solar Power Card
   Widget _buildSolarPowerCard() {
     return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -1525,25 +1208,21 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   'Tấm năng lượng mặt trời',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(16),
+                    fontSize: getProportionateScreenWidth(15),
                     fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
                 ),
                 SizedBox(height: getProportionateScreenHeight(8)),
                 Text(
-                  'Tìm hiểu cách hiện thực hóa một ngôi nhà cân bằng khí thải.',
+                  'Hiện thực hóa ngôi nhà cân bằng khí thải.',
                   style: TextStyle(
                     color: Theme.of(context)
                         .textTheme
                         .bodyMedium
                         ?.color
                         ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(12),
+                    fontSize: getProportionateScreenWidth(11),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
                 ),
               ],
             ),

@@ -18,22 +18,10 @@ class ProfileScreen extends StatelessWidget {
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
             automaticallyImplyLeading: false,
-            title: Text(
-              'Profile',
-              style: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 36,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).textTheme.displayLarge!.color,
-              ),
-            ),
             actions: [
               IconButton(
-                icon: Icon(
-                  Icons.edit, 
-                  color: Theme.of(context).iconTheme.color, 
-                  size: 28
-                ),
+                icon: Icon(Icons.edit,
+                    color: Theme.of(context).iconTheme.color, size: 28),
                 onPressed: () => model.editProfile(context),
               ),
             ],

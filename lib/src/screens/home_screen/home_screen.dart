@@ -2,18 +2,17 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/provider/base_view.dart';
 import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/src/screens/edit_profile/edit_profile.dart';
+import 'package:smart_home/core/constants/app_colors.dart';
 
 import 'package:smart_home/src/screens/rooms_screen/rooms_screen.dart';
 import 'package:smart_home/src/screens/analytics_screen/analytics_screen.dart';
 import 'package:smart_home/src/screens/profile_screen/profile_screen.dart';
 import 'package:smart_home/src/screens/ai_voice_screen/ai_voice_screen.dart';
 
-
 import 'package:smart_home/src/widgets/custom_bottom_nav_bar.dart';
 import 'package:smart_home/src/widgets/connection_status_widget.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'components/body.dart';
 import 'package:smart_home/src/screens/menu_page/menu_screen.dart';
@@ -49,9 +48,11 @@ class HomeScreen extends StatelessWidget {
             toolbarHeight: getProportionateScreenHeight(45),
             elevation: 0,
             backgroundColor: Colors.transparent,
-            iconTheme: IconThemeData(color: Theme.of(context).textTheme.bodyLarge!.color),
+            iconTheme: IconThemeData(
+                color: Theme.of(context).textTheme.bodyLarge!.color),
             title: Padding(
-              padding: EdgeInsets.symmetric(horizontal: getProportionateScreenWidth(4)),
+              padding: EdgeInsets.symmetric(
+                  horizontal: getProportionateScreenWidth(4)),
               child: Row(
                 children: [
                   Expanded(
@@ -83,7 +84,8 @@ class HomeScreen extends StatelessWidget {
                   ),
                   // Connection Status - Simple dot
                   Container(
-                    margin: EdgeInsets.symmetric(horizontal: getProportionateScreenWidth(8)),
+                    margin: EdgeInsets.symmetric(
+                        horizontal: getProportionateScreenWidth(8)),
                     child: ConnectionStatusWidget(model: model),
                   ),
                   SizedBox(width: getProportionateScreenWidth(4)),
@@ -95,9 +97,15 @@ class HomeScreen extends StatelessWidget {
                         height: 40,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: themeProvider.isDarkMode 
-                              ? [const Color(0xFF2D3748), const Color(0xFF4A5568)]
-                              : [const Color(0xFFF7F9FC), const Color(0xFFE6F0FA)],
+                            colors: themeProvider.isDarkMode
+                                ? [
+                                    const Color(0xFF2D3748),
+                                    const Color(0xFF4A5568)
+                                  ]
+                                : [
+                                    const Color(0xFFF7F9FC),
+                                    const Color(0xFFE6F0FA)
+                                  ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -114,7 +122,9 @@ class HomeScreen extends StatelessWidget {
                           padding: EdgeInsets.zero,
                           splashRadius: 20,
                           icon: Icon(
-                            themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                            themeProvider.isDarkMode
+                                ? Icons.light_mode
+                                : Icons.dark_mode,
                             color: const Color(0xFF6B73FF),
                             size: 20,
                           ),
@@ -133,8 +143,11 @@ class HomeScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: Theme.of(context).brightness == Brightness.dark
-                          ? [const Color(0xFF2D3748), const Color(0xFF4A5568)]
-                          : [const Color(0xFFF7F9FC), const Color(0xFFE6F0FA)],
+                            ? [const Color(0xFF2D3748), const Color(0xFF4A5568)]
+                            : [
+                                const Color(0xFFF7F9FC),
+                                const Color(0xFFE6F0FA)
+                              ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -158,7 +171,8 @@ class HomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const EditProfile()),
+                          MaterialPageRoute(
+                              builder: (context) => const EditProfile()),
                         );
                       },
                     ),
@@ -172,24 +186,83 @@ class HomeScreen extends StatelessWidget {
             child: const Menu(),
           ),
 
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerDocked,
+          floatingActionButton: Container(
+            margin: const EdgeInsets.only(top: 70), // Đẩy xuống gần navbar hơn
+            child: SizedBox(
+              width: 56, // Kích thước lớn hơn một chút
+              height: 56, // Kích thước lớn hơn một chút
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF6B73FF),
+                      Color(0xFF9C88FF)
+                    ], // Giữ màu như code cũ
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6B73FF).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton(
+                  onPressed: () {
+                    // Navigate to AI Voice Screen hoặc show dialog/popup
+                    model.onItemTapped(2);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AIVoiceScreenContent()),
+                    );
+                  },
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 200),
+                    scale: model.selectedIndex == 2 ? 1.1 : 1.0,
+                    child: const Icon(
+                      Icons.mic,
+                      color: Colors.white,
+                      size: 32, // Icon mic lớn hơn một chút
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // BODY sử dụng PageView để đồng bộ với BottomNavigationBar
-          body: PageView(
-            controller: model.pageController,
-            onPageChanged: (index) {
-              model.selectedIndex = index;
-              // Sử dụng setState thay vì notifyListeners
-            },
-            children: <Widget>[
-              Body(model: model),
-              // Rooms Screen Content
-              const RoomsScreenContent(),
-              // AI Voice Screen Content
-              const AIVoiceScreenContent(),
-              // Analytics Screen Content  
-              const AnalyticsScreenContent(),
-              // Profile Screen Content
-              const ProfileScreenContent(),
-            ],
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.mainGradient,
+            ),
+            child: PageView(
+              controller: model.pageController,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (pageIdx) {
+                // map page index back to nav index (account for AI voice at nav 2)
+                final navIndex = pageIdx >= 2 ? pageIdx + 1 : pageIdx;
+                model.selectedIndex = navIndex;
+                // Will automatically trigger rebuild through Provider
+              },
+              children: <Widget>[
+                Body(model: model),
+                // Rooms Screen Content
+                const RoomsScreenContent(),
+                // Analytics Screen Content (skip AI Voice for PageView)
+                const AnalyticsScreenContent(),
+                // Profile Screen Content
+                const ProfileScreenContent(),
+              ],
+            ),
           ),
 
           bottomNavigationBar: CustomBottomNavBar(model: model),

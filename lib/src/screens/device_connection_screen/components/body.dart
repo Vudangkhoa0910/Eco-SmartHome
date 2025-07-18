@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_home/config/size_config.dart';
@@ -17,6 +18,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   late AnimationController _fadeAnimationController;
   late Animation<double> _fadeAnimation;
   bool isConnecting = false;
+  String _userName = 'Người dùng';
 
   // Valid device codes with their configurations
   final Map<String, Map<String, dynamic>> validDeviceCodes = {
@@ -44,12 +46,47 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeAnimationController, curve: Curves.easeInOut),
+      CurvedAnimation(
+          parent: _fadeAnimationController, curve: Curves.easeInOut),
     );
-    
+
     _fadeAnimationController.forward();
+    _loadUserData();
+  }
+
+  /// Load user data from Firebase
+  Future<void> _loadUserData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Load user document from Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          setState(() {
+            _userName = userData['displayName'] ??
+                user.displayName ??
+                userData['name'] ??
+                user.email?.split('@')[0] ??
+                'Người dùng';
+          });
+        } else {
+          setState(() {
+            _userName =
+                user.displayName ?? user.email?.split('@')[0] ?? 'Người dùng';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      // Keep default if error occurs
+    }
   }
 
   @override
@@ -66,14 +103,14 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           builder: (context) => const MockQRScannerScreen(),
         ),
       );
-      
+
       if (result != null) {
         setState(() => isConnecting = true);
         // Simulate connection process
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           setState(() => isConnecting = false);
-          
+
           // Check if scanned code is valid
           final code = result.toString().toLowerCase();
           if (validDeviceCodes.containsKey(code)) {
@@ -96,9 +133,11 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Quét QR thành công!'),
-          content: const Text('Đã phát hiện thiết bị Smart Home.\nBạn có muốn kết nối không?'),
+          content: const Text(
+              'Đã phát hiện thiết bị Smart Home.\nBạn có muốn kết nối không?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -123,10 +162,10 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
 
   void _connectToDevice() async {
     setState(() => isConnecting = true);
-    
+
     // Simulate connection process
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (mounted) {
       setState(() => isConnecting = false);
       // Pass default deviceInfo (e.g., smarthome99)
@@ -137,28 +176,28 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
 
   void _connectWithCode() async {
     final code = deviceCodeController.text.trim().toLowerCase();
-    
+
     if (code.isEmpty) {
       _showMessage('Vui lòng nhập mã thiết bị');
       return;
     }
-    
+
     if (code.length < 8) {
       _showMessage('Mã thiết bị phải có ít nhất 8 ký tự');
       return;
     }
 
     setState(() => isConnecting = true);
-    
+
     try {
       // Simulate connection process with validation
       await Future.delayed(const Duration(seconds: 2));
-      
+
       // Check if code is valid
       if (!validDeviceCodes.containsKey(code)) {
         throw Exception('Mã thiết bị không hợp lệ');
       }
-      
+
       if (mounted) {
         setState(() => isConnecting = false);
         final deviceInfo = validDeviceCodes[code]!;
@@ -167,7 +206,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
     } catch (e) {
       if (mounted) {
         setState(() => isConnecting = false);
-        _showMessage('Kết nối thất bại: ${e.toString().replaceAll('Exception: ', '')}');
+        _showMessage(
+            'Kết nối thất bại: ${e.toString().replaceAll('Exception: ', '')}');
       }
     }
   }
@@ -178,7 +218,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -277,8 +318,6 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -307,13 +346,17 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                       children: [
                         Text(
                           'Xin chào,',
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                                color: Colors.white.withOpacity(0.8),
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge!.copyWith(
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
                         ),
                         Text(
-                          user?.displayName ?? user?.email?.split('@')[0] ?? 'User',
-                          style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                          _userName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall!
+                              .copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -331,7 +374,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
               // Main content
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.only(top: getProportionateScreenHeight(20)),
+                  margin:
+                      EdgeInsets.only(top: getProportionateScreenHeight(20)),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
@@ -345,11 +389,14 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(height: getProportionateScreenHeight(30)),
-                        
+
                         // Title
                         Text(
                           'Kết nối thiết bị',
-                          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium!
+                              .copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: const Color(0xFF2E3440),
                               ),
@@ -357,9 +404,10 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                         SizedBox(height: getProportionateScreenHeight(8)),
                         Text(
                           'Kết nối thiết bị Smart Home để bắt đầu sử dụng',
-                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                color: Colors.grey[600],
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: getProportionateScreenHeight(40)),
@@ -369,7 +417,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                           width: 200,
                           height: 200,
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!, width: 2),
+                            border:
+                                Border.all(color: Colors.grey[300]!, width: 2),
                             borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -412,8 +461,12 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                   height: 20,
                                   decoration: BoxDecoration(
                                     border: Border(
-                                      top: BorderSide(color: const Color(0xFF464646), width: 3),
-                                      left: BorderSide(color: const Color(0xFF464646), width: 3),
+                                      top: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
+                                      left: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
                                     ),
                                   ),
                                 ),
@@ -426,8 +479,12 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                   height: 20,
                                   decoration: BoxDecoration(
                                     border: Border(
-                                      top: BorderSide(color: const Color(0xFF464646), width: 3),
-                                      right: BorderSide(color: const Color(0xFF464646), width: 3),
+                                      top: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
+                                      right: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
                                     ),
                                   ),
                                 ),
@@ -440,8 +497,12 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                   height: 20,
                                   decoration: BoxDecoration(
                                     border: Border(
-                                      bottom: BorderSide(color: const Color(0xFF464646), width: 3),
-                                      left: BorderSide(color: const Color(0xFF464646), width: 3),
+                                      bottom: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
+                                      left: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
                                     ),
                                   ),
                                 ),
@@ -454,8 +515,12 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                   height: 20,
                                   decoration: BoxDecoration(
                                     border: Border(
-                                      bottom: BorderSide(color: const Color(0xFF464646), width: 3),
-                                      right: BorderSide(color: const Color(0xFF464646), width: 3),
+                                      bottom: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
+                                      right: BorderSide(
+                                          color: const Color(0xFF464646),
+                                          width: 3),
                                     ),
                                   ),
                                 ),
@@ -495,7 +560,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                           children: [
                             Expanded(child: Divider(color: Colors.grey[300])),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
                                 'HOẶC',
                                 style: TextStyle(
@@ -521,9 +587,11 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                             decoration: InputDecoration(
                               hintText: 'Nhập mã thiết bị (vd: smarthome99)',
                               hintStyle: TextStyle(color: Colors.grey[500]),
-                              prefixIcon: Icon(Icons.devices, color: Colors.grey[600]),
+                              prefixIcon:
+                                  Icon(Icons.devices, color: Colors.grey[600]),
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
                             ),
                           ),
                         ),
@@ -538,10 +606,13 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                           ),
                           child: Text(
                             'Hãy nhập mã in trên thân của thiết bị để kết nối.',
-                            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                              color: Colors.blue[800],
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium!
+                                .copyWith(
+                                  color: Colors.blue[800],
+                                  fontWeight: FontWeight.w500,
+                                ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -587,7 +658,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.developer_mode, color: Colors.orange[700], size: 20),
+                                  Icon(Icons.developer_mode,
+                                      color: Colors.orange[700], size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Dành cho phát triển',
@@ -609,9 +681,11 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                         backgroundColor: Colors.orange[100],
                                         foregroundColor: Colors.orange[800],
                                         elevation: 0,
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 8),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                       child: const Text(
@@ -624,16 +698,19 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                   Expanded(
                                     child: ElevatedButton(
                                       onPressed: () {
-                                        final deviceInfo = validDeviceCodes['smarthome66']!;
+                                        final deviceInfo =
+                                            validDeviceCodes['smarthome66']!;
                                         _navigateToHome(deviceInfo);
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.orange[100],
                                         foregroundColor: Colors.orange[800],
                                         elevation: 0,
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 8),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                       child: const Text(

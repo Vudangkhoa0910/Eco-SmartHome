@@ -15,9 +15,21 @@ import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  // Initialize Firebase with error handling
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Handle duplicate app error
+    if (e.toString().contains('duplicate-app')) {
+      print('Firebase already initialized');
+    } else {
+      print('Firebase initialization error: $e');
+    }
+  }
+
   // Initialize date formatting
   try {
     await initializeDateFormatting('en_US', null);
@@ -25,7 +37,7 @@ void main() async {
   } catch (e) {
     print('Failed to initialize date formatting: $e');
   }
-  
+
   setupLocator();
   runApp(const MyApp());
 }
