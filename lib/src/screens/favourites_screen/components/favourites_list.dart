@@ -1,8 +1,4 @@
 import 'package:smart_home/src/screens/favourites_screen/components/favourite_tile.dart';
-import 'package:smart_home/src/screens/smart_ac/smart_ac.dart';
-import 'package:smart_home/src/screens/smart_fan/smart_fan.dart';
-import 'package:smart_home/src/screens/smart_light/smart_light.dart';
-import 'package:smart_home/src/screens/smart_speaker/smart_speaker.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/src/screens/favourites_screen/components/body.dart';
@@ -31,7 +27,7 @@ class _FavouriteListState extends State<FavouriteList> {
           switchFav: widget.model.lightFav,
           switchButton: widget.model.lightSwitch,
           onTap: () {
-            Navigator.of(context).pushNamed(SmartLight.routeName);
+            // Navigation removed - functionality disabled
           },
           iconAsset: 'assets/icons/svg/speaker.svg',
           device: 'Light',
@@ -45,7 +41,7 @@ class _FavouriteListState extends State<FavouriteList> {
         switchButton: widget.model.fanSwitch,
         switchFav: widget.model.fanFav,
         onTap: () {
-          Navigator.of(context).pushNamed(SmartFan.routeName);
+          // Navigation removed - functionality disabled
         },
         iconAsset: 'assets/icons/svg/fan.svg',
         device: 'Fan',
@@ -61,7 +57,7 @@ class _FavouriteListState extends State<FavouriteList> {
           itsOn: widget.model.isACON,
           switchButton: widget.model.acSwitch,
           onTap: () {
-            Navigator.of(context).pushNamed(SmartAC.routeName);
+            // Navigation removed - functionality disabled
           },
           iconAsset: 'assets/icons/svg/ac.svg',
           device: 'AC',
@@ -79,7 +75,7 @@ class _FavouriteListState extends State<FavouriteList> {
           switchButton: widget.model.speakerSwitch,
           switchFav: widget.model.speakerFav,
           onTap: () {
-            Navigator.of(context).pushNamed(SmartSpeaker.routeName);
+            // Navigation removed - functionality disabled
           },
           iconAsset: 'assets/icons/svg/speaker.svg',
           device: 'Speaker',

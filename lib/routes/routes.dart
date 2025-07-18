@@ -4,10 +4,6 @@ import 'package:smart_home/src/screens/edit_profile/edit_profile.dart';
 import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
 import 'package:smart_home/src/screens/settings_screen/settings_screen.dart';
 import 'package:smart_home/src/screens/electricity_settings/electricity_settings_screen.dart';
-import 'package:smart_home/src/screens/smart_ac/smart_ac.dart';
-import 'package:smart_home/src/screens/smart_light/smart_light.dart';
-import 'package:smart_home/src/screens/smart_speaker/smart_speaker.dart';
-import 'package:smart_home/src/screens/smart_fan/smart_fan.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
 import 'package:smart_home/src/screens/stats_screen/stats_screen.dart';
 import 'package:smart_home/src/screens/rooms_screen/rooms_screen.dart';
@@ -20,7 +16,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:smart_home/src/screens/home_screen/home_screen.dart';
 import 'package:smart_home/src/screens/my_list_screen/my_list_screen.dart';
 import 'package:smart_home/src/screens/savings_screen/savings_screen.dart';
-import 'package:smart_home/src/screens/smart_tv/smart_tv.dart';
 
 // Routes arranged in ascending order
 
@@ -33,11 +28,6 @@ final Map<String, WidgetBuilder> routes = {
   SavingsScreen.routeName: (context) => const SavingsScreen(),
   SetEventScreen.routeName: (context) => const SetEventScreen(),
   SettingScreen.routeName: (context) => const SettingScreen(),
-  SmartAC.routeName: (context) => const SmartAC(),
-  SmartFan.routeName: (context) => const SmartFan(),
-  SmartTV.routeName: (context) => const SmartTV(),
-  SmartLight.routeName: (context) => const SmartLight(),
-  SmartSpeaker.routeName: (context) => const SmartSpeaker(),
   SplashScreen.routeName: (context) => const SplashScreen(),
   StatsScreen.routeName: (context) => const StatsScreen(),
   MyListScreen.routeName: (context) => const MyListScreen(),

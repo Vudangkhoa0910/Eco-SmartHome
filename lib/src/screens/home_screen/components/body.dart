@@ -3,13 +3,7 @@ import 'package:smart_home/src/screens/home_screen/components/weather_container.
 import 'package:smart_home/src/screens/home_screen/components/sensor_data_container.dart';
 import 'package:smart_home/src/screens/home_screen/components/energy_overview_widget.dart';
 import 'package:smart_home/src/screens/set_event_screen/set_event_screen.dart';
-import 'package:smart_home/src/screens/smart_ac/smart_ac.dart';
-import 'package:smart_home/src/screens/smart_fan/smart_fan.dart';
-import 'package:smart_home/src/screens/smart_light/smart_light.dart';
-import 'package:smart_home/src/screens/smart_speaker/smart_speaker.dart';
-
 import 'package:smart_home/view/home_screen_view_model.dart';
-import 'package:smart_home/src/screens/smart_tv/smart_tv.dart';
 import 'package:flutter/material.dart';
 
 import 'add_device_widget.dart';
@@ -127,7 +121,7 @@ class Body extends StatelessWidget {
                             itsOn: model.isLightOn,
                             switchButton: model.lightSwitch,
                             onTap: () {
-                              Navigator.of(context).pushNamed(SmartLight.routeName);
+                              // Navigation removed - functionality disabled
                             },
                             iconAsset: 'assets/icons/svg/light.svg',
                             device: 'Đèn',
@@ -145,7 +139,7 @@ class Body extends StatelessWidget {
                             itsOn: model.isACON,
                             switchButton: model.acSwitch,
                             onTap: () {
-                              Navigator.of(context).pushNamed(SmartAC.routeName);
+                              // Navigation removed - functionality disabled
                             },
                             iconAsset: 'assets/icons/svg/ac.svg',
                             device: 'Điều hòa',
@@ -167,7 +161,7 @@ class Body extends StatelessWidget {
                             itsOn: model.isSpeakerON,
                             switchButton: model.speakerSwitch,
                             onTap: () {
-                              Navigator.of(context).pushNamed(SmartSpeaker.routeName);
+                              // Navigation removed - functionality disabled
                             },
                             iconAsset: 'assets/icons/svg/speaker.svg',
                             device: 'Loa',
@@ -185,7 +179,7 @@ class Body extends StatelessWidget {
                             itsOn: model.isFanON,
                             switchButton: model.fanSwitch,
                             onTap: () {
-                              Navigator.of(context).pushNamed(SmartFan.routeName);
+                              // Navigation removed - functionality disabled
                             },
                             iconAsset: 'assets/icons/svg/fan.svg',
                             device: 'Quạt',
@@ -253,7 +247,7 @@ class Body extends StatelessWidget {
                     height: getProportionateScreenHeight(45),
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.of(context).pushNamed(SmartTV.routeName);
+                        // Navigation removed - functionality disabled
                       },
                       icon: const Icon(Icons.tv, color: Colors.white, size: 18),
                       label: const Text(
