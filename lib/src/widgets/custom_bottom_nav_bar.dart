@@ -1,6 +1,6 @@
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:smart_home/core/constants/app_colors.dart';
+import 'package:smart_home/core/theme/app_theme.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   const CustomBottomNavBar({
@@ -33,7 +33,7 @@ class CustomBottomNavBar extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color:
-              isSelected ? Colors.black.withOpacity(0.1) : Colors.transparent,
+              isSelected ? Colors.black.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: AnimatedContainer(
@@ -41,7 +41,7 @@ class CustomBottomNavBar extends StatelessWidget {
           curve: Curves.easeInOut,
           child: Icon(
             isSelected ? selectedIcon : icon,
-            color: isSelected ? AppColors.primaryColor : Colors.grey.shade600,
+            color: isSelected ? AppColors.primary : Colors.grey.shade600,
             size: isSelected ? 26 : 24,
           ),
         ),
@@ -56,18 +56,18 @@ class CustomBottomNavBar extends StatelessWidget {
           16, 0, 16, 20), // Margin để tạo khoảng cách với cạnh màn hình
       height: 70.0, // Tăng chiều cao cho navbar
       decoration: BoxDecoration(
-        color: AppColors.navbarColor,
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(35), // Bo tròn thành hình trụ
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 0,
           ),
         ],
         border: Border.all(
-          color: AppColors.textLight.withOpacity(0.1),
+          color: AppColors.textLight.withValues(alpha: 0.1),
           width: 1,
         ),
       ),

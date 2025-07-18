@@ -2,7 +2,7 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/provider/base_view.dart';
 import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/src/screens/edit_profile/edit_profile.dart';
-import 'package:smart_home/core/constants/app_colors.dart';
+import 'package:smart_home/core/theme/app_theme.dart';
 
 import 'package:smart_home/src/screens/rooms_screen/rooms_screen.dart';
 import 'package:smart_home/src/screens/analytics_screen/analytics_screen.dart';
@@ -241,8 +241,8 @@ class HomeScreen extends StatelessWidget {
 
           // BODY sử dụng PageView để đồng bộ với BottomNavigationBar
           body: Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.mainGradient,
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
             ),
             child: PageView(
               controller: model.pageController,
