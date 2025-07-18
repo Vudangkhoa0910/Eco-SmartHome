@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
 import 'package:smart_home/service/navigation_service.dart';
+import 'package:smart_home/service/gemini_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -362,7 +363,13 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     if (customResponse != null) {
       _aiResponse = customResponse;
     } else {
-      _aiResponse = _processVietnameseCommand(command);
+      // Check if it's a smart home command
+      if (GeminiService.isSmartHomeCommand(command)) {
+        _aiResponse = _processVietnameseCommand(command);
+      } else {
+        // Forward to Gemini for general questions
+        _aiResponse = await _processGeneralQuestion(command);
+      }
     }
 
     _commandHistory.insert(0, command);
@@ -377,6 +384,22 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     await _speakResponse(_aiResponse);
 
     notifyListeners();
+  }
+
+  /// Xử lý câu hỏi tổng quát bằng Gemini AI
+  Future<String> _processGeneralQuestion(String question) async {
+    try {
+      // Enhance the question with Vietnamese context
+      final enhancedQuestion = GeminiService.enhanceQuestion(question);
+      
+      // Get response from Gemini
+      final geminiResponse = await GeminiService.generateResponse(enhancedQuestion);
+      
+      return geminiResponse;
+    } catch (e) {
+      print('Error processing general question: $e');
+      return 'Xin lỗi, tôi không thể trả lời câu hỏi này lúc này. Vui lòng thử lại sau.';
+    }
   }
 
   Future<String?> _processCustomCommand(String command) async {
@@ -443,7 +466,13 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     if (customResponse != null) {
       _aiResponse = customResponse;
     } else {
-      _aiResponse = _processVietnameseCommand(command);
+      // Check if it's a smart home command
+      if (GeminiService.isSmartHomeCommand(command)) {
+        _aiResponse = _processVietnameseCommand(command);
+      } else {
+        // Forward to Gemini for general questions
+        _aiResponse = await _processGeneralQuestion(command);
+      }
     }
 
     _commandHistory.insert(0, command);
@@ -1223,7 +1252,13 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     if (customResponse != null) {
       response = customResponse;
     } else {
-      response = _processVietnameseCommand(message);
+      // Check if it's a smart home command
+      if (GeminiService.isSmartHomeCommand(message)) {
+        response = _processVietnameseCommand(message);
+      } else {
+        // Forward to Gemini for general questions
+        response = await _processGeneralQuestion(message);
+      }
     }
 
     // Add AI response
