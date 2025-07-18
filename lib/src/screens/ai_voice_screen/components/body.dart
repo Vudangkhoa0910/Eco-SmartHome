@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/ai_voice_view_model.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:lottie/lottie.dart';
 import 'custom_commands_manager.dart';
 
@@ -208,80 +207,13 @@ class Body extends StatelessWidget {
                 ),
               ),
 
-              // Debug section (Temporary for testing)
-              if (!model.speechEnabled) ...[
-                Container(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Debug: Chức năng giọng nói không khả dụng',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _requestPermissions(context),
-                            icon: const Icon(Icons.mic, size: 16),
-                            label: const Text('Cấp quyền'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              await model.forceInitializeSpeech();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Đã thử khởi tạo lại. Speech enabled: ${model.speechEnabled}'),
-                                  backgroundColor: model.speechEnabled
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.refresh, size: 16),
-                            label: const Text('Thử lại'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
               // Voice Visualizer or Chat Box
               if (!model.showChatBox) ...[
                 Flexible(
                   flex: 3,
                   child: Center(
                     child: GestureDetector(
-                      onTap: model.speechEnabled
-                          ? model.toggleListening
-                          : () => _requestPermissions(context),
+                      onTap: model.toggleListening,
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
@@ -810,55 +742,6 @@ class Body extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => CustomCommandsManager(model: model),
-    );
-  }
-
-  void _requestPermissions(BuildContext context) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cần cấp quyền Microphone'),
-        content: const Text(
-          'Để sử dụng trợ lý giọng nói, ứng dụng cần quyền truy cập microphone. '
-          'Vui lòng cấp quyền để tiếp tục.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Để sau'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              // Request permissions using ViewModel method
-              final success = await model.requestMicrophonePermission();
-              if (success) {
-                // Force re-initialize speech after permission granted
-                await model.forceInitializeSpeech();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Đã cấp quyền microphone thành công! Bạn có thể sử dụng trợ lý giọng nói ngay bây giờ.'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 3),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Vui lòng cấp quyền microphone trong cài đặt ứng dụng để sử dụng tính năng giọng nói.'),
-                    backgroundColor: Colors.orange,
-                    duration: Duration(seconds: 4),
-                  ),
-                );
-              }
-            },
-            child: const Text('Cấp quyền'),
-          ),
-        ],
-      ),
     );
   }
 
