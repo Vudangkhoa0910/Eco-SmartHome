@@ -188,6 +188,10 @@ class AIVoiceViewModel extends BaseModel {
         } else {
           print('No Vietnamese locales found');
         }
+        
+        print('Speech recognition successfully initialized and ready!');
+      } else {
+        print('Failed to initialize speech recognition - check device capabilities');
       }
       
       print('Speech recognition initialized successfully: $_speechEnabled');
@@ -1374,47 +1378,6 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     );
   }
 
-  void _showPermissionRequiredDialog() {
-    BuildContext? context = getActiveContext();
-    if (context != null) {
-      showDialog(
-        context: context,
-        builder: (BuildContext dialogContext) => AlertDialog(
-          title: const Text('Cần cấp quyền Microphone'),
-          content: const Text(
-            'Để sử dụng chức năng nhận diện giọng nói, ứng dụng cần được cấp quyền truy cập microphone. '
-            'Bạn có muốn cấp quyền ngay bây giờ không?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Để sau'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                // Request microphone permission
-                final permission = await Permission.microphone.request();
-                if (permission.isGranted) {
-                  // Try to initialize speech recognition again
-                  await _initializeSpeech();
-                } else {
-                  // Open app settings if permission is permanently denied
-                  if (permission.isPermanentlyDenied) {
-                    await openAppSettings();
-                  }
-                }
-              },
-              child: const Text('Cấp quyền'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      print('No context available to show permission dialog');
-    }
-  }
-
   void _showSettingsDialog() {
     BuildContext? context = getActiveContext();
     if (context != null) {
@@ -1466,7 +1429,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       print('Current microphone permission status: $currentStatus');
       
       if (currentStatus.isGranted) {
-        print('Permission already granted');
+        print('Permission already granted, reinitializing speech...');
         await _initializeSpeech();
         return _speechEnabled;
       }
@@ -1483,8 +1446,13 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       
       if (permission.isGranted) {
         print('Permission granted! Reinitializing speech...');
+        // Add small delay to ensure permission is fully processed
+        await Future.delayed(const Duration(milliseconds: 500));
         await _initializeSpeech();
         print('Speech enabled after manual request: $_speechEnabled');
+        
+        // Force UI update
+        notifyListeners();
         return _speechEnabled;
       } else if (permission.isPermanentlyDenied) {
         print('Permission permanently denied after request');

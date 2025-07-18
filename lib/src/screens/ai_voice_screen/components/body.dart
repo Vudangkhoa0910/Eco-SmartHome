@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/ai_voice_view_model.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:lottie/lottie.dart';
 import 'custom_commands_manager.dart';
 
 class Body extends StatelessWidget {
@@ -52,7 +53,10 @@ class Body extends StatelessWidget {
                     children: [
                       Text(
                         'Trợ lý AI',
-                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium!
+                            .copyWith(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
@@ -60,7 +64,8 @@ class Body extends StatelessWidget {
                       Text(
                         'Smart Home Assistant',
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                              color: Theme.of(context).textTheme.bodySmall!.color,
+                              color:
+                                  Theme.of(context).textTheme.bodySmall!.color,
                               fontSize: 11,
                             ),
                       ),
@@ -75,7 +80,8 @@ class Body extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.chat_bubble_outline,
-                              color: Theme.of(context).textTheme.bodyMedium!.color,
+                              color:
+                                  Theme.of(context).textTheme.bodyMedium!.color,
                               size: 22,
                             ),
                             if (model.showChatBox)
@@ -117,8 +123,10 @@ class Body extends StatelessWidget {
               SizedBox(height: getProportionateScreenHeight(10)),
               // AI Status
               Container(
-                margin: EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin:
+                    EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: model.isListening
                       ? Colors.green.withOpacity(0.2)
@@ -186,7 +194,11 @@ class Body extends StatelessWidget {
                                     : model.showChatBox
                                         ? Colors.blue
                                         : model.speechEnabled
-                                            ? Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.7)
+                                            ? Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium!
+                                                .color!
+                                                .withOpacity(0.7)
                                             : Colors.red,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -195,6 +207,66 @@ class Body extends StatelessWidget {
                   ],
                 ),
               ),
+              
+              // Debug section (Temporary for testing)
+              if (!model.speechEnabled) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Debug: Chức năng giọng nói không khả dụng',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _requestPermissions(context),
+                            icon: const Icon(Icons.mic, size: 16),
+                            label: const Text('Cấp quyền'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              await model.forceInitializeSpeech();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã thử khởi tạo lại. Speech enabled: ${model.speechEnabled}'),
+                                  backgroundColor: model.speechEnabled ? Colors.green : Colors.red,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Thử lại'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
               // Voice Visualizer or Chat Box
               if (!model.showChatBox) ...[
                 Flexible(
@@ -211,7 +283,8 @@ class Body extends StatelessWidget {
                             Positioned(
                               bottom: 0,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade700,
                                   borderRadius: BorderRadius.circular(20),
@@ -219,79 +292,33 @@ class Body extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: const [
-                                    Icon(Icons.mic_off, color: Colors.white, size: 16),
+                                    Icon(Icons.mic_off,
+                                        color: Colors.white, size: 16),
                                     SizedBox(width: 4),
                                     Text(
                                       'Chạm để cấp quyền',
-                                      style: TextStyle(color: Colors.white, fontSize: 12),
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 12),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: getProportionateScreenWidth(180),
-                            height: getProportionateScreenWidth(180),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: model.isListening
-                                    ? [
-                                        const Color(0xFF00D4AA).withOpacity(0.8),
-                                        const Color(0xFF00D4AA).withOpacity(0.4),
-                                        const Color(0xFF00D4AA).withOpacity(0.1),
-                                        Colors.transparent,
-                                      ]
-                                    : model.isProcessing
-                                        ? [
-                                            Colors.orange.withOpacity(0.6),
-                                            Colors.orange.withOpacity(0.3),
-                                            Colors.orange.withOpacity(0.1),
-                                            Colors.transparent,
-                                          ]
-                                        : [
-                                            Theme.of(context).primaryColor.withOpacity(0.3),
-                                            Theme.of(context).primaryColor.withOpacity(0.1),
-                                            Colors.transparent,
-                                          ],
-                              ),
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: model.isListening
-                                    ? const Color(0xFF00D4AA)
-                                    : model.isProcessing
-                                        ? Colors.orange
-                                        : Theme.of(context).primaryColor,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (model.isListening
-                                            ? const Color(0xFF00D4AA)
-                                            : model.isProcessing
-                                                ? Colors.orange
-                                                : Theme.of(context).primaryColor)
-                                        .withOpacity(0.3),
-                                    blurRadius: 15,
-                                    spreadRadius: 3,
+                          Center(
+                            child: model.isProcessing
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 4,
+                                  )
+                                : Lottie.asset(
+                                    'assets/Lottie/mic.json',
+                                    width: 400, // Tăng từ 60 → 120
+                                    height: 400, // Tăng từ 60 → 120
+                                    animate: model
+                                        .isListening, // Animate khi đang nghe
+                                    repeat: model
+                                        .isListening, // Lặp lại khi đang nghe
                                   ),
-                                ],
-                              ),
-                              child: Center(
-                                child: model.isProcessing
-                                    ? const CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 3,
-                                      )
-                                    : Icon(
-                                        model.isListening ? Icons.mic : Icons.mic_none,
-                                        color: Colors.white,
-                                        size: 60,
-                                      ),
-                              ),
-                            ),
                           ),
                         ],
                       ),
@@ -302,7 +329,8 @@ class Body extends StatelessWidget {
                 Flexible(
                   flex: 3,
                   child: Container(
-                    margin: EdgeInsets.symmetric(vertical: getProportionateScreenHeight(5)),
+                    margin: EdgeInsets.symmetric(
+                        vertical: getProportionateScreenHeight(5)),
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
@@ -316,7 +344,8 @@ class Body extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            color:
+                                Theme.of(context).primaryColor.withOpacity(0.1),
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(16),
                               topRight: Radius.circular(16),
@@ -324,11 +353,16 @@ class Body extends StatelessWidget {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.chat, color: Theme.of(context).primaryColor, size: 18),
+                              Icon(Icons.chat,
+                                  color: Theme.of(context).primaryColor,
+                                  size: 18),
                               const SizedBox(width: 8),
                               Text(
                                 'Chat với AI',
-                                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium!
+                                    .copyWith(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -338,10 +372,14 @@ class Body extends StatelessWidget {
                                 onPressed: model.clearChatMessages,
                                 icon: Icon(
                                   Icons.clear,
-                                  color: Theme.of(context).textTheme.bodyMedium!.color,
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium!
+                                      .color,
                                   size: 18,
                                 ),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
                                 padding: EdgeInsets.zero,
                               ),
                             ],
@@ -366,7 +404,10 @@ class Body extends StatelessWidget {
                                       const SizedBox(height: 12),
                                       Text(
                                         'Chưa có tin nhắn nào\nBắt đầu trò chuyện với AI!',
-                                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium!
+                                            .copyWith(
                                               color: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium!
@@ -393,14 +434,16 @@ class Body extends StatelessWidget {
                                         mainAxisAlignment: isUser
                                             ? MainAxisAlignment.end
                                             : MainAxisAlignment.start,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           if (!isUser) ...[
                                             Container(
                                               padding: const EdgeInsets.all(6),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFF00D4AA),
-                                                borderRadius: BorderRadius.circular(16),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                               ),
                                               child: const Icon(
                                                 Icons.smart_toy,
@@ -412,19 +455,24 @@ class Body extends StatelessWidget {
                                           ],
                                           Flexible(
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                 horizontal: 12,
                                                 vertical: 8,
                                               ),
                                               decoration: BoxDecoration(
                                                 color: isUser
-                                                    ? Theme.of(context).primaryColor
-                                                    : Theme.of(context).cardColor,
-                                                borderRadius: BorderRadius.circular(12),
+                                                    ? Theme.of(context)
+                                                        .primaryColor
+                                                    : Theme.of(context)
+                                                        .cardColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                                 border: isUser
                                                     ? null
                                                     : Border.all(
-                                                        color: Theme.of(context).dividerColor,
+                                                        color: Theme.of(context)
+                                                            .dividerColor,
                                                       ),
                                               ),
                                               child: Text(
@@ -432,7 +480,10 @@ class Body extends StatelessWidget {
                                                 style: TextStyle(
                                                   color: isUser
                                                       ? Colors.white
-                                                      : Theme.of(context).textTheme.bodyMedium!.color,
+                                                      : Theme.of(context)
+                                                          .textTheme
+                                                          .bodyMedium!
+                                                          .color,
                                                   fontSize: 12,
                                                 ),
                                               ),
@@ -443,8 +494,10 @@ class Body extends StatelessWidget {
                                             Container(
                                               padding: const EdgeInsets.all(6),
                                               decoration: BoxDecoration(
-                                                color: Theme.of(context).primaryColor,
-                                                borderRadius: BorderRadius.circular(16),
+                                                color: Theme.of(context)
+                                                    .primaryColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                               ),
                                               child: const Icon(
                                                 Icons.person,
@@ -500,8 +553,11 @@ class Body extends StatelessWidget {
                               const SizedBox(width: 6),
                               FloatingActionButton(
                                 onPressed: () {
-                                  if (model.chatController.text.trim().isNotEmpty) {
-                                    model.sendChatMessage(model.chatController.text);
+                                  if (model.chatController.text
+                                      .trim()
+                                      .isNotEmpty) {
+                                    model.sendChatMessage(
+                                        model.chatController.text);
                                   }
                                 },
                                 backgroundColor: Theme.of(context).primaryColor,
@@ -525,7 +581,8 @@ class Body extends StatelessWidget {
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(getProportionateScreenWidth(12)),
-                  margin: EdgeInsets.symmetric(vertical: getProportionateScreenHeight(4)),
+                  margin: EdgeInsets.symmetric(
+                      vertical: getProportionateScreenHeight(4)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -541,11 +598,15 @@ class Body extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.record_voice_over, color: Colors.blue, size: 16),
+                          const Icon(Icons.record_voice_over,
+                              color: Colors.blue, size: 16),
                           const SizedBox(width: 6),
                           Text(
                             'Bạn đã nói:',
-                            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium!
+                                .copyWith(
                                   color: Colors.blue,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
@@ -568,7 +629,8 @@ class Body extends StatelessWidget {
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(getProportionateScreenWidth(12)),
-                  margin: EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
+                  margin:
+                      EdgeInsets.only(bottom: getProportionateScreenHeight(8)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -577,7 +639,8 @@ class Body extends StatelessWidget {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF00D4AA).withOpacity(0.3)),
+                    border: Border.all(
+                        color: const Color(0xFF00D4AA).withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,7 +662,10 @@ class Body extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             'Trợ lý AI:',
-                            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium!
+                                .copyWith(
                                   color: const Color(0xFF00D4AA),
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
@@ -625,14 +691,16 @@ class Body extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.flash_on, color: Colors.amber, size: 18),
+                        const Icon(Icons.flash_on,
+                            color: Colors.amber, size: 18),
                         const SizedBox(width: 6),
                         Text(
                           'Lệnh nhanh:',
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyLarge!.copyWith(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
@@ -700,7 +768,9 @@ class Body extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      model.speechEnabled ? Icons.tips_and_updates : Icons.warning,
+                      model.speechEnabled
+                          ? Icons.tips_and_updates
+                          : Icons.warning,
                       color: model.speechEnabled ? Colors.amber : Colors.orange,
                       size: 14,
                     ),
@@ -757,17 +827,23 @@ class Body extends StatelessWidget {
               // Request permissions using ViewModel method
               final success = await model.requestMicrophonePermission();
               if (success) {
+                // Force re-initialize speech after permission granted
+                await model.forceInitializeSpeech();
+                
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Đã cấp quyền microphone thành công!'),
+                    content: Text('Đã cấp quyền microphone thành công! Bạn có thể sử dụng trợ lý giọng nói ngay bây giờ.'),
                     backgroundColor: Colors.green,
+                    duration: Duration(seconds: 3),
                   ),
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Vui lòng cấp quyền microphone trong cài đặt ứng dụng.'),
+                    content: Text(
+                        'Vui lòng cấp quyền microphone trong cài đặt ứng dụng để sử dụng tính năng giọng nói.'),
                     backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 4),
                   ),
                 );
               }
