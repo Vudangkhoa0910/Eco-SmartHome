@@ -11,31 +11,32 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:smart_home/core/permission_helper.dart';
 
-class AIVoiceViewModel extends BaseModel {
+class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
   bool _isListening = false;
   bool _isProcessing = false;
   bool _showChatBox = false;
+  bool _isInitializing = false;
   String _recognizedText = '';
   String _aiResponse = '';
   List<String> _commandHistory = [];
   List<Map<String, dynamic>> _chatMessages = [];
   List<Map<String, dynamic>> _customCommands = [];
-  
+
   // Firebase services
   final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   final MqttService _mqttService = getIt<MqttService>();
-  
+
   // Current user
   String? _currentUserId;
-  
+
   // Available zones and devices
   Map<String, dynamic> _availableZonesAndDevices = {};
-  
+
   // Speech recognition và TTS
   final SpeechToText _speechToText = SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
   bool _speechEnabled = false;
-  
+
   // Chat controller
   final TextEditingController _chatController = TextEditingController();
 
@@ -43,31 +44,63 @@ class AIVoiceViewModel extends BaseModel {
   final Map<String, Map<String, dynamic>> _deviceCommands = {
     // Đèn
     'đèn cổng': {'type': 'light', 'location': 'gate', 'device': 'Đèn cổng'},
-    'đèn phòng khách': {'type': 'light', 'location': 'living_room', 'device': 'Đèn phòng khách'},
-    'đèn phòng ngủ': {'type': 'light', 'location': 'bedroom', 'device': 'Đèn phòng ngủ'},
+    'đèn phòng khách': {
+      'type': 'light',
+      'location': 'living_room',
+      'device': 'Đèn phòng khách'
+    },
+    'đèn phòng ngủ': {
+      'type': 'light',
+      'location': 'bedroom',
+      'device': 'Đèn phòng ngủ'
+    },
     'đèn bếp': {'type': 'light', 'location': 'kitchen', 'device': 'Đèn bếp'},
-    'đèn phòng tắm': {'type': 'light', 'location': 'bathroom', 'device': 'Đèn phòng tắm'},
+    'đèn phòng tắm': {
+      'type': 'light',
+      'location': 'bathroom',
+      'device': 'Đèn phòng tắm'
+    },
     'đèn sân': {'type': 'light', 'location': 'yard', 'device': 'Đèn sân'},
     'tất cả đèn': {'type': 'light', 'location': 'all', 'device': 'Tất cả đèn'},
-    
+
     // Quạt
-    'quạt phòng khách': {'type': 'fan', 'location': 'living_room', 'device': 'Quạt phòng khách'},
-    'quạt phòng ngủ': {'type': 'fan', 'location': 'bedroom', 'device': 'Quạt phòng ngủ'},
+    'quạt phòng khách': {
+      'type': 'fan',
+      'location': 'living_room',
+      'device': 'Quạt phòng khách'
+    },
+    'quạt phòng ngủ': {
+      'type': 'fan',
+      'location': 'bedroom',
+      'device': 'Quạt phòng ngủ'
+    },
     'quạt trần': {'type': 'fan', 'location': 'ceiling', 'device': 'Quạt trần'},
-    
+
     // Điều hòa
     'điều hòa': {'type': 'ac', 'location': 'main', 'device': 'Điều hòa'},
     'máy lạnh': {'type': 'ac', 'location': 'main', 'device': 'Máy lạnh'},
-    'điều hòa phòng khách': {'type': 'ac', 'location': 'living_room', 'device': 'Điều hòa phòng khách'},
-    'điều hòa phòng ngủ': {'type': 'ac', 'location': 'bedroom', 'device': 'Điều hòa phòng ngủ'},
-    
+    'điều hòa phòng khách': {
+      'type': 'ac',
+      'location': 'living_room',
+      'device': 'Điều hòa phòng khách'
+    },
+    'điều hòa phòng ngủ': {
+      'type': 'ac',
+      'location': 'bedroom',
+      'device': 'Điều hòa phòng ngủ'
+    },
+
     // TV & Giải trí
     'tivi': {'type': 'tv', 'location': 'main', 'device': 'TV'},
     'tv': {'type': 'tv', 'location': 'main', 'device': 'TV'},
     'loa': {'type': 'speaker', 'location': 'main', 'device': 'Loa'},
-    
+
     // Khác
-    'camera': {'type': 'camera', 'location': 'security', 'device': 'Camera an ninh'},
+    'camera': {
+      'type': 'camera',
+      'location': 'security',
+      'device': 'Camera an ninh'
+    },
     'cửa': {'type': 'door', 'location': 'main', 'device': 'Cửa chính'},
     'cổng': {'type': 'gate', 'location': 'entrance', 'device': 'Cổng'},
   };
@@ -75,141 +108,163 @@ class AIVoiceViewModel extends BaseModel {
   // Các từ khóa hành động
   final List<String> _onKeywords = ['mở', 'bật', 'khởi động', 'sáng'];
   final List<String> _offKeywords = ['tắt', 'đóng', 'ngắt', 'tối'];
-  final List<String> _adjustKeywords = ['chỉnh', 'điều chỉnh', 'đặt', 'tăng', 'giảm'];
+  final List<String> _adjustKeywords = [
+    'chỉnh',
+    'điều chỉnh',
+    'đặt',
+    'tăng',
+    'giảm'
+  ];
 
   bool get isListening => _isListening;
   bool get isProcessing => _isProcessing;
   bool get showChatBox => _showChatBox;
+  bool get isInitializing => _isInitializing;
   String get recognizedText => _recognizedText;
   String get aiResponse => _aiResponse;
   List<String> get commandHistory => _commandHistory;
   List<Map<String, dynamic>> get chatMessages => _chatMessages;
   List<Map<String, dynamic>> get customCommands => _customCommands;
-  Map<String, dynamic> get availableZonesAndDevices => _availableZonesAndDevices;
+  Map<String, dynamic> get availableZonesAndDevices =>
+      _availableZonesAndDevices;
   TextEditingController get chatController => _chatController;
   bool get speechEnabled => _speechEnabled;
 
+  // Lifecycle methods for WidgetsBindingObserver
+  @override
+  void didChangeMetrics() {
+    // Handle metrics change
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle state changes
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // Stop listening when app goes to background
+      if (_isListening) {
+        stopListening();
+      }
+    }
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    // Handle memory pressure
+  }
+
   void initialize() async {
+    _isInitializing = true;
+    notifyListeners();
+
+    // Add this observer to listen for lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
     // Get current user
     _currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    
+
+    // Request microphone permission first
+    await _requestPermission();
+
     // Initialize speech recognition
-    await _initializeSpeech();
-    
+    await _initSpeech();
+
     // Initialize TTS
     await _initializeTts();
-    
+
     // Load user data
     await _loadUserData();
-    
+
     print('AI Voice Assistant initialized - Speech enabled: $_speechEnabled');
+
+    _isInitializing = false;
     notifyListeners(); // Notify listeners after initialization
   }
-  
+
   Future<void> _loadUserData() async {
     if (_currentUserId == null) return;
-    
+
     try {
       // Load chat history
       final chatHistory = await _firebaseData.getChatHistory(
         userId: _currentUserId!,
         limit: 50,
       );
-      
-      _chatMessages = chatHistory.map((msg) => {
-        'message': msg['message'],
-        'isUser': msg['is_user'],
-        'timestamp': (msg['timestamp'] as Timestamp).toDate(),
-        'response': msg['response'],
-      }).toList();
-      
+
+      _chatMessages = chatHistory
+          .map((msg) => {
+                'message': msg['message'],
+                'isUser': msg['is_user'],
+                'timestamp': (msg['timestamp'] as Timestamp).toDate(),
+                'response': msg['response'],
+              })
+          .toList();
+
       // Load custom commands
       _customCommands = await _firebaseData.getCustomCommands(
         userId: _currentUserId!,
       );
-      
+
       // Load available zones and devices
-      _availableZonesAndDevices = await _firebaseData.getAvailableZonesAndDevices();
-      
+      _availableZonesAndDevices =
+          await _firebaseData.getAvailableZonesAndDevices();
+
       notifyListeners();
     } catch (e) {
       print('Error loading user data: $e');
     }
   }
-  
-  Future<void> _initializeSpeech() async {
+
+  // Initialize speech recognition (theo code tham khảo)
+  Future<bool> _initSpeech() async {
     try {
-      print('=== Initializing Speech Recognition ===');
-      
-      // Check microphone permission first without requesting
-      final micPermission = await Permission.microphone.status;
-      print('Current microphone permission status: $micPermission');
-      
-      if (!micPermission.isGranted) {
-        print('Microphone permission not granted - will request when needed');
-        _speechEnabled = false;
-        notifyListeners();
-        return;
-      }
-      
-      print('Microphone permission granted, initializing speech recognition...');
-      
-      // Initialize speech recognition
+      print('=== INIT SPEECH (New Logic) ===');
+
       _speechEnabled = await _speechToText.initialize(
         onStatus: (status) {
-          print('Speech recognition status: $status');
+          print('Speech status: $status');
           if (status == 'done' || status == 'notListening') {
             _isListening = false;
             notifyListeners();
           }
         },
-        onError: (error) {
-          print('Speech recognition error: $error');
+        onError: (errorNotification) {
+          print('Speech error: ${errorNotification.errorMsg}');
           _isListening = false;
           notifyListeners();
         },
         debugLogging: true,
-        finalTimeout: const Duration(milliseconds: 5000),
       );
-      
-      if (_speechEnabled) {
-        // Check available locales for debugging
-        final locales = await _speechToText.locales();
-        print('Available speech locales: ${locales.map((e) => "${e.localeId} - ${e.name}").join(", ")}');
-        
-        // Check if Vietnamese is available
-        final viLocales = locales.where((locale) => 
-          locale.localeId.startsWith('vi') || 
-          locale.name.toLowerCase().contains('vietnam')
-        );
-        
-        if (viLocales.isNotEmpty) {
-          print('Vietnamese locales found: ${viLocales.map((e) => "${e.localeId} - ${e.name}").join(", ")}');
-        } else {
-          print('No Vietnamese locales found');
-        }
-        
-        print('Speech recognition successfully initialized and ready!');
-      } else {
-        print('Failed to initialize speech recognition - check device capabilities');
-      }
-      
-      print('Speech recognition initialized successfully: $_speechEnabled');
+
+      print('Speech initialized: $_speechEnabled');
       notifyListeners();
+      return _speechEnabled;
     } catch (e) {
-      print('Failed to initialize speech recognition: $e');
+      print('Speech initialization error: $e');
       _speechEnabled = false;
       notifyListeners();
+      return false;
     }
   }
-  
+
+  // Request microphone permission (theo code tham khảo)
+  Future<void> _requestPermission() async {
+    var status = await Permission.microphone.status;
+    print('Current permission status: $status');
+
+    if (status.isDenied) {
+      print('Requesting microphone permission...');
+      final result = await Permission.microphone.request();
+      print('Permission request result: $result');
+    }
+  }
+
   Future<void> _initializeTts() async {
     try {
       await _flutterTts.setLanguage('vi-VN');
       await _flutterTts.setPitch(1.0);
       await _flutterTts.setSpeechRate(0.5);
       await _flutterTts.setVolume(1.0);
-      
+
       print('TTS initialized successfully');
     } catch (e) {
       print('Failed to initialize TTS: $e');
@@ -224,174 +279,135 @@ class AIVoiceViewModel extends BaseModel {
     }
   }
 
-  void startListening() async {
-    print('=== Starting Speech Recognition ===');
-    
+  // Start listening (theo code tham khảo)
+  Future<void> startListening() async {
+    print('=== Start Listening (New Logic) ===');
+
     if (!_speechEnabled) {
-      print('Speech recognition not enabled, checking permissions...');
-      
-      // Check current permission status
-      final micStatus = await Permission.microphone.status;
-      print('Current microphone permission status: $micStatus');
-      
-      if (!micStatus.isGranted) {
-        print('Microphone permission not granted, requesting...');
-        final micPermission = await Permission.microphone.request();
-        print('Microphone permission request result: $micPermission');
-        
-        if (!micPermission.isGranted) {
-          print('Permission denied, showing dialog');
-          _showSettingsDialog();
+      print('Speech not enabled, trying to initialize...');
+      _speechEnabled = await _initSpeech();
+      if (!_speechEnabled) {
+        print('Failed to initialize speech, requesting permission...');
+        await _requestPermission();
+        _speechEnabled = await _initSpeech();
+
+        if (!_speechEnabled) {
+          print('Speech still not available after permission request');
           return;
         }
       }
-      
-      // Try to reinitialize speech recognition
-      print('Attempting to reinitialize speech recognition...');
-      await _initializeSpeech();
-      
-      if (!_speechEnabled) {
-        print('Speech still not enabled after reinitialization');
-        _showSettingsDialog();
-        return;
-      }
     }
-    
-    // Double-check permissions before starting
-    final micPermission = await Permission.microphone.isGranted;
-    print('Final microphone permission check: $micPermission');
-    
-    if (!micPermission) {
-      print('Microphone permission denied at final check');
-      _showSettingsDialog();
-      return;
-    }
-    
-    _isListening = true;
-    _recognizedText = '';
-    _aiResponse = '';
-    notifyListeners();
-    
-    try {
-      // Get available locales
-      final locales = await _speechToText.locales();
-      String viLocale = 'vi_VN';
-      
-      // Look for a Vietnamese locale if the exact one isn't available
-      if (!locales.any((locale) => locale.localeId == 'vi_VN')) {
-        final viLocales = locales.where((locale) => 
-          locale.localeId.startsWith('vi') || 
-          locale.name.toLowerCase().contains('vietnam')
-        );
-        
-        if (viLocales.isNotEmpty) {
-          viLocale = viLocales.first.localeId;
-          print('Using Vietnamese locale: $viLocale');
-        } else {
-          print('No Vietnamese locale found, using default');
-        }
-      }
-      
-      print('Starting speech recognition with locale: $viLocale');
-      
-      await _speechToText.listen(
-        onResult: (result) {
-          print('Speech recognition result: ${result.recognizedWords}');
-          _recognizedText = result.recognizedWords;
-          notifyListeners();
-          
-          // Nếu người dùng dừng nói, xử lý lệnh
-          if (result.finalResult) {
-            _processCommand(_recognizedText);
-          }
-        },
-        listenFor: const Duration(seconds: 15),
-        pauseFor: const Duration(seconds: 3),
-        cancelOnError: false,
-        partialResults: true,
-        localeId: viLocale,
-      );
-      
-      print('Speech recognition started successfully');
-    } catch (e) {
-      print('Error starting speech recognition: $e');
-      _isListening = false;
+
+    if (!_isListening) {
+      _isListening = true;
+      _recognizedText = '';
+      _aiResponse = '';
       notifyListeners();
+
+      try {
+        await _speechToText.listen(
+          onResult: (result) {
+            _recognizedText = result.recognizedWords;
+            print('Recognized: $_recognizedText');
+            notifyListeners();
+          },
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
+          partialResults: true,
+          localeId: 'vi-VN',
+          cancelOnError: false,
+          listenMode: ListenMode.deviceDefault,
+        );
+
+        print('Started listening successfully');
+      } catch (e) {
+        print('Listen error: $e');
+        _isListening = false;
+        notifyListeners();
+      }
     }
   }
 
-  void stopListening() async {
-    if (_speechToText.isListening) {
+  // Stop listening (theo code tham khảo)
+  Future<void> stopListening() async {
+    if (_isListening) {
+      _isListening = false;
+      notifyListeners();
       await _speechToText.stop();
+
+      print('Stopped listening');
+
+      // Process command if recognized text is available
+      if (_recognizedText.isNotEmpty) {
+        _processCommand(_recognizedText);
+      }
     }
-    _isListening = false;
-    notifyListeners();
   }
-  
+
   void _processCommand(String command) async {
     if (command.trim().isEmpty) return;
-    
+
     _isProcessing = true;
     _isListening = false;
     notifyListeners();
-    
+
     // Simulate processing delay
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     _isProcessing = false;
-    
+
     // Try to match with custom commands first
     final customResponse = await _processCustomCommand(command);
-    
+
     if (customResponse != null) {
       _aiResponse = customResponse;
     } else {
       _aiResponse = _processVietnameseCommand(command);
     }
-    
+
     _commandHistory.insert(0, command);
     if (_commandHistory.length > 10) {
       _commandHistory.removeAt(10);
     }
-    
+
     // Save to Firebase
     await _saveChatMessage(command, _aiResponse, isUser: false);
-    
+
     // Speak the response
     await _speakResponse(_aiResponse);
-    
+
     notifyListeners();
   }
-  
+
   Future<String?> _processCustomCommand(String command) async {
     if (_currentUserId == null) return null;
-    
+
     try {
       // Search for matching custom commands
       final matchingCommands = await _firebaseData.searchCustomCommands(
         userId: _currentUserId!,
         searchText: command,
       );
-      
+
       if (matchingCommands.isNotEmpty) {
         final customCommand = matchingCommands.first;
         final deviceId = customCommand['device_id'];
         final action = customCommand['action'];
         final zone = customCommand['zone'];
-        
+
         // Execute the command
         await _executeDeviceCommand(deviceId, action);
-        
+
         return 'Đã thực hiện lệnh tùy chỉnh: ${customCommand['description'] ?? customCommand['command_text']} trong khu vực $zone! ✅';
       }
-      
+
       return null;
     } catch (e) {
       print('Error processing custom command: $e');
       return null;
     }
   }
-  
+
   Future<void> _executeDeviceCommand(String deviceId, String action) async {
     try {
       switch (deviceId) {
@@ -416,34 +432,34 @@ class AIVoiceViewModel extends BaseModel {
     _recognizedText = command;
     _isProcessing = true;
     notifyListeners();
-    
+
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     _isProcessing = false;
-    
+
     // Try to match with custom commands first
     final customResponse = await _processCustomCommand(command);
-    
+
     if (customResponse != null) {
       _aiResponse = customResponse;
     } else {
       _aiResponse = _processVietnameseCommand(command);
     }
-    
+
     _commandHistory.insert(0, command);
     if (_commandHistory.length > 10) {
       _commandHistory.removeAt(10);
     }
-    
+
     // Save to Firebase
     await _saveChatMessage(command, _aiResponse, isUser: false);
-    
+
     // Speak the response
     await _speakResponse(_aiResponse);
-    
+
     notifyListeners();
   }
-  
+
   Future<void> _speakResponse(String text) async {
     try {
       // Remove emojis and special characters for better TTS
@@ -456,12 +472,12 @@ class AIVoiceViewModel extends BaseModel {
 
   String _processVietnameseCommand(String command) {
     final lowerCommand = command.toLowerCase();
-    
+
     // Phân tích lệnh
     String action = '';
     String device = '';
     String? temperature;
-    
+
     // Xác định hành động
     for (String keyword in _onKeywords) {
       if (lowerCommand.contains(keyword)) {
@@ -469,7 +485,7 @@ class AIVoiceViewModel extends BaseModel {
         break;
       }
     }
-    
+
     if (action.isEmpty) {
       for (String keyword in _offKeywords) {
         if (lowerCommand.contains(keyword)) {
@@ -478,7 +494,7 @@ class AIVoiceViewModel extends BaseModel {
         }
       }
     }
-    
+
     if (action.isEmpty) {
       for (String keyword in _adjustKeywords) {
         if (lowerCommand.contains(keyword)) {
@@ -487,7 +503,7 @@ class AIVoiceViewModel extends BaseModel {
         }
       }
     }
-    
+
     // Xác định thiết bị
     for (String deviceKey in _deviceCommands.keys) {
       if (lowerCommand.contains(deviceKey)) {
@@ -495,7 +511,7 @@ class AIVoiceViewModel extends BaseModel {
         break;
       }
     }
-    
+
     // Xác định nhiệt độ nếu có
     final tempRegex = RegExp(r'(\d+)\s*độ');
     final tempMatch = tempRegex.firstMatch(lowerCommand);
@@ -503,25 +519,28 @@ class AIVoiceViewModel extends BaseModel {
       temperature = tempMatch.group(1);
       action = 'adjust';
     }
-    
+
     // Xử lý lệnh đặc biệt
-    if (lowerCommand.contains('chế độ đi ngủ') || lowerCommand.contains('good night')) {
+    if (lowerCommand.contains('chế độ đi ngủ') ||
+        lowerCommand.contains('good night')) {
       return _handleNightMode();
     }
-    
-    if (lowerCommand.contains('chế độ ra về') || lowerCommand.contains('về nhà')) {
+
+    if (lowerCommand.contains('chế độ ra về') ||
+        lowerCommand.contains('về nhà')) {
       return _handleHomeMode();
     }
-    
-    if (lowerCommand.contains('chế độ tiết kiệm') || lowerCommand.contains('tiết kiệm năng lượng')) {
+
+    if (lowerCommand.contains('chế độ tiết kiệm') ||
+        lowerCommand.contains('tiết kiệm năng lượng')) {
       return _handleEcoMode();
     }
-    
+
     // Xử lý lệnh thông thường
     if (device.isNotEmpty && _deviceCommands.containsKey(device)) {
       final deviceInfo = _deviceCommands[device]!;
       final deviceName = deviceInfo['device'];
-      
+
       switch (action) {
         case 'on':
           return 'Đã bật $deviceName thành công! ✅';
@@ -537,7 +556,7 @@ class AIVoiceViewModel extends BaseModel {
           return 'Đã thực hiện lệnh cho $deviceName! ✅';
       }
     }
-    
+
     // Lệnh không nhận diện được
     return 'Xin lỗi, tôi không hiểu lệnh này. Vui lòng thử lại với các lệnh như "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ". 🤔';
   }
@@ -615,7 +634,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                   ],
                 ),
               ),
-              
+
               // Tab Bar
               Container(
                 color: const Color(0xFF3B4252),
@@ -630,7 +649,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                   ],
                 ),
               ),
-              
+
               // Tab Content
               Expanded(
                 child: TabBarView(
@@ -676,7 +695,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
             ],
           ),
           const SizedBox(height: 10),
-          
+
           Expanded(
             flex: 1,
             child: _commandHistory.isEmpty
@@ -698,7 +717,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.history, color: Colors.white54, size: 16),
+                            const Icon(Icons.history,
+                                color: Colors.white54, size: 16),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -711,7 +731,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                                 Navigator.pop(context);
                                 executeQuickCommand(_commandHistory[index]);
                               },
-                              icon: const Icon(Icons.replay, color: Colors.blue, size: 16),
+                              icon: const Icon(Icons.replay,
+                                  color: Colors.blue, size: 16),
                             ),
                           ],
                         ),
@@ -719,9 +740,9 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                     },
                   ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Chat History
           Row(
             children: [
@@ -744,7 +765,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
             ],
           ),
           const SizedBox(height: 10),
-          
+
           Expanded(
             flex: 1,
             child: _chatMessages.isEmpty
@@ -759,12 +780,12 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                     itemBuilder: (context, index) {
                       final message = _chatMessages[index];
                       final isUser = message['isUser'] as bool;
-                      
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isUser 
+                          color: isUser
                               ? Colors.blue.withOpacity(0.1)
                               : Colors.green.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -783,7 +804,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                                 children: [
                                   Text(
                                     message['message'],
-                                    style: const TextStyle(color: Colors.white70),
+                                    style:
+                                        const TextStyle(color: Colors.white70),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -837,14 +859,14 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
             ],
           ),
           const SizedBox(height: 10),
-          
           Expanded(
             child: _customCommands.isEmpty
                 ? const Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.voice_over_off, size: 48, color: Colors.white24),
+                        Icon(Icons.voice_over_off,
+                            size: 48, color: Colors.white24),
                         SizedBox(height: 16),
                         Text(
                           'Chưa có lệnh tùy chỉnh nào',
@@ -876,7 +898,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.blue.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(4),
@@ -894,9 +917,11 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                                 IconButton(
                                   onPressed: () {
                                     Navigator.pop(context);
-                                    executeQuickCommand(command['command_text'] ?? '');
+                                    executeQuickCommand(
+                                        command['command_text'] ?? '');
                                   },
-                                  icon: const Icon(Icons.play_arrow, color: Colors.green, size: 16),
+                                  icon: const Icon(Icons.play_arrow,
+                                      color: Colors.green, size: 16),
                                 ),
                               ],
                             ),
@@ -905,7 +930,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   command['description'],
-                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                  style: const TextStyle(
+                                      color: Colors.white54, fontSize: 12),
                                 ),
                               ),
                           ],
@@ -935,22 +961,28 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
               children: [
                 ListTile(
                   leading: const Icon(Icons.mic, color: Colors.white70),
-                  title: const Text('Độ nhạy micro', style: TextStyle(color: Colors.white)),
-                  trailing: const Text('Cao', style: TextStyle(color: Colors.blue)),
+                  title: const Text('Độ nhạy micro',
+                      style: TextStyle(color: Colors.white)),
+                  trailing:
+                      const Text('Cao', style: TextStyle(color: Colors.blue)),
                   onTap: () {},
                 ),
                 const Divider(color: Colors.white24),
                 ListTile(
                   leading: const Icon(Icons.language, color: Colors.white70),
-                  title: const Text('Ngôn ngữ', style: TextStyle(color: Colors.white)),
-                  trailing: const Text('Tiếng Việt', style: TextStyle(color: Colors.blue)),
+                  title: const Text('Ngôn ngữ',
+                      style: TextStyle(color: Colors.white)),
+                  trailing: const Text('Tiếng Việt',
+                      style: TextStyle(color: Colors.blue)),
                   onTap: () {},
                 ),
                 const Divider(color: Colors.white24),
                 ListTile(
                   leading: const Icon(Icons.volume_up, color: Colors.white70),
-                  title: const Text('Âm lượng phản hồi', style: TextStyle(color: Colors.white)),
-                  trailing: const Text('Trung bình', style: TextStyle(color: Colors.blue)),
+                  title: const Text('Âm lượng phản hồi',
+                      style: TextStyle(color: Colors.white)),
+                  trailing: const Text('Trung bình',
+                      style: TextStyle(color: Colors.blue)),
                   onTap: () {},
                 ),
                 const Divider(color: Colors.white24),
@@ -959,14 +991,16 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                     _speechEnabled ? Icons.mic : Icons.mic_off,
                     color: _speechEnabled ? Colors.green : Colors.red,
                   ),
-                  title: const Text('Trạng thái nhận diện giọng nói', style: TextStyle(color: Colors.white)),
+                  title: const Text('Trạng thái nhận diện giọng nói',
+                      style: TextStyle(color: Colors.white)),
                   trailing: Text(
                     _speechEnabled ? 'Hoạt động' : 'Không khả dụng',
-                    style: TextStyle(color: _speechEnabled ? Colors.green : Colors.red),
+                    style: TextStyle(
+                        color: _speechEnabled ? Colors.green : Colors.red),
                   ),
                   onTap: () async {
                     if (!_speechEnabled) {
-                      await _initializeSpeech();
+                      await _initSpeech();
                     } else {
                       // Test speech recognition
                       if (_speechToText.isAvailable) {
@@ -978,7 +1012,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                 const Divider(color: Colors.white24),
                 ListTile(
                   leading: const Icon(Icons.camera_alt, color: Colors.white70),
-                  title: const Text('Quyền Camera', style: TextStyle(color: Colors.white)),
+                  title: const Text('Quyền Camera',
+                      style: TextStyle(color: Colors.white)),
                   trailing: FutureBuilder<PermissionStatus>(
                     future: Permission.camera.status,
                     builder: (context, snapshot) {
@@ -986,16 +1021,20 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                         final isGranted = snapshot.data!.isGranted;
                         return Text(
                           isGranted ? 'Đã cấp' : 'Chưa cấp',
-                          style: TextStyle(color: isGranted ? Colors.green : Colors.red),
+                          style: TextStyle(
+                              color: isGranted ? Colors.green : Colors.red),
                         );
                       }
-                      return const Text('Đang kiểm tra...', style: TextStyle(color: Colors.grey));
+                      return const Text('Đang kiểm tra...',
+                          style: TextStyle(color: Colors.grey));
                     },
                   ),
                   onTap: () async {
-                    final granted = await PermissionHelper.requestCameraPermission();
+                    final granted =
+                        await PermissionHelper.requestCameraPermission();
                     if (!granted) {
-                      await PermissionHelper.showPermissionDialog(context, 'Camera');
+                      await PermissionHelper.showPermissionDialog(
+                          context, 'Camera');
                     }
                     // Refresh UI after permission change
                     Future.delayed(const Duration(milliseconds: 500), () {
@@ -1006,7 +1045,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                 const Divider(color: Colors.white24),
                 ListTile(
                   leading: const Icon(Icons.mic, color: Colors.white70),
-                  title: const Text('Quyền Microphone', style: TextStyle(color: Colors.white)),
+                  title: const Text('Quyền Microphone',
+                      style: TextStyle(color: Colors.white)),
                   trailing: FutureBuilder<PermissionStatus>(
                     future: Permission.microphone.status,
                     builder: (context, snapshot) {
@@ -1014,16 +1054,20 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                         final isGranted = snapshot.data!.isGranted;
                         return Text(
                           isGranted ? 'Đã cấp' : 'Chưa cấp',
-                          style: TextStyle(color: isGranted ? Colors.green : Colors.red),
+                          style: TextStyle(
+                              color: isGranted ? Colors.green : Colors.red),
                         );
                       }
-                      return const Text('Đang kiểm tra...', style: TextStyle(color: Colors.grey));
+                      return const Text('Đang kiểm tra...',
+                          style: TextStyle(color: Colors.grey));
                     },
                   ),
                   onTap: () async {
-                    final granted = await PermissionHelper.requestMicrophonePermission();
+                    final granted =
+                        await PermissionHelper.requestMicrophonePermission();
                     if (!granted) {
-                      await PermissionHelper.showPermissionDialog(context, 'Microphone');
+                      await PermissionHelper.showPermissionDialog(
+                          context, 'Microphone');
                     }
                     // Refresh UI after permission change
                     Future.delayed(const Duration(milliseconds: 500), () {
@@ -1034,9 +1078,9 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Statistics
           Container(
             padding: const EdgeInsets.all(16),
@@ -1056,7 +1100,6 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                   ),
                 ),
                 const SizedBox(height: 12),
-                
                 Row(
                   children: [
                     Expanded(
@@ -1078,9 +1121,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
                     ),
                   ],
                 ),
-                
                 const SizedBox(height: 12),
-                
                 Row(
                   children: [
                     Expanded(
@@ -1110,7 +1151,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1148,66 +1190,67 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     _commandHistory.clear();
     notifyListeners();
   }
-  
+
   // Chat Box Functions
   void toggleChatBox() {
     _showChatBox = !_showChatBox;
     notifyListeners();
   }
-  
+
   void sendChatMessage(String message) async {
     if (message.trim().isEmpty) return;
-    
+
     // Add user message
     _chatMessages.insert(0, {
       'message': message,
       'isUser': true,
       'timestamp': DateTime.now(),
     });
-    
+
     _chatController.clear();
     notifyListeners();
-    
+
     // Save user message to Firebase
     await _saveChatMessage(message, null, isUser: true);
-    
+
     // Process and respond
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     // Try to match with custom commands first
     final customResponse = await _processCustomCommand(message);
     String response;
-    
+
     if (customResponse != null) {
       response = customResponse;
     } else {
       response = _processVietnameseCommand(message);
     }
-    
+
     // Add AI response
     _chatMessages.insert(0, {
       'message': response,
       'isUser': false,
       'timestamp': DateTime.now(),
     });
-    
+
     // Keep only 50 messages
     if (_chatMessages.length > 50) {
       _chatMessages.removeRange(50, _chatMessages.length);
     }
-    
+
     // Save AI response to Firebase
     await _saveChatMessage(response, null, isUser: false);
-    
+
     // Speak the response
     await _speakResponse(response);
-    
+
     notifyListeners();
   }
 
-  Future<void> _saveChatMessage(String message, String? response, {required bool isUser}) async {
+  Future<void> _saveChatMessage(String message, String? response,
+      {required bool isUser}) async {
     if (_currentUserId == null) return;
-    
+
     try {
       await _firebaseData.writeChatMessage(
         userId: _currentUserId!,
@@ -1220,11 +1263,11 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       print('Error saving chat message: $e');
     }
   }
-  
+
   void clearChatMessages() async {
     _chatMessages.clear();
     notifyListeners();
-    
+
     // Clear chat history from Firebase for current user
     if (_currentUserId != null) {
       await _firebaseData.clearChatHistory(_currentUserId!);
@@ -1241,7 +1284,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     List<String>? aliases,
   }) async {
     if (_currentUserId == null) return;
-    
+
     try {
       final success = await _firebaseData.saveCustomCommand(
         userId: _currentUserId!,
@@ -1252,7 +1295,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
         description: description,
         aliases: aliases,
       );
-      
+
       if (success) {
         // Reload custom commands
         _customCommands = await _firebaseData.getCustomCommands(
@@ -1276,7 +1319,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     bool? isActive,
   }) async {
     if (_currentUserId == null) return;
-    
+
     try {
       final success = await _firebaseData.updateCustomCommand(
         commandId: commandId,
@@ -1288,7 +1331,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
         aliases: aliases,
         isActive: isActive,
       );
-      
+
       if (success) {
         // Reload custom commands
         _customCommands = await _firebaseData.getCustomCommands(
@@ -1303,10 +1346,10 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
 
   Future<void> deleteCustomCommand(String commandId) async {
     if (_currentUserId == null) return;
-    
+
     try {
       final success = await _firebaseData.deleteCustomCommand(commandId);
-      
+
       if (success) {
         // Reload custom commands
         _customCommands = await _firebaseData.getCustomCommands(
@@ -1319,9 +1362,10 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     }
   }
 
-  Future<List<Map<String, dynamic>>> getCustomCommandsByZone(String zone) async {
+  Future<List<Map<String, dynamic>>> getCustomCommandsByZone(
+      String zone) async {
     if (_currentUserId == null) return [];
-    
+
     try {
       return await _firebaseData.getCustomCommands(
         userId: _currentUserId!,
@@ -1333,9 +1377,10 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
     }
   }
 
-  Future<List<Map<String, dynamic>>> searchCustomCommands(String searchText) async {
+  Future<List<Map<String, dynamic>>> searchCustomCommands(
+      String searchText) async {
     if (_currentUserId == null) return [];
-    
+
     try {
       return await _firebaseData.searchCustomCommands(
         userId: _currentUserId!,
@@ -1346,9 +1391,12 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       return [];
     }
   }
-  
+
   @override
   void dispose() {
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
+
     _chatController.dispose();
     _speechToText.cancel();
     _flutterTts.stop();
@@ -1360,7 +1408,8 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Test nhận diện giọng nói'),
-        content: const Text('Nhận diện giọng nói đã được kích hoạt. Bạn có thể thử nói "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ".'),
+        content: const Text(
+            'Nhận diện giọng nói đã được kích hoạt. Bạn có thể thử nói "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -1423,34 +1472,34 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
   Future<bool> requestMicrophonePermission() async {
     try {
       print('=== Manual Microphone Permission Request ===');
-      
+
       // Check current status first
       final currentStatus = await Permission.microphone.status;
       print('Current microphone permission status: $currentStatus');
-      
+
       if (currentStatus.isGranted) {
         print('Permission already granted, reinitializing speech...');
-        await _initializeSpeech();
+        await _initSpeech();
         return _speechEnabled;
       }
-      
+
       if (currentStatus.isPermanentlyDenied) {
         print('Permission permanently denied, need to go to settings');
         _showSettingsDialog();
         return false;
       }
-      
+
       print('Requesting microphone permission...');
       final permission = await Permission.microphone.request();
       print('Permission request result: $permission');
-      
+
       if (permission.isGranted) {
         print('Permission granted! Reinitializing speech...');
         // Add small delay to ensure permission is fully processed
         await Future.delayed(const Duration(milliseconds: 500));
-        await _initializeSpeech();
+        await _initSpeech();
         print('Speech enabled after manual request: $_speechEnabled');
-        
+
         // Force UI update
         notifyListeners();
         return _speechEnabled;
@@ -1470,6 +1519,6 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
 
   // Force re-initialize speech (useful after permission granted)
   Future<void> forceInitializeSpeech() async {
-    await _initializeSpeech();
+    await _initSpeech();
   }
 }

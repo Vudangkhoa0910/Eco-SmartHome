@@ -207,11 +207,12 @@ class Body extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Debug section (Temporary for testing)
               if (!model.speechEnabled) ...[
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.1),
@@ -239,7 +240,8 @@ class Body extends StatelessWidget {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                             ),
                           ),
                           ElevatedButton.icon(
@@ -247,8 +249,11 @@ class Body extends StatelessWidget {
                               await model.forceInitializeSpeech();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Đã thử khởi tạo lại. Speech enabled: ${model.speechEnabled}'),
-                                  backgroundColor: model.speechEnabled ? Colors.green : Colors.red,
+                                  content: Text(
+                                      'Đã thử khởi tạo lại. Speech enabled: ${model.speechEnabled}'),
+                                  backgroundColor: model.speechEnabled
+                                      ? Colors.green
+                                      : Colors.red,
                                 ),
                               );
                             },
@@ -257,7 +262,8 @@ class Body extends StatelessWidget {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                             ),
                           ),
                         ],
@@ -266,7 +272,7 @@ class Body extends StatelessWidget {
                   ),
                 ),
               ],
-              
+
               // Voice Visualizer or Chat Box
               if (!model.showChatBox) ...[
                 Flexible(
@@ -829,10 +835,11 @@ class Body extends StatelessWidget {
               if (success) {
                 // Force re-initialize speech after permission granted
                 await model.forceInitializeSpeech();
-                
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Đã cấp quyền microphone thành công! Bạn có thể sử dụng trợ lý giọng nói ngay bây giờ.'),
+                    content: Text(
+                        'Đã cấp quyền microphone thành công! Bạn có thể sử dụng trợ lý giọng nói ngay bây giờ.'),
                     backgroundColor: Colors.green,
                     duration: Duration(seconds: 3),
                   ),
