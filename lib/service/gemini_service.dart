@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class GeminiService {
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-  static const String _apiKey = 'api;
+  static const String _apiKey = 'AIzaSyC6R_Q3mE-68c4wyw9uiOOn7fz3EswqYSA';
 
   static Future<String> generateResponse(String question) async {
     try {
@@ -60,11 +60,11 @@ class GeminiService {
         }
         return 'Xin lỗi, tôi không thể trả lời câu hỏi này.';
       } else {
-        print('Gemini API Error: ${response.statusCode} - ${response.body}');
+        // print('Gemini API Error: ${response.statusCode} - ${response.body}');
         return 'Xin lỗi, có lỗi xảy ra khi kết nối với AI. Vui lòng thử lại sau.';
       }
     } catch (e) {
-      print('Gemini Service Error: $e');
+      // print('Gemini Service Error: $e');
       return 'Xin lỗi, có lỗi xảy ra. Vui lòng kiểm tra kết nối mạng và thử lại.';
     }
   }

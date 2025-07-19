@@ -7,6 +7,7 @@ import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/gemini_service.dart';
+import 'package:smart_home/view/rooms_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,6 +27,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
   // Firebase services
   final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
   final MqttService _mqttService = getIt<MqttService>();
+  final RoomsViewModel _roomsViewModel = getIt<RoomsViewModel>();
 
   // Current user
   String? _currentUserId;
@@ -41,69 +43,100 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
   // Chat controller
   final TextEditingController _chatController = TextEditingController();
 
-  // Mapping các lệnh tiếng Việt với thiết bị
+  // Mapping các lệnh tiếng Việt với thiết bị thực tế
   final Map<String, Map<String, dynamic>> _deviceCommands = {
-    // Đèn
-    'đèn cổng': {'type': 'light', 'location': 'gate', 'device': 'Đèn cổng'},
+    // Đèn - kết nối với MQTT thực tế
+    'đèn cổng': {
+      'type': 'light', 
+      'mqtt_id': 'led_gate', 
+      'device': 'Đèn cổng',
+      'room_id': '1',
+      'device_id': '1'
+    },
+    'đèn xung quanh': {
+      'type': 'light', 
+      'mqtt_id': 'led_around', 
+      'device': 'Đèn xung quanh',
+      'room_id': '1',
+      'device_id': '2'
+    },
     'đèn phòng khách': {
       'type': 'light',
-      'location': 'living_room',
-      'device': 'Đèn phòng khách'
+      'mqtt_id': 'led_living',
+      'device': 'Đèn phòng khách',
+      'room_id': '1',
+      'device_id': '1'
     },
     'đèn phòng ngủ': {
       'type': 'light',
-      'location': 'bedroom',
-      'device': 'Đèn phòng ngủ'
+      'mqtt_id': 'led_bedroom',
+      'device': 'Đèn phòng ngủ',
+      'room_id': '2',
+      'device_id': '4'
     },
-    'đèn bếp': {'type': 'light', 'location': 'kitchen', 'device': 'Đèn bếp'},
-    'đèn phòng tắm': {
+    'đèn bếp': {
       'type': 'light',
-      'location': 'bathroom',
-      'device': 'Đèn phòng tắm'
+      'mqtt_id': 'led_kitchen',
+      'device': 'Đèn bếp',
+      'room_id': '3',
+      'device_id': '6'
     },
-    'đèn sân': {'type': 'light', 'location': 'yard', 'device': 'Đèn sân'},
-    'tất cả đèn': {'type': 'light', 'location': 'all', 'device': 'Tất cả đèn'},
+    'tất cả đèn': {
+      'type': 'light_all',
+      'mqtt_id': 'all_lights',
+      'device': 'Tất cả đèn'
+    },
 
     // Quạt
     'quạt phòng khách': {
       'type': 'fan',
-      'location': 'living_room',
-      'device': 'Quạt phòng khách'
+      'mqtt_id': 'fan_living',
+      'device': 'Quạt phòng khách',
+      'room_id': '1',
+      'device_id': '3'
     },
     'quạt phòng ngủ': {
       'type': 'fan',
-      'location': 'bedroom',
-      'device': 'Quạt phòng ngủ'
+      'mqtt_id': 'fan_bedroom',
+      'device': 'Quạt phòng ngủ',
+      'room_id': '2',
+      'device_id': '5'
     },
-    'quạt trần': {'type': 'fan', 'location': 'ceiling', 'device': 'Quạt trần'},
-
-    // Điều hòa
-    'điều hòa': {'type': 'ac', 'location': 'main', 'device': 'Điều hòa'},
-    'máy lạnh': {'type': 'ac', 'location': 'main', 'device': 'Máy lạnh'},
-    'điều hòa phòng khách': {
-      'type': 'ac',
-      'location': 'living_room',
-      'device': 'Điều hòa phòng khách'
-    },
-    'điều hòa phòng ngủ': {
-      'type': 'ac',
-      'location': 'bedroom',
-      'device': 'Điều hòa phòng ngủ'
+    'quạt bếp': {
+      'type': 'fan',
+      'mqtt_id': 'fan_kitchen',
+      'device': 'Quạt bếp',
+      'room_id': '3',
+      'device_id': '7'
     },
 
-    // TV & Giải trí
-    'tivi': {'type': 'tv', 'location': 'main', 'device': 'TV'},
-    'tv': {'type': 'tv', 'location': 'main', 'device': 'TV'},
-    'loa': {'type': 'speaker', 'location': 'main', 'device': 'Loa'},
-
-    // Khác
-    'camera': {
-      'type': 'camera',
-      'location': 'security',
-      'device': 'Camera an ninh'
+    // TV
+    'tivi': {
+      'type': 'tv',
+      'mqtt_id': 'tv_main',
+      'device': 'TV',
+      'room_id': '1',
+      'device_id': '2'
     },
-    'cửa': {'type': 'door', 'location': 'main', 'device': 'Cửa chính'},
-    'cổng': {'type': 'gate', 'location': 'entrance', 'device': 'Cổng'},
+    'tv': {
+      'type': 'tv',
+      'mqtt_id': 'tv_main',
+      'device': 'TV',
+      'room_id': '1',
+      'device_id': '2'
+    },
+
+    // Motor/Cửa
+    'cửa': {
+      'type': 'motor',
+      'mqtt_id': 'motor_main',
+      'device': 'Cửa chính'
+    },
+    'cổng': {
+      'type': 'motor',
+      'mqtt_id': 'motor_gate',
+      'device': 'Cổng'
+    },
   };
 
   // Các từ khóa hành động
@@ -433,21 +466,79 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
   Future<void> _executeDeviceCommand(String deviceId, String action) async {
     try {
+      final bool isOn = action.toLowerCase() == 'on';
+      
       switch (deviceId) {
         case 'led_gate':
-          _mqttService.controlLedGate(action.toLowerCase() == 'on');
+          _mqttService.controlLedGate(isOn);
           break;
         case 'led_around':
-          _mqttService.controlLedAround(action.toLowerCase() == 'on');
+          _mqttService.controlLedAround(isOn);
           break;
-        case 'motor':
-          _mqttService.controlMotor(action.toUpperCase());
+        case 'motor_main':
+        case 'motor_gate':
+          // Motor commands: OPEN, CLOSE, STOP
+          if (action.toLowerCase() == 'on' || action.toLowerCase() == 'open') {
+            _mqttService.controlMotor('OPEN');
+          } else if (action.toLowerCase() == 'off' || action.toLowerCase() == 'close') {
+            _mqttService.controlMotor('CLOSE');
+          } else {
+            _mqttService.controlMotor('STOP');
+          }
           break;
         default:
           print('Unknown device: $deviceId');
       }
     } catch (e) {
       print('Error executing device command: $e');
+    }
+  }
+
+  /// Điều khiển thiết bị thông qua voice command
+  Future<void> _controlDeviceByVoice(String deviceKey, String action) async {
+    try {
+      if (!_deviceCommands.containsKey(deviceKey)) {
+        return;
+      }
+
+      final deviceInfo = _deviceCommands[deviceKey]!;
+      final mqttId = deviceInfo['mqtt_id'];
+      final roomId = deviceInfo['room_id'];
+      final deviceId = deviceInfo['device_id'];
+
+      // Điều khiển thông qua MQTT
+      await _executeDeviceCommand(mqttId, action);
+
+      // Cập nhật UI thông qua RoomsViewModel (nếu có room_id và device_id)
+      if (roomId != null && deviceId != null) {
+        if (action.toLowerCase() == 'toggle') {
+          _roomsViewModel.toggleDevice(roomId, deviceId);
+        } else {
+          // Cập nhật trạng thái thiết bị trong UI
+          _updateDeviceStateInUI(roomId, deviceId, action.toLowerCase() == 'on');
+        }
+      }
+    } catch (e) {
+      print('Error controlling device by voice: $e');
+    }
+  }
+
+  /// Cập nhật trạng thái thiết bị trong UI
+  void _updateDeviceStateInUI(String roomId, String deviceId, bool isOn) {
+    try {
+      for (var room in _roomsViewModel.rooms) {
+        if (room.id == roomId) {
+          for (var device in room.devices) {
+            if (device.id == deviceId) {
+              device.isOn = isOn;
+              _roomsViewModel.notifyListeners();
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error updating device state in UI: $e');
     }
   }
 
@@ -552,16 +643,19 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     // Xử lý lệnh đặc biệt
     if (lowerCommand.contains('chế độ đi ngủ') ||
         lowerCommand.contains('good night')) {
+      _executeNightMode();
       return _handleNightMode();
     }
 
     if (lowerCommand.contains('chế độ ra về') ||
         lowerCommand.contains('về nhà')) {
+      _executeHomeMode();
       return _handleHomeMode();
     }
 
     if (lowerCommand.contains('chế độ tiết kiệm') ||
         lowerCommand.contains('tiết kiệm năng lượng')) {
+      _executeEcoMode();
       return _handleEcoMode();
     }
 
@@ -569,6 +663,9 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     if (device.isNotEmpty && _deviceCommands.containsKey(device)) {
       final deviceInfo = _deviceCommands[device]!;
       final deviceName = deviceInfo['device'];
+
+      // Thực thi lệnh điều khiển thiết bị
+      _controlDeviceByVoice(device, action);
 
       switch (action) {
         case 'on':
@@ -615,6 +712,55 @@ Chúc bạn một buổi tối vui vẻ! 😊''';
 • Tắt các thiết bị không cần thiết
 • Ước tính tiết kiệm 30% điện năng
 Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
+  }
+
+  /// Thực thi chế độ đi ngủ
+  void _executeNightMode() {
+    try {
+      // Tắt hầu hết đèn, chỉ giữ đèn ngủ
+      _controlDeviceByVoice('đèn phòng khách', 'off');
+      _controlDeviceByVoice('đèn bếp', 'off');
+      _controlDeviceByVoice('đèn cổng', 'off');
+      
+      // Bật đèn phòng ngủ với độ sáng thấp
+      _controlDeviceByVoice('đèn phòng ngủ', 'on');
+      
+      // Tắt TV và thiết bị giải trí
+      _controlDeviceByVoice('tivi', 'off');
+    } catch (e) {
+      print('Error executing night mode: $e');
+    }
+  }
+
+  /// Thực thi chế độ về nhà
+  void _executeHomeMode() {
+    try {
+      // Bật đèn chính
+      _controlDeviceByVoice('đèn phòng khách', 'on');
+      _controlDeviceByVoice('đèn cổng', 'on');
+      
+      // Bật quạt phòng khách
+      _controlDeviceByVoice('quạt phòng khách', 'on');
+      
+      // Mở cổng (nếu có)
+      _controlDeviceByVoice('cổng', 'on');
+    } catch (e) {
+      print('Error executing home mode: $e');
+    }
+  }
+
+  /// Thực thi chế độ tiết kiệm năng lượng
+  void _executeEcoMode() {
+    try {
+      // Tắt các thiết bị không cần thiết
+      _controlDeviceByVoice('tivi', 'off');
+      _controlDeviceByVoice('đèn xung quanh', 'off');
+      
+      // Giảm quạt
+      _controlDeviceByVoice('quạt phòng khách', 'off');
+    } catch (e) {
+      print('Error executing eco mode: $e');
+    }
   }
 
   void showSettings(BuildContext context) {
