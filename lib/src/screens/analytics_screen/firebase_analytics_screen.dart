@@ -43,9 +43,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
   // Month selection
   DateTime _selectedMonth = DateTime.now();
 
-  // Cache management
+  // Cache management - Tăng thời gian cache
   final Map<String, Map<String, dynamic>> _cache = {};
-  static const int _cacheValidityMinutes = 5;
+  static const int _cacheValidityMinutes = 20; // Tăng từ 5 lên 20 phút
 
   // Firebase data variables
   final FirebaseDataService _firebaseService = FirebaseDataService();
@@ -60,7 +60,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
   // Cache để tránh load lại dữ liệu không cần thiết
   bool _dataLoaded = false;
   DateTime? _lastDataLoadTime;
-  static const int _cacheValidMinutes = 5; // Cache valid for 5 minutes
+  static const int _cacheValidMinutes = 15; // Tăng cache time từ 5 lên 15 phút
 
   @override
   bool get wantKeepAlive => true; // Keep state alive when switching pages

@@ -19,24 +19,30 @@ class FirebaseDataService {
   factory FirebaseDataService() => _instance;
   FirebaseDataService._internal();
 
-  /// Write sensor data to Firestore
+  /// Write sensor data to Firestore (optimized - only 1 write per sensor reading)
   Future<bool> writeSensorData(SensorData data) async {
     try {
+      // Calculate energy consumption directly in main write to avoid separate calls
+      final powerKw = data.power / 1000.0; // Convert watts to kW
+      final energyKwh = powerKw; // For hourly reading
+      final cost = energyKwh * 1500; // 1500 VND per kWh
+      
       await _firestore.collection(_sensorDataCollection).add({
         'temperature': data.temperature,
         'humidity': data.humidity,
         'power': data.power,
         'voltage': data.voltage,
         'current': data.current,
+        // Include energy data in same write to reduce Firebase operations
+        'energy_kwh': energyKwh,
+        'cost': cost,
+        'electricity_rate': 1500,
         'timestamp': FieldValue.serverTimestamp(),
         'location': 'home',
         'created_at': DateTime.now(),
       });
 
-      // Also write power consumption data
-      await _writePowerConsumptionData(data);
-      
-      print('✅ Firebase: Sensor data written successfully');
+      print('✅ Firebase: Consolidated sensor data written successfully');
       return true;
     } catch (e) {
       print('❌ Firebase Write Exception: $e');

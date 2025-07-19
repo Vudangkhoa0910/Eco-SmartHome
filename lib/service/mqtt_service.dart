@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
+import 'package:smart_home/service/firebase_batch_service.dart';
 
 class MqttService {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
@@ -51,6 +52,15 @@ class MqttService {
 
   // Firebase service instance
   final FirebaseDataService _firebaseData = FirebaseDataService();
+  final FirebaseBatchService _batchService = FirebaseBatchService();
+
+  // Firebase write throttling - chỉ ghi tối đa 1 lần mỗi 30 giây
+  DateTime? _lastFirebaseWrite;
+  static const Duration _firebaseWriteInterval = Duration(seconds: 30);
+  
+  // Device control throttling - chỉ ghi tối đa 1 lần mỗi 5 giây cho device control
+  DateTime? _lastDeviceWrite;
+  static const Duration _deviceWriteInterval = Duration(seconds: 5);
 
   Stream<SensorData> get sensorDataStream => _sensorDataController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -180,6 +190,17 @@ class MqttService {
     print('🏓 Ping response received');
   }
 
+  // Firebase write throttling methods
+  bool _shouldWriteToFirebase() {
+    if (_lastFirebaseWrite == null) return true;
+    return DateTime.now().difference(_lastFirebaseWrite!) >= _firebaseWriteInterval;
+  }
+  
+  bool _shouldWriteDeviceState() {
+    if (_lastDeviceWrite == null) return true;
+    return DateTime.now().difference(_lastDeviceWrite!) >= _deviceWriteInterval;
+  }
+
   void _subscribeToTopics() {
     final topics = [
       // Outdoor ESP32 Dev topics
@@ -251,66 +272,35 @@ class MqttService {
       
       _sensorDataController.add(_currentData);
       
-      // Send data to Firebase asynchronously (only if enabled)
-      if (_enableFirebase) {
-        // Write basic sensor data (outdoor)
+      // Send data to Firebase asynchronously (only if enabled and with throttling)
+      if (_enableFirebase && _shouldWriteToFirebase()) {
+        // Use optimized batch service instead of direct writes
         if (!topic.startsWith('inside/')) {
-          _firebaseData.writeSensorData(_currentData).timeout(
-            const Duration(seconds: 5),
-          ).catchError((error) {
-            print('⚠️ Firebase write error: $error');
+          _batchService.writeSensorDataOptimized(_currentData).catchError((error) {
+            print('⚠️ Firebase batch write error: $error');
             return false;
           });
           
-          // Write detailed energy consumption data
-          _firebaseData.writeEnergyConsumption(_currentData).timeout(
-            const Duration(seconds: 5),
-          ).catchError((error) {
-            print('⚠️ Firebase energy write error: $error');
-            return false;
-          });
-          
-          // Also write power consumption data for energy tracking
-          if (_currentData.power > 0) {
-            _firebaseData.writePowerConsumption(
-              deviceId: 'outdoor_system',
-              power: _currentData.power,
-              voltage: _currentData.voltage,
-              current: _currentData.current,
-              timestamp: DateTime.now(),
-              metadata: {
-                'type': 'outdoor_consumption',
-                'efficiency': ((5.0 - _currentData.voltage) / 5.0 * 100).clamp(0, 100),
-                'temperature': _currentData.temperature,
-                'humidity': _currentData.humidity,
-              },
-            ).timeout(
-              const Duration(seconds: 5),
-            ).catchError((error) {
-              print('⚠️ Firebase power consumption write error: $error');
-              return false;
-            });
-          }
+          // Update last write timestamp
+          _lastFirebaseWrite = DateTime.now();
         } else {
-          // Write indoor ESP32-S3 power consumption data
-          if (_currentDataInside.power > 0) {
-            _firebaseData.writePowerConsumption(
-              deviceId: 'indoor_system',
-              power: _currentDataInside.power,
-              voltage: _currentDataInside.voltage,
-              current: _currentDataInside.current,
-              timestamp: DateTime.now(),
-              metadata: {
+          // Write only essential indoor data - less frequent
+          if (_currentDataInside.power > 5.0) { // Only write if significant power usage
+            _batchService.addToBatch(
+              collection: 'power_consumption_optimized',
+              data: {
+                'device': 'indoor_system',
+                'power': _currentDataInside.power,
+                'voltage': _currentDataInside.voltage,
+                'current': _currentDataInside.current,
                 'type': 'indoor_consumption',
                 'efficiency': ((5.0 - _currentDataInside.voltage) / 5.0 * 100).clamp(0, 100),
                 'location': 'inside_house',
               },
-            ).timeout(
-              const Duration(seconds: 5),
-            ).catchError((error) {
-              print('⚠️ Firebase indoor power consumption write error: $error');
-              return false;
-            });
+            );
+            
+            // Update last write timestamp  
+            _lastFirebaseWrite = DateTime.now();
           }
         }
       }
@@ -334,96 +324,93 @@ class MqttService {
   void controlLedGate(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedGate, command);
-    // Log device state to Firebase asynchronously
-    _firebaseData.writeDeviceState('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
-        .catchError((error) {
-          print('⚠️ Firebase LED Gate error: $error');
-          return false;
-        });
     
-    // Write estimated power consumption for LED Gate (assuming 10W when ON)
-    if (_enableFirebase) {
-      final estimatedPower = isOn ? 10.0 : 0.0;
-      _firebaseData.writePowerConsumption(
-        deviceId: 'led_gate',
-        power: estimatedPower,
-        voltage: _currentData.voltage,
-        current: isOn ? 2.0 : 0.0, // Estimated current for 10W LED
-        timestamp: DateTime.now(),
-        metadata: {
+    // Log device state to Firebase asynchronously (with throttling)
+    if (_enableFirebase && _shouldWriteDeviceState()) {
+      _batchService.writeDeviceStateOptimized('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
+          .catchError((error) {
+            print('⚠️ Firebase LED Gate error: $error');
+            return false;
+          });
+      
+      // Only add power consumption to batch occasionally to save writes
+      _batchService.addToBatch(
+        collection: 'power_consumption_optimized',
+        data: {
+          'device': 'led_gate',
+          'power': isOn ? 10.0 : 0.0,
+          'voltage': _currentData.voltage,
+          'current': isOn ? 2.0 : 0.0,
           'room': 'entrance',
           'type': 'light',
           'zone': 'gate',
           'state': command,
         },
-      ).catchError((error) {
-        print('⚠️ Firebase LED Gate power error: $error');
-        return false;
-      });
+      );
+      
+      _lastDeviceWrite = DateTime.now();
     }
   }
 
   void controlLedAround(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedAround, command);
-    // Log device state to Firebase asynchronously
-    _firebaseData.writeDeviceState('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
-        .catchError((error) {
-          print('⚠️ Firebase LED Around error: $error');
-          return false;
-        });
     
-    // Write estimated power consumption for LED Around (assuming 15W when ON)
-    if (_enableFirebase) {
-      final estimatedPower = isOn ? 15.0 : 0.0;
-      _firebaseData.writePowerConsumption(
-        deviceId: 'led_around',
-        power: estimatedPower,
-        voltage: _currentData.voltage,
-        current: isOn ? 3.0 : 0.0, // Estimated current for 15W LED
-        timestamp: DateTime.now(),
-        metadata: {
+    // Log device state to Firebase asynchronously (with throttling)
+    if (_enableFirebase && _shouldWriteDeviceState()) {
+      _batchService.writeDeviceStateOptimized('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
+          .catchError((error) {
+            print('⚠️ Firebase LED Around error: $error');
+            return false;
+          });
+      
+      // Only add power consumption to batch occasionally to save writes
+      _batchService.addToBatch(
+        collection: 'power_consumption_optimized',
+        data: {
+          'device': 'led_around',
+          'power': isOn ? 15.0 : 0.0,
+          'voltage': _currentData.voltage,
+          'current': isOn ? 3.0 : 0.0,
           'room': 'garden',
           'type': 'light',
           'zone': 'around',
           'state': command,
         },
-      ).catchError((error) {
-        print('⚠️ Firebase LED Around power error: $error');
-        return false;
-      });
+      );
+      
+      _lastDeviceWrite = DateTime.now();
     }
   }
 
   void controlMotor(String direction) {
     // direction can be 'FORWARD', 'REVERSE', or 'OFF'
     publishDeviceCommand(topicMotor, direction);
-    // Log device state to Firebase asynchronously
-    _firebaseData.writeDeviceState('motor', direction, metadata: {'room': 'garage', 'type': 'motor', 'zone': 'entrance'})
-        .catchError((error) {
-          print('⚠️ Firebase Motor error: $error');
-          return false;
-        });
     
-    // Write estimated power consumption for Motor (assuming 50W when running)
-    if (_enableFirebase) {
-      final estimatedPower = (direction == 'FORWARD' || direction == 'REVERSE') ? 50.0 : 0.0;
-      _firebaseData.writePowerConsumption(
-        deviceId: 'motor',
-        power: estimatedPower,
-        voltage: _currentData.voltage,
-        current: (direction == 'FORWARD' || direction == 'REVERSE') ? 10.0 : 0.0, // Estimated current for 50W Motor
-        timestamp: DateTime.now(),
-        metadata: {
+    // Log device state to Firebase asynchronously (with throttling)
+    if (_enableFirebase && _shouldWriteDeviceState()) {
+      _batchService.writeDeviceStateOptimized('motor', direction, metadata: {'room': 'garage', 'type': 'motor', 'zone': 'entrance'})
+          .catchError((error) {
+            print('⚠️ Firebase Motor error: $error');
+            return false;
+          });
+      
+      // Only add power consumption to batch occasionally to save writes
+      _batchService.addToBatch(
+        collection: 'power_consumption_optimized',
+        data: {
+          'device': 'motor',
+          'power': (direction == 'FORWARD' || direction == 'REVERSE') ? 50.0 : 0.0,
+          'voltage': _currentData.voltage,
+          'current': (direction == 'FORWARD' || direction == 'REVERSE') ? 10.0 : 0.0,
           'room': 'garage',
           'type': 'motor',
           'zone': 'entrance',
           'state': direction,
         },
-      ).catchError((error) {
-        print('⚠️ Firebase Motor power error: $error');
-        return false;
-      });
+      );
+      
+      _lastDeviceWrite = DateTime.now();
     }
   }
 
@@ -483,14 +470,14 @@ class MqttService {
     _logIndoorDeviceState('balcony_light', command, 'floor_2', 'balcony', 20.0);
   }
 
-  // Helper method to log indoor device states
+  // Helper method to log indoor device states (with optimized batching)
   void _logIndoorDeviceState(String deviceId, String command, String floor, String room, double estimatedPower) {
-    if (!_enableFirebase) return;
+    if (!_enableFirebase || !_shouldWriteDeviceState()) return;
     
     final isOn = command == 'ON';
     
-    // Log device state to Firebase
-    _firebaseData.writeDeviceState(deviceId, command, metadata: {
+    // Use batch service for device state (less frequent)
+    _batchService.writeDeviceStateOptimized(deviceId, command, metadata: {
       'floor': floor,
       'room': room,
       'type': 'light',
@@ -500,27 +487,23 @@ class MqttService {
       return false;
     });
     
-    // Write estimated power consumption
-    final actualPower = isOn ? estimatedPower : 0.0;
-    final estimatedCurrent = isOn ? (estimatedPower / _currentDataInside.voltage) : 0.0;
-    
-    _firebaseData.writePowerConsumption(
-      deviceId: deviceId,
-      power: actualPower,
-      voltage: _currentDataInside.voltage,
-      current: estimatedCurrent,
-      timestamp: DateTime.now(),
-      metadata: {
+    // Only add power consumption to batch occasionally to save writes
+    _batchService.addToBatch(
+      collection: 'power_consumption_optimized',
+      data: {
+        'device': deviceId,
+        'power': isOn ? estimatedPower : 0.0,
+        'voltage': _currentDataInside.voltage,
+        'current': isOn ? (estimatedPower / _currentDataInside.voltage) : 0.0,
         'floor': floor,
         'room': room,
         'type': 'light',
         'controller': 'esp32_s3_indoor',
         'state': command,
       },
-    ).catchError((error) {
-      print('⚠️ Firebase $deviceId power error: $error');
-      return false;
-    });
+    );
+    
+    _lastDeviceWrite = DateTime.now();
   }
 
   void disconnect() {
@@ -531,6 +514,8 @@ class MqttService {
 
   void dispose() {
     disconnect();
+    _batchService.flush(); // Flush pending writes before disposing
+    _batchService.dispose();
     _sensorDataController.close();
     _connectionController.close();
   }
