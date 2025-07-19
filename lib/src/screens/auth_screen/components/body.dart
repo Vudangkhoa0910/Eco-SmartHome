@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/service/auth_service.dart';
 import 'package:flutter/material.dart';
-import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -16,14 +16,35 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
+  final AuthService _authService = AuthService();
+  
   bool isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _rememberMe = false; // Add remember me state
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadRememberMeState();
+  }
+
+  /// Load remember me state and stored email
+  Future<void> _loadRememberMeState() async {
+    try {
+      final rememberMe = await _authService.isRememberMeEnabled();
+      final storedEmail = await _authService.getStoredUserEmail();
+      
+      setState(() {
+        _rememberMe = rememberMe;
+        if (storedEmail != null && rememberMe) {
+          emailController.text = storedEmail;
+        }
+      });
+    } catch (e) {
+      print('❌ Error loading remember me state: $e');
+    }
   }
 
   @override
@@ -44,10 +65,18 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
 
     setState(() => isLoading = true);
     try {
+      // Sign in with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+      
+      // Handle successful login with remember me
+      await _authService.handleSuccessfulLogin(
+        emailController.text.trim(), 
+        _rememberMe
+      );
+      
       Navigator.of(context).pushReplacementNamed('/device-connection-screen');
     } on FirebaseAuthException catch (e) {
       String message = 'Đăng nhập thất bại';
@@ -99,7 +128,13 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
       // Update display name
       await userCredential.user?.updateDisplayName(nameController.text.trim());
       
-      Navigator.of(context).pushReplacementNamed('/auth-screen');
+      // Handle successful registration with remember me (default to false for registration)
+      await _authService.handleSuccessfulLogin(
+        emailController.text.trim(), 
+        false // Don't auto-enable remember me for new registrations
+      );
+      
+      Navigator.of(context).pushReplacementNamed('/device-connection-screen');
     } on FirebaseAuthException catch (e) {
       String message = 'Đăng ký thất bại';
       if (e.code == 'email-already-in-use') {
@@ -304,7 +339,49 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
           ),
-          SizedBox(height: getProportionateScreenHeight(30)),
+          SizedBox(height: getProportionateScreenHeight(16)),
+
+          // Remember Me checkbox
+          Row(
+            children: [
+              Checkbox(
+                value: _rememberMe,
+                onChanged: (value) {
+                  setState(() {
+                    _rememberMe = value ?? false;
+                  });
+                },
+                activeColor: const Color(0xFF464646),
+                checkColor: Colors.white,
+              ),
+              Text(
+                'Ghi nhớ đăng nhập',
+                style: TextStyle(
+                  color: Colors.grey[700],
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              // Future: Add "Forgot Password?" here if needed
+              GestureDetector(
+                onTap: () {
+                  // TODO: Implement forgot password
+                  _showMessage('Tính năng quên mật khẩu sẽ sớm có');
+                },
+                child: Text(
+                  'Quên mật khẩu?',
+                  style: TextStyle(
+                    color: const Color(0xFF464646),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: getProportionateScreenHeight(20)),
 
           // Login button
           SizedBox(
