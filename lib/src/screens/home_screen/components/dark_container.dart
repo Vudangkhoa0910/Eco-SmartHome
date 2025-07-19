@@ -33,9 +33,9 @@ class DarkContainer extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           color: itsOn
-              ? (Theme.of(context).brightness == Brightness.dark 
-                  ? const Color(0xFF2D3748) 
-                  : const Color.fromRGBO(0, 0, 0, 1))
+              ? (Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2D3748)
+                  : const Color.fromARGB(255, 182, 174, 255))
               : Theme.of(context).cardColor,
           boxShadow: [
             BoxShadow(
@@ -64,25 +64,29 @@ class DarkContainer extends StatelessWidget {
                     height: 50,
                     decoration: BoxDecoration(
                       color: itsOn
-                          ? (Theme.of(context).brightness == Brightness.dark 
-                              ? const Color(0xFF4A5568) 
-                              : const Color.fromRGBO(45, 45, 45, 1))
-                          : (Theme.of(context).brightness == Brightness.dark 
-                              ? const Color(0xFF1A202C) 
-                              : const Color(0xffdadada)),
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? const Color.fromARGB(255, 254, 254, 254)
+                              : const Color.fromARGB(255, 182, 174, 255))
+                          : (Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF1A202C)
+                              : const Color.fromARGB(255, 255, 255, 255)),
                       borderRadius:
                           const BorderRadius.all(Radius.elliptical(45, 45)),
                     ),
                     child: SvgPicture.asset(
                       iconAsset,
-                      color: itsOn ? Colors.amber : Theme.of(context).iconTheme.color,
+                      color: itsOn
+                          ? const Color.fromARGB(255, 29, 93, 202)
+                          : const Color.fromARGB(255, 0, 0, 0),
                     ),
                   ),
                   GestureDetector(
                     onTap: switchFav,
                     child: Icon(
                       Icons.star_rounded,
-                      color: isFav ? Colors.amber : Theme.of(context).iconTheme.color,
+                      color: isFav
+                          ? Colors.amber
+                          : Theme.of(context).iconTheme.color,
                     ),
                   ),
                 ],
@@ -94,19 +98,22 @@ class DarkContainer extends StatelessWidget {
                     device,
                     textAlign: TextAlign.left,
                     style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                          color: itsOn 
-                              ? (Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.white 
+                          color: itsOn
+                              ? (Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
                                   : Colors.white)
-                              : Theme.of(context).textTheme.displayMedium!.color,
+                              : Theme.of(context)
+                                  .textTheme
+                                  .displayMedium!
+                                  .color,
                         ),
                   ),
                   Text(
                     deviceCount,
                     textAlign: TextAlign.left,
                     style: TextStyle(
-                        color: itsOn 
-                            ? const Color.fromRGBO(166, 166, 166, 1)
+                        color: itsOn
+                            ? const Color.fromARGB(255, 255, 254, 254)
                             : Theme.of(context).textTheme.bodyMedium!.color,
                         fontSize: 13,
                         letterSpacing: 0,
@@ -133,11 +140,9 @@ class DarkContainer extends StatelessWidget {
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        color: itsOn ? Colors.black : const Color(0xffd6d6d6),
-                        border: Border.all(
-                          color: const Color.fromRGBO(255, 255, 255, 1),
-                          width: itsOn ? 2 : 0,
-                        ),
+                        color: itsOn
+                            ? const Color.fromARGB(255, 66, 135, 255)
+                            : const Color(0xffd6d6d6),
                       ),
                       child: Row(
                         children: [
