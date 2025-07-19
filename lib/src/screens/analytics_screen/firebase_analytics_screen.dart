@@ -570,10 +570,6 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
               SizedBox(height: getProportionateScreenHeight(12)),
               _buildDeviceUsageCard(),
               SizedBox(height: getProportionateScreenHeight(12)),
-              _buildEnergyConsumptionCard(),
-              SizedBox(height: getProportionateScreenHeight(12)),
-              _buildSmartMeterCard(),
-              SizedBox(height: getProportionateScreenHeight(12)),
               _buildSolarPowerCard(),
               SizedBox(
                   height: getProportionateScreenHeight(
@@ -623,28 +619,40 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
                   ),
                 ),
                 SizedBox(height: getProportionateScreenHeight(4)),
-                DropdownButton<DateTime>(
-                  value: _getValidSelectedMonth(),
-                  underline: SizedBox(),
-                  icon: Icon(Icons.arrow_drop_down,
-                      color: Theme.of(context).primaryColor),
-                  isExpanded: true,
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyMedium?.color,
-                    fontSize: getProportionateScreenWidth(12),
+                GestureDetector(
+                  onTap: () => _showMonthPicker(),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: getProportionateScreenWidth(12),
+                      vertical: getProportionateScreenHeight(8),
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).dividerColor,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color: Theme.of(context).cardColor,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatMonthYear(_selectedMonth),
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
+                            fontSize: getProportionateScreenWidth(12),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_today,
+                          color: Theme.of(context).primaryColor,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
-                  onChanged: (DateTime? newMonth) {
-                    if (newMonth != null && newMonth != _selectedMonth) {
-                      _refreshDataForMonth(newMonth);
-                    }
-                  },
-                  items: _generateMonthOptions()
-                      .map<DropdownMenuItem<DateTime>>((DateTime month) {
-                    return DropdownMenuItem<DateTime>(
-                      value: month,
-                      child: Text(_formatMonthYear(month)),
-                    );
-                  }).toList(),
                 ),
               ],
             ),
@@ -664,35 +672,42 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
     );
   }
 
-  // Generate month options (last 12 months)
-  List<DateTime> _generateMonthOptions() {
-    final List<DateTime> months = [];
-    final now = DateTime.now();
 
-    for (int i = 0; i < 12; i++) {
-      final month = DateTime(now.year, now.month - i, 1);
-      months.add(month);
-    }
 
-    return months;
-  }
+  // Show month picker dialog
+  Future<void> _showMonthPicker() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedMonth,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: DateTime.now(),
+      selectableDayPredicate: (DateTime day) {
+        // Cho phép chọn bất kỳ ngày nào
+        return true;
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Theme.of(context).primaryColor,
+              brightness: Theme.of(context).brightness,
+            ),
+          ),
+          child: child!,
+        );
+      },
+      helpText: 'Chọn tháng để xem thống kê',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+    );
 
-  // Get valid selected month (ensure it's in the options list)
-  DateTime _getValidSelectedMonth() {
-    final options = _generateMonthOptions();
-    final normalizedSelected =
-        DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-
-    // Check if current selected month is in options
-    for (final option in options) {
-      if (option.year == normalizedSelected.year &&
-          option.month == normalizedSelected.month) {
-        return option;
+    if (picked != null) {
+      // Lấy tháng từ ngày được chọn
+      final selectedMonth = DateTime(picked.year, picked.month, 1);
+      if (selectedMonth != DateTime(_selectedMonth.year, _selectedMonth.month, 1)) {
+        _refreshDataForMonth(selectedMonth);
       }
     }
-
-    // If not found, return current month (first option)
-    return options.first;
   }
 
   // Format month year for display
@@ -1395,194 +1410,6 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
           ),
         ),
       ],
-    );
-  }
-
-  // Energy Consumption Recommendation Card
-  Widget _buildEnergyConsumptionCard() {
-    return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Phân tích mức tiêu thụ năng lượng',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(15),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: getProportionateScreenHeight(8)),
-                Text(
-                  'Xem kiểu tiêu thụ năng lượng của Virtual Home.',
-                  style: TextStyle(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color
-                        ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: getProportionateScreenWidth(60),
-            height: getProportionateScreenWidth(60),
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey[300]
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Icon(Icons.bar_chart, color: Colors.white, size: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Smart Meter Card
-  Widget _buildSmartMeterCard() {
-    return Container(
-      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Đồng hồ thông minh',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(15),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: getProportionateScreenHeight(8)),
-                Text(
-                  'Kiểm tra tổng mức tiêu thụ năng lượng trong nhà.',
-                  style: TextStyle(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color
-                        ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              Container(
-                width: getProportionateScreenWidth(40),
-                height: getProportionateScreenWidth(50),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[600]
-                      : Colors.grey[400],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 2,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.grey[800],
-                    ),
-                    SizedBox(height: 4),
-                    Container(
-                      width: 15,
-                      height: 2,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.grey[800],
-                    ),
-                    SizedBox(height: 4),
-                    Container(
-                      width: 20,
-                      height: 2,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.grey[800],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 8),
-              Container(
-                width: getProportionateScreenWidth(30),
-                height: getProportionateScreenWidth(30),
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(Icons.electric_bolt, color: Colors.white, size: 16),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
