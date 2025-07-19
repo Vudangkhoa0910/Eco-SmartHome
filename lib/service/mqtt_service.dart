@@ -14,7 +14,7 @@ class MqttService {
   // Firebase toggle - enable để lưu dữ liệu thực tế
   static const bool _enableFirebase = true; // Bật để lưu dữ liệu lên Firebase
 
-  // Topics from ESP32 - Updated to match ESP32 configuration
+  // Topics from ESP32 Dev (outdoor) - Giữ nguyên cho thiết bị ngoài trời
   static const String topicTemp = 'khoasmarthome/temperature';
   static const String topicHumid = 'khoasmarthome/humidity';
   static const String topicCurrent = 'khoasmarthome/current';
@@ -23,6 +23,24 @@ class MqttService {
   static const String topicLedGate = 'khoasmarthome/led_gate';     // đèn cổng
   static const String topicLedAround = 'khoasmarthome/led_around'; // đèn xung quanh
   static const String topicMotor = 'khoasmarthome/motor';
+
+  // Topics from ESP32-S3 (indoor) - Thiết bị trong nhà
+  // Sensor data from indoor ESP32-S3
+  static const String topicCurrentInside = 'inside/current';
+  static const String topicVoltageInside = 'inside/voltage';
+  static const String topicPowerInside = 'inside/power';
+  
+  // Floor 1 devices
+  static const String topicKitchenLight = 'inside/kitchen_light';       // Đèn bếp lớn
+  static const String topicLivingRoomLight = 'inside/living_room_light'; // Đèn phòng khách
+  static const String topicBedroomLight = 'inside/bedroom_light';       // Đèn phòng ngủ
+  
+  // Floor 2 devices
+  static const String topicCornerBedroomLight = 'inside/corner_bedroom_light'; // Đèn phòng ngủ góc
+  static const String topicYardBedroomLight = 'inside/yard_bedroom_light';     // Đèn phòng ngủ sân
+  static const String topicWorshipRoomLight = 'inside/worship_room_light';     // Đèn phòng thờ
+  static const String topicHallwayLight = 'inside/hallway_light';             // Đèn hành lang
+  static const String topicBalconyLight = 'inside/balcony_light';             // Đèn ban công lớn
 
   MqttServerClient? _client;
   bool _isConnected = false;
@@ -41,6 +59,10 @@ class MqttService {
   // Current sensor values (with defaults)
   SensorData _currentData = SensorData.defaultData();
   SensorData get currentData => _currentData;
+
+  // Indoor sensor data from ESP32-S3
+  SensorData _currentDataInside = SensorData.defaultData();
+  SensorData get currentDataInside => _currentDataInside;
 
   Future<void> connect() async {
     try {
@@ -160,11 +182,16 @@ class MqttService {
 
   void _subscribeToTopics() {
     final topics = [
+      // Outdoor ESP32 Dev topics
       topicTemp,
       topicHumid,
       topicCurrent,
       topicVoltage,
       topicPower,
+      // Indoor ESP32-S3 topics
+      topicCurrentInside,
+      topicVoltageInside,
+      topicPowerInside,
     ];
 
     for (String topic in topics) {
@@ -186,6 +213,7 @@ class MqttService {
     try {
       final value = double.tryParse(message) ?? 0.0;
       
+      // Handle outdoor ESP32 Dev data
       switch (topic) {
         case topicTemp:
           _currentData = _currentData.copyWith(temperature: value);
@@ -202,49 +230,88 @@ class MqttService {
         case topicPower:
           _currentData = _currentData.copyWith(power: value);
           break;
+        // Handle indoor ESP32-S3 data
+        case topicCurrentInside:
+          _currentDataInside = _currentDataInside.copyWith(current: value);
+          break;
+        case topicVoltageInside:
+          _currentDataInside = _currentDataInside.copyWith(voltage: value);
+          break;
+        case topicPowerInside:
+          _currentDataInside = _currentDataInside.copyWith(power: value);
+          break;
       }
       
-      _currentData = _currentData.copyWith(lastUpdated: DateTime.now());
+      // Update timestamps
+      if (topic.startsWith('inside/')) {
+        _currentDataInside = _currentDataInside.copyWith(lastUpdated: DateTime.now());
+      } else {
+        _currentData = _currentData.copyWith(lastUpdated: DateTime.now());
+      }
+      
       _sensorDataController.add(_currentData);
       
       // Send data to Firebase asynchronously (only if enabled)
       if (_enableFirebase) {
-        // Write basic sensor data
-        _firebaseData.writeSensorData(_currentData).timeout(
-          const Duration(seconds: 5),
-        ).catchError((error) {
-          print('⚠️ Firebase write error: $error');
-          return false; // Return a value assignable to bool
-        });
-        
-        // Write detailed energy consumption data
-        _firebaseData.writeEnergyConsumption(_currentData).timeout(
-          const Duration(seconds: 5),
-        ).catchError((error) {
-          print('⚠️ Firebase energy write error: $error');
-          return false;
-        });
-        
-        // Also write power consumption data for energy tracking
-        if (_currentData.power > 0) {
-          _firebaseData.writePowerConsumption(
-            deviceId: 'total_system',
-            power: _currentData.power,
-            voltage: _currentData.voltage,
-            current: _currentData.current,
-            timestamp: DateTime.now(),
-            metadata: {
-              'type': 'total_consumption',
-              'efficiency': ((5.0 - _currentData.voltage) / 5.0 * 100).clamp(0, 100),
-              'temperature': _currentData.temperature,
-              'humidity': _currentData.humidity,
-            },
-          ).timeout(
+        // Write basic sensor data (outdoor)
+        if (!topic.startsWith('inside/')) {
+          _firebaseData.writeSensorData(_currentData).timeout(
             const Duration(seconds: 5),
           ).catchError((error) {
-            print('⚠️ Firebase power consumption write error: $error');
+            print('⚠️ Firebase write error: $error');
             return false;
           });
+          
+          // Write detailed energy consumption data
+          _firebaseData.writeEnergyConsumption(_currentData).timeout(
+            const Duration(seconds: 5),
+          ).catchError((error) {
+            print('⚠️ Firebase energy write error: $error');
+            return false;
+          });
+          
+          // Also write power consumption data for energy tracking
+          if (_currentData.power > 0) {
+            _firebaseData.writePowerConsumption(
+              deviceId: 'outdoor_system',
+              power: _currentData.power,
+              voltage: _currentData.voltage,
+              current: _currentData.current,
+              timestamp: DateTime.now(),
+              metadata: {
+                'type': 'outdoor_consumption',
+                'efficiency': ((5.0 - _currentData.voltage) / 5.0 * 100).clamp(0, 100),
+                'temperature': _currentData.temperature,
+                'humidity': _currentData.humidity,
+              },
+            ).timeout(
+              const Duration(seconds: 5),
+            ).catchError((error) {
+              print('⚠️ Firebase power consumption write error: $error');
+              return false;
+            });
+          }
+        } else {
+          // Write indoor ESP32-S3 power consumption data
+          if (_currentDataInside.power > 0) {
+            _firebaseData.writePowerConsumption(
+              deviceId: 'indoor_system',
+              power: _currentDataInside.power,
+              voltage: _currentDataInside.voltage,
+              current: _currentDataInside.current,
+              timestamp: DateTime.now(),
+              metadata: {
+                'type': 'indoor_consumption',
+                'efficiency': ((5.0 - _currentDataInside.voltage) / 5.0 * 100).clamp(0, 100),
+                'location': 'inside_house',
+              },
+            ).timeout(
+              const Duration(seconds: 5),
+            ).catchError((error) {
+              print('⚠️ Firebase indoor power consumption write error: $error');
+              return false;
+            });
+          }
         }
       }
       
@@ -360,9 +427,101 @@ class MqttService {
     }
   }
 
-  // Compatibility methods for backward compatibility
+  // Compatibility methods for backward compatibility (outdoor ESP32 Dev)
   void controlLed1(bool isOn) => controlLedGate(isOn);
   void controlLed2(bool isOn) => controlLedAround(isOn);
+
+  // ========== ESP32-S3 Indoor Device Controls ==========
+  
+  // Floor 1 Controls
+  void controlKitchenLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicKitchenLight, command);
+    _logIndoorDeviceState('kitchen_light', command, 'floor_1', 'kitchen', 8.0);
+  }
+
+  void controlLivingRoomLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicLivingRoomLight, command);
+    _logIndoorDeviceState('living_room_light', command, 'floor_1', 'living_room', 12.0);
+  }
+
+  void controlBedroomLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicBedroomLight, command);
+    _logIndoorDeviceState('bedroom_light', command, 'floor_1', 'bedroom', 10.0);
+  }
+
+  // Floor 2 Controls
+  void controlCornerBedroomLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicCornerBedroomLight, command);
+    _logIndoorDeviceState('corner_bedroom_light', command, 'floor_2', 'corner_bedroom', 10.0);
+  }
+
+  void controlYardBedroomLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicYardBedroomLight, command);
+    _logIndoorDeviceState('yard_bedroom_light', command, 'floor_2', 'yard_bedroom', 10.0);
+  }
+
+  void controlWorshipRoomLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicWorshipRoomLight, command);
+    _logIndoorDeviceState('worship_room_light', command, 'floor_2', 'worship_room', 15.0);
+  }
+
+  void controlHallwayLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicHallwayLight, command);
+    _logIndoorDeviceState('hallway_light', command, 'floor_2', 'hallway', 6.0);
+  }
+
+  void controlBalconyLight(bool isOn) {
+    final command = isOn ? 'ON' : 'OFF';
+    publishDeviceCommand(topicBalconyLight, command);
+    _logIndoorDeviceState('balcony_light', command, 'floor_2', 'balcony', 20.0);
+  }
+
+  // Helper method to log indoor device states
+  void _logIndoorDeviceState(String deviceId, String command, String floor, String room, double estimatedPower) {
+    if (!_enableFirebase) return;
+    
+    final isOn = command == 'ON';
+    
+    // Log device state to Firebase
+    _firebaseData.writeDeviceState(deviceId, command, metadata: {
+      'floor': floor,
+      'room': room,
+      'type': 'light',
+      'controller': 'esp32_s3_indoor',
+    }).catchError((error) {
+      print('⚠️ Firebase $deviceId error: $error');
+      return false;
+    });
+    
+    // Write estimated power consumption
+    final actualPower = isOn ? estimatedPower : 0.0;
+    final estimatedCurrent = isOn ? (estimatedPower / _currentDataInside.voltage) : 0.0;
+    
+    _firebaseData.writePowerConsumption(
+      deviceId: deviceId,
+      power: actualPower,
+      voltage: _currentDataInside.voltage,
+      current: estimatedCurrent,
+      timestamp: DateTime.now(),
+      metadata: {
+        'floor': floor,
+        'room': room,
+        'type': 'light',
+        'controller': 'esp32_s3_indoor',
+        'state': command,
+      },
+    ).catchError((error) {
+      print('⚠️ Firebase $deviceId power error: $error');
+      return false;
+    });
+  }
 
   void disconnect() {
     _client?.disconnect();
