@@ -34,6 +34,19 @@ class HomeScreenViewModel extends BaseModel {
   bool isSpeakerFav = false;
   bool isFanFav = false;
 
+  // Indoor device states for ESP32-S3
+  // Floor 1 devices
+  bool isKitchenLightOn = false;
+  bool isLivingRoomLightOn = false;
+  bool isBedroomLightOn = false;
+  
+  // Floor 2 devices
+  bool isCornerBedroomLightOn = false;
+  bool isYardBedroomLightOn = false;
+  bool isWorshipRoomLightOn = false;
+  bool isHallwayLightOn = false;
+  bool isBalconyLightOn = false;
+
   // Weather data
   WeatherData? _currentWeather;
   List<ForecastData> _forecast = [];
@@ -309,5 +322,90 @@ class HomeScreenViewModel extends BaseModel {
 
   void reconnectMqtt() {
     _connectMqtt();
+  }
+
+  // ========== ESP32-S3 Indoor Device Controls ==========
+  
+  // Floor 1 Controls
+  void toggleKitchenLight() {
+    isKitchenLightOn = !isKitchenLightOn;
+    notifyListeners();
+  }
+
+  void toggleLivingRoomLight() {
+    isLivingRoomLightOn = !isLivingRoomLightOn;
+    notifyListeners();
+  }
+
+  void toggleBedroomLight() {
+    isBedroomLightOn = !isBedroomLightOn;
+    notifyListeners();
+  }
+
+  // Floor 2 Controls
+  void toggleCornerBedroomLight() {
+    isCornerBedroomLightOn = !isCornerBedroomLightOn;
+    notifyListeners();
+  }
+
+  void toggleYardBedroomLight() {
+    isYardBedroomLightOn = !isYardBedroomLightOn;
+    notifyListeners();
+  }
+
+  void toggleWorshipRoomLight() {
+    isWorshipRoomLightOn = !isWorshipRoomLightOn;
+    notifyListeners();
+  }
+
+  void toggleHallwayLight() {
+    isHallwayLightOn = !isHallwayLightOn;
+    notifyListeners();
+  }
+
+  void toggleBalconyLight() {
+    isBalconyLightOn = !isBalconyLightOn;
+    notifyListeners();
+  }
+
+  // Direct control methods (for external calls)
+  void setKitchenLight(bool isOn) {
+    isKitchenLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setLivingRoomLight(bool isOn) {
+    isLivingRoomLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setBedroomLight(bool isOn) {
+    isBedroomLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setCornerBedroomLight(bool isOn) {
+    isCornerBedroomLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setYardBedroomLight(bool isOn) {
+    isYardBedroomLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setWorshipRoomLight(bool isOn) {
+    isWorshipRoomLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setHallwayLight(bool isOn) {
+    isHallwayLightOn = isOn;
+    notifyListeners();
+  }
+
+  void setBalconyLight(bool isOn) {
+    isBalconyLightOn = isOn;
+    notifyListeners();
   }
 }

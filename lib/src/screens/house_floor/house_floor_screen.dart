@@ -3,6 +3,7 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
+import 'package:smart_home/service/mqtt_service.dart';
 
 class HouseFloorScreen extends StatefulWidget {
   final HouseFloor floor;
@@ -21,6 +22,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   late AnimationController _animationController;
   String? _expandedRoomName;
   final HomeScreenViewModel _model = getIt<HomeScreenViewModel>();
+  final MqttService _mqttService = getIt<MqttService>();
 
   @override
   void initState() {
@@ -445,6 +447,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
 
   bool _isDeviceControllable(SmartDevice device) {
     const controllableTopics = [
+      // ESP32 Dev (outdoor) topics
       'khoasmarthome/led1',
       'khoasmarthome/led2',
       'khoasmarthome/motor',
@@ -454,17 +457,32 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'khoasmarthome/yard_main_light', // Đèn sân chính
       'khoasmarthome/fish_pond_light', // Đèn khu bể cá
       'khoasmarthome/awning_light', // Đèn mái hiên
-      'khoasmarthome/living_room_light', // Đèn phòng khách
-      'khoasmarthome/kitchen_light', // Đèn phòng bếp
-      'khoasmarthome/bedroom_light', // Đèn phòng ngủ
-      'khoasmarthome/stairs_light', // Đèn cầu thang
-      'khoasmarthome/bathroom_light', // Đèn phòng vệ sinh
+      
+      // ESP32-S3 (indoor) topics - Floor 1
+      'inside/kitchen_light', // Đèn bếp lớn
+      'inside/living_room_light', // Đèn phòng khách
+      'inside/bedroom_light', // Đèn phòng ngủ
+      
+      // ESP32-S3 (indoor) topics - Floor 2
+      'inside/corner_bedroom_light', // Đèn phòng ngủ góc
+      'inside/yard_bedroom_light', // Đèn phòng ngủ sân
+      'inside/worship_room_light', // Đèn phòng thờ
+      'inside/hallway_light', // Đèn hành lang
+      'inside/balcony_light', // Đèn ban công lớn
+      
+      // Legacy topics for compatibility
+      'khoasmarthome/living_room_light', // Đèn phòng khách (legacy)
+      'khoasmarthome/kitchen_light', // Đèn phòng bếp (legacy)
+      'khoasmarthome/bedroom_light', // Đèn phòng ngủ (legacy)
+      'khoasmarthome/stairs_light', // Đèn cầu thang (legacy)
+      'khoasmarthome/bathroom_light', // Đèn phòng vệ sinh (legacy)
     ];
     return controllableTopics.contains(device.mqttTopic);
   }
 
   bool _getDeviceState(SmartDevice device) {
     switch (device.mqttTopic) {
+      // ESP32 Dev (outdoor) devices
       case 'khoasmarthome/led1':
         return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/led2':
@@ -483,17 +501,38 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.isLightFav; // Sử dụng state favourite cho đèn bể cá
       case 'khoasmarthome/awning_light':
         return _model.isACFav; // Sử dụng AC favourite cho đèn mái hiên
+      
+      // ESP32-S3 (indoor) devices - Floor 1
+      case 'inside/kitchen_light':
+        return _model.isKitchenLightOn; // State riêng cho đèn bếp
+      case 'inside/living_room_light':
+        return _model.isLivingRoomLightOn; // State riêng cho đèn phòng khách
+      case 'inside/bedroom_light':
+        return _model.isBedroomLightOn; // State riêng cho đèn phòng ngủ
+      
+      // ESP32-S3 (indoor) devices - Floor 2
+      case 'inside/corner_bedroom_light':
+        return _model.isCornerBedroomLightOn; // State riêng cho đèn phòng ngủ góc
+      case 'inside/yard_bedroom_light':
+        return _model.isYardBedroomLightOn; // State riêng cho đèn phòng ngủ sân
+      case 'inside/worship_room_light':
+        return _model.isWorshipRoomLightOn; // State riêng cho đèn phòng thờ
+      case 'inside/hallway_light':
+        return _model.isHallwayLightOn; // State riêng cho đèn hành lang
+      case 'inside/balcony_light':
+        return _model.isBalconyLightOn; // State riêng cho đèn ban công
+      
+      // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
-        return _model
-            .isSpeakerFav; // Sử dụng speaker favourite cho đèn phòng khách
+        return _model.isSpeakerFav; // Sử dụng speaker favourite cho đèn phòng khách (legacy)
       case 'khoasmarthome/kitchen_light':
-        return _model.isFanFav; // Sử dụng fan favourite cho đèn bếp
+        return _model.isFanFav; // Sử dụng fan favourite cho đèn bếp (legacy)
       case 'khoasmarthome/bedroom_light':
-        return _model.isLightOn; // Sử dụng light state cho đèn phòng ngủ
+        return _model.isLightOn; // Sử dụng light state cho đèn phòng ngủ (legacy)
       case 'khoasmarthome/stairs_light':
-        return _model.isACON; // Sử dụng AC state cho đèn cầu thang
+        return _model.isACON; // Sử dụng AC state cho đèn cầu thang (legacy)
       case 'khoasmarthome/bathroom_light':
-        return _model.isSpeakerON; // Sử dụng speaker state cho đèn vệ sinh
+        return _model.isSpeakerON; // Sử dụng speaker state cho đèn vệ sinh (legacy)
       default:
         return device.isOn;
     }
@@ -501,6 +540,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
 
   void _toggleDevice(SmartDevice device) {
     switch (device.mqttTopic) {
+      // ESP32 Dev (outdoor) devices
       case 'khoasmarthome/led1':
         _model.toggleLed1();
         break;
@@ -512,13 +552,11 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         break;
       case 'khoasmarthome/led_gate':
         // Điều khiển đèn cổng từ ESP32
-        _model
-            .toggleLed1(); // Sử dụng cùng logic với led1 để điều khiển LED Gate
+        _model.toggleLed1(); // Sử dụng cùng logic với led1 để điều khiển LED Gate
         break;
       case 'khoasmarthome/led_around':
         // Điều khiển đèn xung quanh từ ESP32
-        _model
-            .toggleLed2(); // Sử dụng cùng logic với led2 để điều khiển LED Around
+        _model.toggleLed2(); // Sử dụng cùng logic với led2 để điều khiển LED Around
         break;
       case 'khoasmarthome/awning':
         // Điều khiển mái che
@@ -536,25 +574,70 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         // Điều khiển đèn mái hiên
         _model.acFav(); // Sử dụng AC favourite toggle cho đèn mái hiên
         break;
+      
+      // ESP32-S3 (indoor) devices - Floor 1
+      case 'inside/kitchen_light':
+        // Điều khiển đèn bếp trong nhà
+        _model.toggleKitchenLight();
+        _mqttService.controlKitchenLight(_model.isKitchenLightOn);
+        break;
+      case 'inside/living_room_light':
+        // Điều khiển đèn phòng khách trong nhà
+        _model.toggleLivingRoomLight();
+        _mqttService.controlLivingRoomLight(_model.isLivingRoomLightOn);
+        break;
+      case 'inside/bedroom_light':
+        // Điều khiển đèn phòng ngủ trong nhà
+        _model.toggleBedroomLight();
+        _mqttService.controlBedroomLight(_model.isBedroomLightOn);
+        break;
+      
+      // ESP32-S3 (indoor) devices - Floor 2
+      case 'inside/corner_bedroom_light':
+        // Điều khiển đèn phòng ngủ góc
+        _model.toggleCornerBedroomLight();
+        _mqttService.controlCornerBedroomLight(_model.isCornerBedroomLightOn);
+        break;
+      case 'inside/yard_bedroom_light':
+        // Điều khiển đèn phòng ngủ sân
+        _model.toggleYardBedroomLight();
+        _mqttService.controlYardBedroomLight(_model.isYardBedroomLightOn);
+        break;
+      case 'inside/worship_room_light':
+        // Điều khiển đèn phòng thờ
+        _model.toggleWorshipRoomLight();
+        _mqttService.controlWorshipRoomLight(_model.isWorshipRoomLightOn);
+        break;
+      case 'inside/hallway_light':
+        // Điều khiển đèn hành lang
+        _model.toggleHallwayLight();
+        _mqttService.controlHallwayLight(_model.isHallwayLightOn);
+        break;
+      case 'inside/balcony_light':
+        // Điều khiển đèn ban công lớn
+        _model.toggleBalconyLight();
+        _mqttService.controlBalconyLight(_model.isBalconyLightOn);
+        break;
+      
+      // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
-        // Điều khiển đèn phòng khách
-        _model
-            .speakerFav(); // Sử dụng speaker favourite toggle cho đèn phòng khách
+        // Điều khiển đèn phòng khách (legacy)
+        _model.speakerFav(); // Sử dụng speaker favourite toggle cho đèn phòng khách
         break;
       case 'khoasmarthome/kitchen_light':
-        // Điều khiển đèn phòng bếp
+        // Điều khiển đèn phòng bếp (legacy)
         _model.fanFav(); // Sử dụng fan favourite toggle cho đèn bếp
         break;
       case 'khoasmarthome/bedroom_light':
-        // Điều khiển đèn phòng ngủ
+        // Điều khiển đèn phòng ngủ (legacy)
         _model.lightSwitch(); // Sử dụng light switch cho đèn phòng ngủ
         break;
       case 'khoasmarthome/stairs_light':
-        // Điều khiển đèn cầu thang
+        // Điều khiển đèn cầu thang (legacy)
         _model.acSwitch(); // Sử dụng AC switch cho đèn cầu thang
         break;
       case 'khoasmarthome/bathroom_light':
-        // Điều khiển đèn phòng vệ sinh
+        // Điều khiển đèn phòng vệ sinh (legacy)
         _model.speakerSwitch(); // Sử dụng speaker switch cho đèn vệ sinh
         break;
     }
