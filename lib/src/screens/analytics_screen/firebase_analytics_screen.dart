@@ -34,9 +34,18 @@ class FirebaseAnalyticsScreen extends StatefulWidget {
       _FirebaseAnalyticsScreenState();
 }
 
-class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
+class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
+  bool _isRefreshing = false;
   bool _aiEnergyModeEnabled = true;
+
+  // Month selection
+  DateTime _selectedMonth = DateTime.now();
+
+  // Cache management
+  final Map<String, Map<String, dynamic>> _cache = {};
+  static const int _cacheValidityMinutes = 5;
 
   // Firebase data variables
   final FirebaseDataService _firebaseService = FirebaseDataService();
@@ -48,10 +57,20 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   List<DeviceUsageData> _deviceUsageData = [];
   Map<String, dynamic> _deviceStats = {};
 
+  // Cache để tránh load lại dữ liệu không cần thiết
+  bool _dataLoaded = false;
+  DateTime? _lastDataLoadTime;
+  static const int _cacheValidMinutes = 5; // Cache valid for 5 minutes
+
+  @override
+  bool get wantKeepAlive => true; // Keep state alive when switching pages
+
   @override
   void initState() {
     super.initState();
-    _loadAnalyticsData();
+    // Ensure selected month is normalized to first day of month
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    _loadAnalyticsDataIfNeeded();
   }
 
   @override
@@ -59,6 +78,30 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
     super.dispose();
   }
 
+  // Check if data needs to be loaded (cache logic)
+  bool _needsDataReload() {
+    if (!_dataLoaded) return true;
+    if (_lastDataLoadTime == null) return true;
+
+    final now = DateTime.now();
+    final timeSinceLastLoad = now.difference(_lastDataLoadTime!);
+    return timeSinceLastLoad.inMinutes > _cacheValidMinutes;
+  }
+
+  // Load data only if needed (not cached or expired)
+  Future<void> _loadAnalyticsDataIfNeeded() async {
+    if (!_needsDataReload()) {
+      // Data is still fresh, just update loading state
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    await _loadAnalyticsData();
+  }
+
+  // Load data only - don't reload entire page
   Future<void> _loadAnalyticsData() async {
     if (!mounted) return;
 
@@ -79,6 +122,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
 
       setState(() {
         _isLoading = false;
+        _dataLoaded = true;
+        _lastDataLoadTime = DateTime.now();
       });
     } catch (e) {
       print('❌ Analytics Error: $e');
@@ -91,6 +136,103 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         _dailyEnergyConsumption = 0.0;
         _monthlyEnergyConsumption = 0.0;
         _monthlyCost = 0.0;
+        _dataLoaded =
+            true; // Mark as loaded even on error to prevent infinite loading
+        _lastDataLoadTime = DateTime.now();
+      });
+    }
+  }
+
+  // Cache helper methods
+  bool _isCacheValid(String key) {
+    final cacheEntry = _cache[key];
+    if (cacheEntry == null || cacheEntry['timestamp'] == null) return false;
+
+    final cacheTime = cacheEntry['timestamp'] as DateTime;
+    final now = DateTime.now();
+    final ageMinutes = now.difference(cacheTime).inMinutes;
+
+    return ageMinutes < _cacheValidityMinutes;
+  }
+
+  void _setCacheData(String key, dynamic data) {
+    _cache[key] = {
+      'data': data,
+      'timestamp': DateTime.now(),
+    };
+  }
+
+  T? _getCacheData<T>(String key) {
+    if (_isCacheValid(key)) {
+      return _cache[key]!['data'] as T?;
+    }
+    return null;
+  }
+
+  void _clearCache() {
+    _cache.clear();
+    print('🗑️ Cache cleared');
+  }
+
+  // Refresh data for selected month without rebuilding entire page
+  Future<void> _refreshDataForMonth(DateTime month) async {
+    if (!mounted) return;
+
+    print('🔄 Refreshing data for month: ${_formatMonthYear(month)}');
+    print(
+        '🔄 Previous values - Monthly: $_monthlyEnergyConsumption kWh, Cost: $_monthlyCost VND');
+
+    setState(() {
+      _isRefreshing = true;
+      _selectedMonth = month;
+
+      // Clear cache for new month
+      _clearCache();
+
+      // Force clear ALL cache and data
+      _dataLoaded = false;
+      _lastDataLoadTime = null;
+
+      // Reset all data variables to force UI update
+      _monthlyEnergyConsumption = 0.0;
+      _monthlyCost = 0.0;
+      _dailyUsageData = [];
+      _deviceUsageData = [];
+      _deviceStats = {};
+    });
+
+    print('🔄 Data reset to 0, starting data load...');
+
+    try {
+      // Load data for selected month with forced refresh
+      await Future.wait([
+        _loadMonthlyEnergyConsumption(),
+        _loadDailyUsageData(),
+        _loadDeviceUsageData(),
+        _loadDeviceStats(),
+      ]).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      print(
+          '🔄 Data loaded - Monthly: $_monthlyEnergyConsumption kWh, Cost: $_monthlyCost VND');
+      print('🔄 Daily usage data length: ${_dailyUsageData.length}');
+
+      setState(() {
+        _isRefreshing = false;
+        _dataLoaded = true;
+        _lastDataLoadTime = DateTime.now();
+      });
+
+      print('🔄 Final setState completed - UI should update now');
+    } catch (e) {
+      print('❌ Analytics Refresh Error: $e');
+      if (!mounted) return;
+
+      setState(() {
+        _isRefreshing = false;
+        _dataLoaded = true;
+        _lastDataLoadTime = DateTime.now();
       });
     }
   }
@@ -116,11 +258,61 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   }
 
   Future<void> _loadMonthlyEnergyConsumption() async {
+    // Check cache first
+    final cacheKey = 'monthly_${_selectedMonth.year}_${_selectedMonth.month}';
+    final cachedData = _getCacheData<Map<String, double>>(cacheKey);
+
+    if (cachedData != null) {
+      print(
+          '📋 Using cached monthly data for ${_formatMonthYear(_selectedMonth)}');
+      _monthlyEnergyConsumption = cachedData['consumption'] ?? 0.0;
+      _monthlyCost = cachedData['cost'] ?? 0.0;
+      return;
+    }
+
     try {
-      _monthlyEnergyConsumption =
-          await _firebaseService.getMonthlyEnergyConsumption();
+      // Use selected month for data query
+      final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final endDate =
+          DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+
+      print('📊 Loading monthly data for ${_formatMonthYear(_selectedMonth)}');
+      print('📊 Date range: $startDate to $endDate');
+
+      // Query data for selected month
+      final monthlyData = await _firebaseService.getPowerConsumptionHistory(
+        startTime: startDate,
+        endTime: endDate,
+      );
+
+      print('📊 Found ${monthlyData.length} records for this month');
+
+      // Calculate monthly consumption from daily data
+      double totalConsumption = 0.0;
+      for (final data in monthlyData) {
+        final energyKwh = (data['energy_kwh'] as num?)?.toDouble() ?? 0.0;
+        totalConsumption += energyKwh;
+        print('📊 Daily energy: $energyKwh kWh');
+      }
+
+      print('📊 Total monthly consumption: $totalConsumption kWh');
+
+      _monthlyEnergyConsumption = totalConsumption > 0
+          ? totalConsumption
+          : 0.0; // Show 0 instead of fallback to avoid confusion
+
       // Calculate cost (1500 VND per kWh as default)
       _monthlyCost = _monthlyEnergyConsumption * 1500;
+
+      // Cache the result
+      _setCacheData(cacheKey, {
+        'consumption': _monthlyEnergyConsumption,
+        'cost': _monthlyCost,
+      });
+
+      print('📊 Final monthly consumption: $_monthlyEnergyConsumption kWh');
+      print('📊 Final monthly cost: $_monthlyCost VND');
+      print('💾 Cached monthly data for ${_formatMonthYear(_selectedMonth)}');
     } catch (e) {
       print('❌ Error loading monthly energy: $e');
       _monthlyEnergyConsumption = 0.0;
@@ -129,14 +321,33 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   }
 
   Future<void> _loadDailyUsageData() async {
+    // Check cache first
+    final cacheKey = 'daily_${_selectedMonth.year}_${_selectedMonth.month}';
+    final cachedData = _getCacheData<List<EnergyBarData>>(cacheKey);
+
+    if (cachedData != null) {
+      print(
+          '📋 Using cached daily usage data for ${_formatMonthYear(_selectedMonth)}');
+      _dailyUsageData = cachedData;
+      return;
+    }
+
     try {
-      final endDate = DateTime.now();
-      final startDate = endDate.subtract(const Duration(days: 7));
+      // Use selected month for daily usage data
+      final endDate = DateTime(_selectedMonth.year, _selectedMonth.month + 1,
+          0); // Last day of month
+      final startDate = DateTime(
+          _selectedMonth.year, _selectedMonth.month, 1); // First day of month
+
+      print('📈 Loading daily usage for ${_formatMonthYear(_selectedMonth)}');
+      print('📈 Date range: $startDate to $endDate');
 
       final powerHistory = await _firebaseService.getPowerConsumptionHistory(
         startTime: startDate,
         endTime: endDate,
       );
+
+      print('📈 Found ${powerHistory.length} daily records');
 
       // Group data by day and calculate averages
       final Map<String, List<double>> dailyPower = {};
@@ -175,37 +386,69 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         }
       }
 
-      _dailyUsageData = [];
-      final today = DateTime.now();
-      for (int i = 6; i >= 0; i--) {
-        final date = today.subtract(Duration(days: i));
-        final dayKey = '${date.month}/${date.day}';
-        final displayKey = i == 0 ? 'Hôm nay' : (i == 1 ? 'Hôm qua' : dayKey);
+      print('📈 Processed daily data for ${dailyPower.keys.length} days');
 
+      _dailyUsageData = [];
+
+      // Generate data for selected month - show last 7 days of the month or recent days
+      final isCurrentMonth = _selectedMonth.year == DateTime.now().year &&
+          _selectedMonth.month == DateTime.now().month;
+      final referenceDate = isCurrentMonth
+          ? DateTime.now()
+          : DateTime(_selectedMonth.year, _selectedMonth.month + 1,
+              0); // Last day of selected month
+
+      for (int i = 6; i >= 0; i--) {
+        final date = referenceDate.subtract(Duration(days: i));
+        final dayKey = '${date.month}/${date.day}';
+
+        // Display format
+        String displayKey;
+        if (isCurrentMonth && i == 0) {
+          displayKey = 'Hôm nay';
+        } else if (isCurrentMonth && i == 1) {
+          displayKey = 'Hôm qua';
+        } else {
+          displayKey = '${date.day}/${date.month}';
+        }
+
+        // Only show real data, no fallback
         final avgPower = dailyPower[dayKey]?.isNotEmpty == true
             ? dailyPower[dayKey]!.reduce((a, b) => a + b) /
                 dailyPower[dayKey]!.length
-            : (15 + i * 2).toDouble(); // Demo data fallback
+            : 0.0; // Show 0 if no data
 
         final avgSaved = dailySaved[dayKey]?.isNotEmpty == true
             ? dailySaved[dayKey]!.reduce((a, b) => a + b) /
                 dailySaved[dayKey]!.length
-            : (5 + i).toDouble(); // Demo data fallback
+            : 0.0; // Show 0 if no data
+
+        print(
+            '📈 Day $displayKey ($dayKey): Power=${avgPower.toStringAsFixed(2)}, Saved=${avgSaved.toStringAsFixed(2)}');
 
         _dailyUsageData.add(EnergyBarData(displayKey, avgPower, avgSaved));
       }
+
+      // Cache the successful result
+      _setCacheData(cacheKey, _dailyUsageData);
+      print(
+          '💾 Cached daily usage data for ${_formatMonthYear(_selectedMonth)}');
     } catch (e) {
       print('❌ Error loading daily usage data: $e');
-      // Fallback to demo data
-      _dailyUsageData = [
-        EnergyBarData('8/14', 15, 5),
-        EnergyBarData('15', 25, 8),
-        EnergyBarData('16', 12, 4),
-        EnergyBarData('17', 18, 6),
-        EnergyBarData('18', 20, 7),
-        EnergyBarData('19', 14, 5),
-        EnergyBarData('Hôm nay', 22, 8),
-      ];
+      // Set empty data instead of demo data
+      _dailyUsageData = [];
+      for (int i = 6; i >= 0; i--) {
+        final date = DateTime.now().subtract(Duration(days: i));
+        String displayKey;
+        if (i == 0) {
+          displayKey = 'Hôm nay';
+        } else if (i == 1) {
+          displayKey = 'Hôm qua';
+        } else {
+          displayKey = '${date.day}/${date.month}';
+        }
+        _dailyUsageData.add(EnergyBarData(displayKey, 0.0, 0.0));
+      }
     }
   }
 
@@ -239,24 +482,14 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         colorIndex++;
       }
 
-      // Add some demo devices if no real data
+      // If no real data, leave empty instead of demo data
       if (_deviceUsageData.isEmpty) {
-        _deviceUsageData = [
-          DeviceUsageData('Máy điều hòa', 120, Colors.blue[300]!),
-          DeviceUsageData('Family Hub', 95, Colors.blue[600]!),
-          DeviceUsageData('TV', 78, Colors.cyan),
-          DeviceUsageData('Khác', 50, Colors.grey),
-        ];
+        _deviceUsageData = [];
       }
     } catch (e) {
       print('❌ Error loading device usage data: $e');
-      // Fallback to demo data
-      _deviceUsageData = [
-        DeviceUsageData('Máy điều hòa', 120, Colors.blue[300]!),
-        DeviceUsageData('Family Hub', 95, Colors.blue[600]!),
-        DeviceUsageData('TV', 78, Colors.cyan),
-        DeviceUsageData('Khác', 50, Colors.grey),
-      ];
+      // Leave empty instead of demo data
+      _deviceUsageData = [];
     }
   }
 
@@ -271,6 +504,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return SafeArea(
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -308,7 +542,12 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
 
   Widget _buildContent() {
     return RefreshIndicator(
-      onRefresh: _loadAnalyticsData,
+      onRefresh: () async {
+        // Force reload by clearing cache
+        _dataLoaded = false;
+        _lastDataLoadTime = null;
+        await _loadAnalyticsData();
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(getProportionateScreenWidth(16)),
@@ -321,6 +560,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           ),
           child: Column(
             children: [
+              _buildMonthSelector(),
+              SizedBox(height: getProportionateScreenHeight(12)),
               _buildAIEnergyModeCard(),
               SizedBox(height: getProportionateScreenHeight(12)),
               _buildMonthlyCostCard(),
@@ -342,6 +583,135 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
         ),
       ),
     );
+  }
+
+  // Month Selector Widget
+  Widget _buildMonthSelector() {
+    return Container(
+      padding: EdgeInsets.all(getProportionateScreenWidth(16)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_month,
+            color: Theme.of(context).primaryColor,
+            size: 20,
+          ),
+          SizedBox(width: getProportionateScreenWidth(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chọn tháng thống kê',
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.titleLarge?.color,
+                    fontSize: getProportionateScreenWidth(14),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: getProportionateScreenHeight(4)),
+                DropdownButton<DateTime>(
+                  value: _getValidSelectedMonth(),
+                  underline: SizedBox(),
+                  icon: Icon(Icons.arrow_drop_down,
+                      color: Theme.of(context).primaryColor),
+                  isExpanded: true,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    fontSize: getProportionateScreenWidth(12),
+                  ),
+                  onChanged: (DateTime? newMonth) {
+                    if (newMonth != null && newMonth != _selectedMonth) {
+                      _refreshDataForMonth(newMonth);
+                    }
+                  },
+                  items: _generateMonthOptions()
+                      .map<DropdownMenuItem<DateTime>>((DateTime month) {
+                    return DropdownMenuItem<DateTime>(
+                      value: month,
+                      child: Text(_formatMonthYear(month)),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          if (_isRefreshing)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Generate month options (last 12 months)
+  List<DateTime> _generateMonthOptions() {
+    final List<DateTime> months = [];
+    final now = DateTime.now();
+
+    for (int i = 0; i < 12; i++) {
+      final month = DateTime(now.year, now.month - i, 1);
+      months.add(month);
+    }
+
+    return months;
+  }
+
+  // Get valid selected month (ensure it's in the options list)
+  DateTime _getValidSelectedMonth() {
+    final options = _generateMonthOptions();
+    final normalizedSelected =
+        DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+
+    // Check if current selected month is in options
+    for (final option in options) {
+      if (option.year == normalizedSelected.year &&
+          option.month == normalizedSelected.month) {
+        return option;
+      }
+    }
+
+    // If not found, return current month (first option)
+    return options.first;
+  }
+
+  // Format month year for display
+  String _formatMonthYear(DateTime date) {
+    final months = [
+      'Tháng 1',
+      'Tháng 2',
+      'Tháng 3',
+      'Tháng 4',
+      'Tháng 5',
+      'Tháng 6',
+      'Tháng 7',
+      'Tháng 8',
+      'Tháng 9',
+      'Tháng 10',
+      'Tháng 11',
+      'Tháng 12'
+    ];
+    return '${months[date.month - 1]} ${date.year}';
   }
 
   // AI Energy Mode Card
@@ -391,9 +761,15 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                 Text(
                   _currentPowerConsumption > 0
                       ? 'Hiện tại: ${_currentPowerConsumption.toStringAsFixed(1)}W'
-                      : 'Đang tiết kiệm',
+                      : 'Chưa có dữ liệu',
                   style: TextStyle(
-                    color: Colors.blue[300],
+                    color: _currentPowerConsumption > 0
+                        ? Colors.blue[300]
+                        : Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.7),
                     fontSize: getProportionateScreenWidth(14),
                     fontWeight: FontWeight.w500,
                   ),
@@ -439,20 +815,35 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Chi phí điện tháng này',
-            style: TextStyle(
-              color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(14),
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Chi phí điện ${_formatMonthYear(_selectedMonth)}',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                  fontSize: getProportionateScreenWidth(14),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (_isRefreshing)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor),
+                  ),
+                ),
+            ],
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
           Row(
             children: [
               Flexible(
                 child: Text(
-                  '${(_monthlyCost > 0 ? _monthlyCost : 551338).toStringAsFixed(0)}',
+                  '${(_monthlyCost > 0 ? _monthlyCost.toStringAsFixed(0) : '0')}',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
                     fontSize: getProportionateScreenWidth(14),
@@ -478,7 +869,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
               SizedBox(width: getProportionateScreenWidth(4)),
               Flexible(
                 child: Text(
-                  'Tiết kiệm 178.877đ với AI',
+                  _monthlyCost > 0
+                      ? 'Tiết kiệm ${(_monthlyCost * 0.3).toStringAsFixed(0)}đ với AI'
+                      : 'Chưa có dữ liệu tiết kiệm',
                   style: TextStyle(
                     color: Colors.teal,
                     fontSize: getProportionateScreenWidth(10),
@@ -536,7 +929,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.65).toStringAsFixed(0) : '909.710')} đ',
+                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.65).toStringAsFixed(0) : '0')} đ',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
                         fontSize: getProportionateScreenWidth(10),
@@ -544,7 +937,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       ),
                     ),
                     Text(
-                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.1).toStringAsFixed(0) : '606.474')} đ',
+                      '${(_monthlyCost > 0 ? (_monthlyCost * 1.1).toStringAsFixed(0) : '0')} đ',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
                         fontSize: getProportionateScreenWidth(10),
@@ -602,7 +995,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
           ),
           SizedBox(height: getProportionateScreenHeight(16)),
           Text(
-            '${(_monthlyEnergyConsumption > 0 ? _monthlyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
+            '${(_monthlyEnergyConsumption > 0 ? _monthlyEnergyConsumption.toStringAsFixed(2) : '0.00')} kWh',
             style: TextStyle(
               color: Theme.of(context).textTheme.titleLarge?.color,
               fontSize: getProportionateScreenWidth(16),
@@ -610,7 +1003,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
             ),
           ),
           Text(
-            'Tiêu thụ ít hơn ${(_monthlyEnergyConsumption > 0 ? (_monthlyEnergyConsumption * 0.1).toStringAsFixed(2) : '29.39')} kWh so với cùng kỳ tháng trước.',
+            _monthlyEnergyConsumption > 0
+                ? 'Tiêu thụ ít hơn ${(_monthlyEnergyConsumption * 0.1).toStringAsFixed(2)} kWh so với cùng kỳ tháng trước.'
+                : 'Chưa có dữ liệu tiêu thụ năng lượng cho tháng này.',
             style: TextStyle(
               color: Theme.of(context)
                   .textTheme
@@ -819,7 +1214,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       ],
                     ),
                     Text(
-                      '${(_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption.toStringAsFixed(2) : '293.89')} kWh',
+                      '${(_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption.toStringAsFixed(2) : '0.00')} kWh',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
                         fontSize: getProportionateScreenWidth(14),
@@ -843,7 +1238,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
                       ],
                     ),
                     Text(
-                      '${((_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption : 95.35) * 0.3).toStringAsFixed(2)} kWh',
+                      '${((_dailyEnergyConsumption > 0 ? _dailyEnergyConsumption : 0.0) * 0.3).toStringAsFixed(2)} kWh',
                       style: TextStyle(
                         color: Theme.of(context).textTheme.titleLarge?.color,
                         fontSize: getProportionateScreenWidth(14),
@@ -897,14 +1292,24 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen> {
   List<Widget> _buildDeviceUsageItems() {
     if (_deviceUsageData.isEmpty) {
       return [
-        _buildDeviceUsageItem('Máy điều hòa trong phòng', '34.98 kWh',
-            '14.25 kWh', Colors.blue, Colors.teal),
-        SizedBox(height: getProportionateScreenHeight(8)),
-        _buildDeviceUsageItem(
-            'Family Hub', '27.41 kWh', '7.52 kWh', Colors.blue, Colors.teal),
-        SizedBox(height: getProportionateScreenHeight(8)),
-        _buildDeviceUsageItem(
-            'TV', '25.23 kWh', '8.78 kWh', Colors.blue, Colors.teal),
+        Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+                vertical: getProportionateScreenHeight(20)),
+            child: Text(
+              'Chưa có dữ liệu thiết bị',
+              style: TextStyle(
+                color: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.color
+                    ?.withValues(alpha: 0.7),
+                fontSize: getProportionateScreenWidth(12),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ),
       ];
     }
 
