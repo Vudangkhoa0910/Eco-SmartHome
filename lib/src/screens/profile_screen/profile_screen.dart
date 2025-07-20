@@ -14,18 +14,6 @@ class ProfileScreen extends StatelessWidget {
       builder: (context, model, child) {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          appBar: AppBar(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            actions: [
-              IconButton(
-                icon: Icon(Icons.edit,
-                    color: Theme.of(context).iconTheme.color, size: 28),
-                onPressed: () => model.editProfile(context),
-              ),
-            ],
-          ),
           body: Body(model: model),
         );
       },
