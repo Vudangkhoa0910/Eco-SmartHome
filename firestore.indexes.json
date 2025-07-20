@@ -167,6 +167,34 @@
       ]
     },
     {
+      "collectionGroup": "gate_states",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "device_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "gate_states",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "user_settings",
       "queryScope": "COLLECTION",
       "fields": [
