@@ -70,7 +70,48 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
     super.initState();
     // Ensure selected month is normalized to first day of month
     _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    _loadAnalyticsDataIfNeeded();
+    _checkDataAndLoad();
+  }
+
+  // Check if data exists, generate sample data if needed, then load
+  Future<void> _checkDataAndLoad() async {
+    try {
+      print('🔍 Checking data availability...');
+      
+      // Check if we have data
+      final dataAvailability = await _firebaseService.debugCheckDataAvailability();
+      
+      bool hasData = false;
+      for (final count in dataAvailability.values) {
+        if (count > 0) {
+          hasData = true;
+          break;
+        }
+      }
+      
+      // If no data exists, generate sample data
+      if (!hasData) {
+        print('🎯 No data found, generating sample data...');
+        setState(() {
+          _isLoading = true;
+        });
+        
+        final success = await _firebaseService.generateSampleAnalyticsData();
+        if (success) {
+          print('✅ Sample data generated successfully');
+        } else {
+          print('❌ Failed to generate sample data');
+        }
+      } else {
+        print('✅ Data exists, proceeding with normal load...');
+      }
+      
+      // Now load the analytics data
+      await _loadAnalyticsDataIfNeeded();
+    } catch (e) {
+      print('❌ Error in _checkDataAndLoad: $e');
+      await _loadAnalyticsDataIfNeeded();
+    }
   }
 
   @override
@@ -108,6 +149,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
     setState(() => _isLoading = true);
 
     try {
+      print('🔄 Starting analytics data load...');
+      
       // Load real data from Firebase with timeout
       await Future.wait([
         _loadCurrentPowerConsumption(),
@@ -120,11 +163,20 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
       if (!mounted) return;
 
+      print('🔄 Data load completed, updating UI...');
+      print('🔄 Current power: ${_currentPowerConsumption}W');
+      print('🔄 Daily energy: ${_dailyEnergyConsumption} kWh');
+      print('🔄 Monthly energy: ${_monthlyEnergyConsumption} kWh');
+      print('🔄 Monthly cost: ${_monthlyCost} VND');
+      print('🔄 Device data: ${_deviceUsageData.length} devices');
+
       setState(() {
         _isLoading = false;
         _dataLoaded = true;
         _lastDataLoadTime = DateTime.now();
       });
+      
+      print('🔄 UI updated successfully');
     } catch (e) {
       print('❌ Analytics Error: $e');
       if (!mounted) return;
@@ -136,8 +188,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
         _dailyEnergyConsumption = 0.0;
         _monthlyEnergyConsumption = 0.0;
         _monthlyCost = 0.0;
-        _dataLoaded =
-            true; // Mark as loaded even on error to prevent infinite loading
+        _dataLoaded = true; // Mark as loaded even on error to prevent infinite loading
         _lastDataLoadTime = DateTime.now();
       });
     }
@@ -239,8 +290,10 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
   Future<void> _loadCurrentPowerConsumption() async {
     try {
+      print('📊 Loading current power consumption...');
       _currentPowerConsumption =
           await _firebaseService.getCurrentPowerConsumption();
+      print('📊 Current power loaded: ${_currentPowerConsumption}W');
     } catch (e) {
       print('❌ Error loading current power: $e');
       _currentPowerConsumption = 0.0;
@@ -249,8 +302,10 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
   Future<void> _loadDailyEnergyConsumption() async {
     try {
+      print('📊 Loading daily energy consumption...');
       _dailyEnergyConsumption =
           await _firebaseService.getDailyEnergyConsumption();
+      print('📊 Daily energy loaded: ${_dailyEnergyConsumption} kWh');
     } catch (e) {
       print('❌ Error loading daily energy: $e');
       _dailyEnergyConsumption = 0.0;
@@ -263,10 +318,10 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
     final cachedData = _getCacheData<Map<String, double>>(cacheKey);
 
     if (cachedData != null) {
-      print(
-          '📋 Using cached monthly data for ${_formatMonthYear(_selectedMonth)}');
+      print('📋 Using cached monthly data for ${_formatMonthYear(_selectedMonth)}');
       _monthlyEnergyConsumption = cachedData['consumption'] ?? 0.0;
       _monthlyCost = cachedData['cost'] ?? 0.0;
+      print('📋 Cached monthly: ${_monthlyEnergyConsumption} kWh, Cost: ${_monthlyCost} VND');
       return;
     }
 
@@ -297,12 +352,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
       print('📊 Total monthly consumption: $totalConsumption kWh');
 
-      _monthlyEnergyConsumption = totalConsumption > 0
-          ? totalConsumption
-          : 0.0; // Show 0 instead of fallback to avoid confusion
-
-      // Calculate cost (1500 VND per kWh as default)
-      _monthlyCost = _monthlyEnergyConsumption * 1500;
+      _monthlyEnergyConsumption = totalConsumption;
+      _monthlyCost = _monthlyEnergyConsumption * 1500; // Calculate cost
 
       // Cache the result
       _setCacheData(cacheKey, {
@@ -454,7 +505,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
   Future<void> _loadDeviceUsageData() async {
     try {
+      print('📊 Loading device usage data...');
       _deviceStats = await _firebaseService.getDeviceStats('');
+      print('📊 Device stats loaded: ${_deviceStats.keys.length} devices');
 
       // Convert to DeviceUsageData format
       _deviceUsageData = [];
@@ -474,6 +527,8 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
             double.tryParse(stats['usage_percentage']?.toString() ?? '0') ??
                 0.0;
 
+        print('📊 Device $deviceName: ${usagePercent}%');
+
         _deviceUsageData.add(DeviceUsageData(
           deviceName,
           usagePercent,
@@ -482,8 +537,11 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
         colorIndex++;
       }
 
+      print('📊 Device usage data processed: ${_deviceUsageData.length} devices');
+
       // If no real data, leave empty instead of demo data
       if (_deviceUsageData.isEmpty) {
+        print('📊 No device usage data available');
         _deviceUsageData = [];
       }
     } catch (e) {
@@ -495,7 +553,9 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
 
   Future<void> _loadDeviceStats() async {
     try {
+      print('📊 Loading device stats...');
       _deviceStats = await _firebaseService.getDeviceStats('', timeRange: '7d');
+      print('📊 Device stats loaded: ${_deviceStats.keys.length} devices');
     } catch (e) {
       print('❌ Error loading device stats: $e');
       _deviceStats = {};
@@ -544,9 +604,22 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
     return RefreshIndicator(
       onRefresh: () async {
         // Force reload by clearing cache
+        print('🔄 Pull-to-refresh triggered');
+        _clearCache();
         _dataLoaded = false;
         _lastDataLoadTime = null;
         await _loadAnalyticsData();
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dữ liệu đã được làm mới'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -657,16 +730,82 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
               ],
             ),
           ),
-          if (_isRefreshing)
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).primaryColor),
+          SizedBox(width: getProportionateScreenWidth(8)),
+          Column(
+            children: [
+              if (_isRefreshing)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor),
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: () async {
+                    print('🔄 Manual refresh triggered');
+                    _clearCache();
+                    _dataLoaded = false;
+                    _lastDataLoadTime = null;
+                    setState(() => _isRefreshing = true);
+                    
+                    try {
+                      await _loadAnalyticsData();
+                      
+                      if (mounted) {
+                        setState(() => _isRefreshing = false);
+                        
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Dữ liệu đã được cập nhật'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      print('❌ Refresh error: $e');
+                      if (mounted) {
+                        setState(() => _isRefreshing = false);
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Lỗi khi cập nhật dữ liệu'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.refresh,
+                      color: Theme.of(context).primaryColor,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              SizedBox(height: getProportionateScreenHeight(4)),
+              Text(
+                'Làm mới',
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontSize: getProportionateScreenWidth(9),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -705,7 +844,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
       // Lấy tháng từ ngày được chọn
       final selectedMonth = DateTime(picked.year, picked.month, 1);
       if (selectedMonth != DateTime(_selectedMonth.year, _selectedMonth.month, 1)) {
-        _refreshDataForMonth(selectedMonth);
+        await _refreshDataForMonth(selectedMonth);
       }
     }
   }
@@ -773,6 +912,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                SizedBox(height: getProportionateScreenHeight(4)),
                 Text(
                   _currentPowerConsumption > 0
                       ? 'Hiện tại: ${_currentPowerConsumption.toStringAsFixed(1)}W'
@@ -785,10 +925,20 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
                             .bodyMedium
                             ?.color
                             ?.withValues(alpha: 0.7),
-                    fontSize: getProportionateScreenWidth(14),
+                    fontSize: getProportionateScreenWidth(12),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                // Debug info
+                if (_currentPowerConsumption > 0)
+                  Text(
+                    'Hôm nay: ${_dailyEnergyConsumption.toStringAsFixed(2)} kWh',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: getProportionateScreenWidth(10),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -861,7 +1011,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
                   '${(_monthlyCost > 0 ? _monthlyCost.toStringAsFixed(0) : '0')}',
                   style: TextStyle(
                     color: Theme.of(context).textTheme.titleLarge?.color,
-                    fontSize: getProportionateScreenWidth(14),
+                    fontSize: getProportionateScreenWidth(20),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -871,7 +1021,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
                 'đ',
                 style: TextStyle(
                   color: Theme.of(context).textTheme.titleLarge?.color,
-                  fontSize: getProportionateScreenWidth(12),
+                  fontSize: getProportionateScreenWidth(14),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1013,7 +1163,7 @@ class _FirebaseAnalyticsScreenState extends State<FirebaseAnalyticsScreen>
             '${(_monthlyEnergyConsumption > 0 ? _monthlyEnergyConsumption.toStringAsFixed(2) : '0.00')} kWh',
             style: TextStyle(
               color: Theme.of(context).textTheme.titleLarge?.color,
-              fontSize: getProportionateScreenWidth(16),
+              fontSize: getProportionateScreenWidth(20),
               fontWeight: FontWeight.bold,
             ),
           ),

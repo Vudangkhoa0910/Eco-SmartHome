@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:intl/intl.dart';
 
 class FirebaseDataService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -224,6 +225,10 @@ class FirebaseDataService {
     String? location,
   }) async {
     try {
+      print('🔍 Getting power consumption history');
+      print('🔍 Time range: $startTime to $endTime');
+      print('🔍 Location: ${location ?? 'all'}');
+      
       Query query = _firestore
           .collection(_powerConsumptionCollection)
           .where('created_at', isGreaterThanOrEqualTo: startTime)
@@ -235,11 +240,41 @@ class FirebaseDataService {
       }
 
       final QuerySnapshot snapshot = await query.get();
-      return snapshot.docs.map((doc) {
+      print('🔍 Found ${snapshot.docs.length} power consumption history records');
+      
+      final List<Map<String, dynamic>> result = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
+      
+      // If no power_consumption data, try sensor_data
+      if (result.isEmpty) {
+        print('🔍 No power_consumption history, trying sensor_data...');
+        Query sensorQuery = _firestore
+            .collection(_sensorDataCollection)
+            .where('created_at', isGreaterThanOrEqualTo: startTime)
+            .where('created_at', isLessThanOrEqualTo: endTime)
+            .orderBy('created_at', descending: false);
+
+        final QuerySnapshot sensorSnapshot = await sensorQuery.get();
+        print('🔍 Found ${sensorSnapshot.docs.length} sensor history records');
+        
+        final List<Map<String, dynamic>> sensorResult = sensorSnapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          // Add energy_kwh field if not present
+          if (!data.containsKey('energy_kwh')) {
+            final power = (data['power'] as num?)?.toDouble() ?? 0.0;
+            data['energy_kwh'] = power / 1000.0; // Convert W to kWh
+          }
+          return data;
+        }).toList();
+        
+        return sensorResult;
+      }
+      
+      return result;
     } catch (e) {
       print('❌ Firebase Query Exception: $e');
       return [];
@@ -282,6 +317,10 @@ class FirebaseDataService {
     String? location,
   }) async {
     try {
+      print('🔍 Getting total energy consumption');
+      print('🔍 Time range: $startTime to $endTime');
+      print('🔍 Location: ${location ?? 'all'}');
+      
       Query query = _firestore
           .collection(_powerConsumptionCollection)
           .where('created_at', isGreaterThanOrEqualTo: startTime)
@@ -292,14 +331,39 @@ class FirebaseDataService {
       }
 
       final QuerySnapshot snapshot = await query.get();
+      print('🔍 Found ${snapshot.docs.length} power consumption records');
+      
       double total = 0.0;
       
       for (final doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final energyKwh = (data['energy_kwh'] as num?)?.toDouble() ?? 0.0;
         total += energyKwh;
+        print('🔍 Record energy: ${energyKwh} kWh, Total so far: ${total} kWh');
       }
       
+      // If no power_consumption data, try sensor_data
+      if (total == 0.0) {
+        print('🔍 No power_consumption data, trying sensor_data...');
+        Query sensorQuery = _firestore
+            .collection(_sensorDataCollection)
+            .where('created_at', isGreaterThanOrEqualTo: startTime)
+            .where('created_at', isLessThanOrEqualTo: endTime);
+
+        final QuerySnapshot sensorSnapshot = await sensorQuery.get();
+        print('🔍 Found ${sensorSnapshot.docs.length} sensor records');
+        
+        for (final doc in sensorSnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final power = (data['power'] as num?)?.toDouble() ?? 0.0;
+          // Convert power to energy (assuming hourly readings)
+          final energyKwh = power / 1000.0; // Convert W to kWh
+          total += energyKwh;
+          print('🔍 Sensor power: ${power}W, Energy: ${energyKwh} kWh, Total: ${total} kWh');
+        }
+      }
+      
+      print('🔍 Final total energy: ${total} kWh');
       return total;
     } catch (e) {
       print('❌ Firebase Total Energy Query Exception: $e');
@@ -477,17 +541,41 @@ class FirebaseDataService {
   /// Get current power consumption
   Future<double> getCurrentPowerConsumption() async {
     try {
+      print('🔍 Getting current power consumption from collection: $_powerConsumptionCollection');
+      
       final QuerySnapshot snapshot = await _firestore
           .collection(_powerConsumptionCollection)
           .orderBy('created_at', descending: true)
           .limit(1)
           .get();
 
+      print('🔍 Found ${snapshot.docs.length} power consumption records');
+
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data() as Map<String, dynamic>;
-        return (data['power'] as num?)?.toDouble() ?? 0.0;
+        final power = (data['power'] as num?)?.toDouble() ?? 0.0;
+        print('🔍 Current power: ${power}W');
+        return power;
       }
       
+      // Try sensor_data collection as fallback
+      print('🔍 No power_consumption data, trying sensor_data collection...');
+      final sensorSnapshot = await _firestore
+          .collection(_sensorDataCollection)
+          .orderBy('created_at', descending: true)
+          .limit(1)
+          .get();
+
+      print('🔍 Found ${sensorSnapshot.docs.length} sensor records');
+
+      if (sensorSnapshot.docs.isNotEmpty) {
+        final data = sensorSnapshot.docs.first.data() as Map<String, dynamic>;
+        final power = (data['power'] as num?)?.toDouble() ?? 0.0;
+        print('🔍 Current power from sensor: ${power}W');
+        return power;
+      }
+      
+      print('🔍 No data found, returning 0.0');
       return 0.0;
     } catch (e) {
       print('❌ Firebase Current Power Query Exception: $e');
@@ -497,14 +585,25 @@ class FirebaseDataService {
 
   /// Get daily energy consumption
   Future<double> getDailyEnergyConsumption({DateTime? date}) async {
-    final targetDate = date ?? DateTime.now();
-    final startOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-    
-    return await getTotalEnergyConsumption(
-      startTime: startOfDay,
-      endTime: endOfDay,
-    );
+    try {
+      final targetDate = date ?? DateTime.now();
+      final startOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+      
+      print('🔍 Getting daily energy for ${DateFormat('yyyy-MM-dd').format(targetDate)}');
+      print('🔍 Time range: $startOfDay to $endOfDay');
+      
+      final result = await getTotalEnergyConsumption(
+        startTime: startOfDay,
+        endTime: endOfDay,
+      );
+      
+      print('🔍 Daily energy result: ${result} kWh');
+      return result;
+    } catch (e) {
+      print('❌ Error getting daily energy consumption: $e');
+      return 0.0;
+    }
   }
 
   /// Get monthly energy consumption
@@ -886,6 +985,107 @@ class FirebaseDataService {
     } catch (e) {
       print('❌ Firebase clear chat history error: $e');
       return false;
+    }
+  }
+
+  /// Generate sample data for testing analytics
+  Future<bool> generateSampleAnalyticsData() async {
+    try {
+      print('🎯 Generating sample analytics data...');
+      final now = DateTime.now();
+      
+      // Generate data for last 30 days
+      for (int i = 0; i < 30; i++) {
+        final date = now.subtract(Duration(days: i));
+        
+        // Generate sample power consumption data
+        final power = 500.0 + (i * 10.0) + (DateTime.now().millisecond % 200);
+        final voltage = 220.0 + (DateTime.now().millisecond % 20);
+        final current = power / voltage;
+        final energyKwh = power / 1000.0; // Convert W to kWh
+        final cost = energyKwh * 1500; // 1500 VND per kWh
+        
+        await _firestore.collection(_powerConsumptionCollection).add({
+          'power': power,
+          'voltage': voltage,
+          'current': current,
+          'energy_kwh': energyKwh,
+          'cost': cost,
+          'electricity_rate': 1500,
+          'location': 'home',
+          'timestamp': FieldValue.serverTimestamp(),
+          'created_at': date,
+        });
+        
+        // Generate sample sensor data
+        await _firestore.collection(_sensorDataCollection).add({
+          'temperature': 25.0 + (i % 10),
+          'humidity': 60.0 + (i % 20),
+          'power': power,
+          'voltage': voltage,
+          'current': current,
+          'energy_kwh': energyKwh,
+          'cost': cost,
+          'electricity_rate': 1500,
+          'timestamp': FieldValue.serverTimestamp(),
+          'location': 'home',
+          'created_at': date,
+        });
+        
+        // Generate sample device states
+        final devices = ['led_gate', 'led_around', 'motor', 'air_conditioner', 'fan'];
+        for (final device in devices) {
+          await _firestore.collection(_deviceStateCollection).add({
+            'device': device,
+            'state': (i + devices.indexOf(device)) % 2 == 0 ? 'ON' : 'OFF',
+            'value': (i + devices.indexOf(device)) % 2 == 0 ? 1 : 0,
+            'timestamp': FieldValue.serverTimestamp(),
+            'created_at': date,
+          });
+        }
+        
+        print('🎯 Generated data for day ${i + 1}/30');
+      }
+      
+      print('✅ Sample analytics data generated successfully');
+      return true;
+    } catch (e) {
+      print('❌ Error generating sample data: $e');
+      return false;
+    }
+  }
+
+  /// Debug method to check available data
+  Future<Map<String, int>> debugCheckDataAvailability() async {
+    try {
+      final Map<String, int> counts = {};
+      
+      // Check each collection
+      final collections = [
+        _sensorDataCollection,
+        _deviceStateCollection,
+        _powerConsumptionCollection,
+        _energyConsumptionCollection,
+        _electricityBillCollection,
+      ];
+      
+      for (final collection in collections) {
+        final QuerySnapshot snapshot = await _firestore
+            .collection(collection)
+            .limit(1)
+            .get();
+        counts[collection] = snapshot.docs.length;
+      }
+      
+      print('🔍 Data availability check:');
+      for (final entry in counts.entries) {
+        print('🔍 ${entry.key}: ${entry.value > 0 ? 'HAS DATA' : 'NO DATA'}');
+      }
+      
+      return counts;
+    } catch (e) {
+      print('❌ Error checking data availability: $e');
+      return {};
     }
   }
 }
