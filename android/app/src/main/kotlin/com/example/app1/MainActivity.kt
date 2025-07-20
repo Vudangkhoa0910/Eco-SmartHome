@@ -1,4 +1,4 @@
-package com.example.app1
+package com.smarthome.khoa
 
 import io.flutter.embedding.android.FlutterActivity
 
