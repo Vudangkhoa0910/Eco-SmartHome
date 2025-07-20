@@ -4,6 +4,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
+import 'package:smart_home/service/gate_state_service.dart'; // Import gate service
 
 class MqttService {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
@@ -15,7 +16,7 @@ class MqttService {
   // Firebase toggle - enable để lưu dữ liệu thực tế
   static const bool _enableFirebase = true; // Bật để lưu dữ liệu lên Firebase
 
-  // Topics from ESP32 Dev (outdoor) - Giữ nguyên cho thiết bị ngoài trời
+    // MQTT topics - outdoor ESP32 Dev
   static const String topicTemp = 'khoasmarthome/temperature';
   static const String topicHumid = 'khoasmarthome/humidity';
   static const String topicCurrent = 'khoasmarthome/current';
@@ -23,7 +24,9 @@ class MqttService {
   static const String topicPower = 'khoasmarthome/power';
   static const String topicLedGate = 'khoasmarthome/led_gate';     // đèn cổng
   static const String topicLedAround = 'khoasmarthome/led_around'; // đèn xung quanh
-  static const String topicMotor = 'khoasmarthome/motor';
+  static const String topicMotor = 'khoasmarthome/motor';          // motor cổng (tương thích cũ)
+  static const String topicGateLevel = 'khoasmarthome/gate_level'; // điều khiển mức độ cổng
+  static const String topicGateStatus = 'khoasmarthome/gate_status'; // trạng thái cổng
 
   // Topics from ESP32-S3 (indoor) - Thiết bị trong nhà
   // Sensor data from indoor ESP32-S3
@@ -49,22 +52,41 @@ class MqttService {
   // StreamControllers cho data streaming
   final StreamController<SensorData> _sensorDataController = StreamController<SensorData>.broadcast();
   final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
+  
+  // Gate control streams
+  final StreamController<Map<String, dynamic>> _gateStatusController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
 
   // Firebase service instance
   final FirebaseDataService _firebaseData = FirebaseDataService();
   final FirebaseBatchService _batchService = FirebaseBatchService();
 
-  // Firebase write throttling - chỉ ghi tối đa 1 lần mỗi 30 giây
+  // Firebase write throttling - HEAVILY REDUCED to save costs
   DateTime? _lastFirebaseWrite;
-  static const Duration _firebaseWriteInterval = Duration(seconds: 30);
+  static const Duration _firebaseWriteInterval = Duration(minutes: 5); // Only write every 5 minutes!
+  double _lastPowerValue = 0.0;
+  double _lastIndoorPowerValue = 0.0;
   
-  // Device control throttling - chỉ ghi tối đa 1 lần mỗi 5 giây cho device control
+  // Device control throttling - chỉ ghi tối đa 1 lần mỗi 30 giây cho device control (was 5 seconds!)
   DateTime? _lastDeviceWrite;
-  static const Duration _deviceWriteInterval = Duration(seconds: 5);
+  static const Duration _deviceWriteInterval = Duration(seconds: 30);
+  
+  // Track last states to avoid duplicate writes
+  final Map<String, bool> _lastLightStates = {};
+  
+  // Gate state management
+  final StreamController<int> _gateStateController = StreamController<int>.broadcast();
+  int _currentGateLevel = 0; // 0=closed, 1=33%, 2=66%, 3=open
 
   Stream<SensorData> get sensorDataStream => _sensorDataController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
+  Stream<int> get gateStateStream => _gateStateController.stream;
+  
+  // New gate control streams
+  Stream<Map<String, dynamic>> get gateStatusStream => _gateStatusController.stream;
+  Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
   bool get isConnected => _isConnected;
+  int get currentGateLevel => _currentGateLevel;
 
   // Current sensor values (with defaults)
   SensorData _currentData = SensorData.defaultData();
@@ -157,6 +179,7 @@ class MqttService {
       print('❌ Non-SSL MQTT connection error: $e');
       _isConnected = false;
       _connectionController.add(false);
+      _connectionStatusController.add(false);
       disconnect();
     }
   }
@@ -165,13 +188,18 @@ class MqttService {
     print('✅ MQTT Connected');
     _isConnected = true;
     _connectionController.add(true);
+    _connectionStatusController.add(true);
     _subscribeToTopics();
+    
+    // Initialize gate state when connected
+    initializeGateState();
   }
 
   void _onDisconnected() {
     print('❌ MQTT Disconnected');
     _isConnected = false;
     _connectionController.add(false);
+    _connectionStatusController.add(false);
   }
 
   void _onSubscribed(String topic) {
@@ -191,9 +219,17 @@ class MqttService {
   }
 
   // Firebase write throttling methods
-  bool _shouldWriteToFirebase() {
+  bool _shouldWriteToFirebaseHeavyThrottle() {
     if (_lastFirebaseWrite == null) return true;
     return DateTime.now().difference(_lastFirebaseWrite!) >= _firebaseWriteInterval;
+  }
+
+  bool _shouldWriteSignificantChange(double currentPower) {
+    // Only write if power changed significantly OR enough time passed
+    final powerChangeSignificant = (currentPower - _lastPowerValue).abs() > 50.0; // 50W change threshold
+    final timeThresholdMet = DateTime.now().difference(_lastFirebaseWrite ?? DateTime.fromMillisecondsSinceEpoch(0)) >= _firebaseWriteInterval;
+    
+    return powerChangeSignificant || timeThresholdMet;
   }
   
   bool _shouldWriteDeviceState() {
@@ -209,6 +245,8 @@ class MqttService {
       topicCurrent,
       topicVoltage,
       topicPower,
+      // Gate status topic
+      topicGateStatus,
       // Indoor ESP32-S3 topics
       topicCurrentInside,
       topicVoltageInside,
@@ -261,6 +299,9 @@ class MqttService {
         case topicPowerInside:
           _currentDataInside = _currentDataInside.copyWith(power: value);
           break;
+        case topicGateStatus:
+          _handleGateStatus(message);
+          return; // Don't process as sensor data
       }
       
       // Update timestamps
@@ -272,20 +313,25 @@ class MqttService {
       
       _sensorDataController.add(_currentData);
       
-      // Send data to Firebase asynchronously (only if enabled and with throttling)
-      if (_enableFirebase && _shouldWriteToFirebase()) {
-        // Use optimized batch service instead of direct writes
+      // Send data to Firebase asynchronously (HEAVILY THROTTLED - only every 5 minutes)
+      if (_enableFirebase && _shouldWriteToFirebaseHeavyThrottle()) {
+        // Use optimized batch service - write MUCH less frequently
         if (!topic.startsWith('inside/')) {
-          _batchService.writeSensorDataOptimized(_currentData).catchError((error) {
-            print('⚠️ Firebase batch write error: $error');
-            return false;
-          });
-          
-          // Update last write timestamp
-          _lastFirebaseWrite = DateTime.now();
+          // Only write if power changes significantly or after long time
+          if (_shouldWriteSignificantChange(_currentData.power)) {
+            _batchService.writeSensorDataOptimized(_currentData).catchError((error) {
+              print('⚠️ Firebase batch write error: $error');
+              return false;
+            });
+            
+            _lastFirebaseWrite = DateTime.now();
+            _lastPowerValue = _currentData.power;
+          }
         } else {
-          // Write only essential indoor data - less frequent
-          if (_currentDataInside.power > 5.0) { // Only write if significant power usage
+          // Write indoor data even LESS frequently - only if major power usage change
+          if (_currentDataInside.power > 10.0 && 
+              (_lastIndoorPowerValue == 0 || 
+               (_currentDataInside.power - _lastIndoorPowerValue).abs() > 5.0)) {
             _batchService.addToBatch(
               collection: 'power_consumption_optimized',
               data: {
@@ -294,13 +340,12 @@ class MqttService {
                 'voltage': _currentDataInside.voltage,
                 'current': _currentDataInside.current,
                 'type': 'indoor_consumption',
-                'efficiency': ((5.0 - _currentDataInside.voltage) / 5.0 * 100).clamp(0, 100),
                 'location': 'inside_house',
               },
             );
             
-            // Update last write timestamp  
             _lastFirebaseWrite = DateTime.now();
+            _lastIndoorPowerValue = _currentDataInside.power;
           }
         }
       }
@@ -325,28 +370,33 @@ class MqttService {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedGate, command);
     
-    // Log device state to Firebase asynchronously (with throttling)
-    if (_enableFirebase && _shouldWriteDeviceState()) {
+    // Log device state to Firebase asynchronously (HEAVILY THROTTLED)
+    if (_enableFirebase && _shouldWriteDeviceState() && isOn != (_lastLightStates['led_gate'] ?? false)) {
       _batchService.writeDeviceStateOptimized('led_gate', command, metadata: {'room': 'entrance', 'type': 'light', 'zone': 'gate'})
           .catchError((error) {
             print('⚠️ Firebase LED Gate error: $error');
             return false;
           });
       
-      // Only add power consumption to batch occasionally to save writes
-      _batchService.addToBatch(
-        collection: 'power_consumption_optimized',
-        data: {
-          'device': 'led_gate',
-          'power': isOn ? 10.0 : 0.0,
-          'voltage': _currentData.voltage,
-          'current': isOn ? 2.0 : 0.0,
-          'room': 'entrance',
-          'type': 'light',
-          'zone': 'gate',
-          'state': command,
-        },
-      );
+      // Cache state to avoid duplicates
+      _lastLightStates['led_gate'] = isOn;
+      
+      // Only add power consumption for significant power usage
+      if (isOn) {
+        _batchService.addToBatch(
+          collection: 'power_consumption_optimized',
+          data: {
+            'device': 'led_gate',
+            'power': 10.0,
+            'voltage': _currentData.voltage,
+            'current': 2.0,
+            'room': 'entrance',
+            'type': 'light',
+            'zone': 'gate',
+            'state': command,
+          },
+        );
+      }
       
       _lastDeviceWrite = DateTime.now();
     }
@@ -356,36 +406,100 @@ class MqttService {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedAround, command);
     
-    // Log device state to Firebase asynchronously (with throttling)
-    if (_enableFirebase && _shouldWriteDeviceState()) {
+    // Log device state to Firebase asynchronously (HEAVILY THROTTLED)
+    if (_enableFirebase && _shouldWriteDeviceState() && isOn != (_lastLightStates['led_around'] ?? false)) {
       _batchService.writeDeviceStateOptimized('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
           .catchError((error) {
             print('⚠️ Firebase LED Around error: $error');
             return false;
           });
       
-      // Only add power consumption to batch occasionally to save writes
-      _batchService.addToBatch(
-        collection: 'power_consumption_optimized',
-        data: {
-          'device': 'led_around',
-          'power': isOn ? 15.0 : 0.0,
-          'voltage': _currentData.voltage,
-          'current': isOn ? 3.0 : 0.0,
-          'room': 'garden',
-          'type': 'light',
-          'zone': 'around',
-          'state': command,
-        },
-      );
+      // Cache state to avoid duplicates
+      _lastLightStates['led_around'] = isOn;
+      
+      // Only add power consumption for significant power usage
+      if (isOn) {
+        _batchService.addToBatch(
+          collection: 'power_consumption_optimized',
+          data: {
+            'device': 'led_around',
+            'power': 15.0,
+            'voltage': _currentData.voltage,
+            'current': 3.0,
+            'room': 'garden',
+            'type': 'light',
+            'zone': 'around',
+            'state': command,
+          },
+        );
+      }
       
       _lastDeviceWrite = DateTime.now();
     }
   }
 
+  // CẢI TIẾN: Điều khiển cổng với percentage (0-100%)
+  Future<void> publishGateControl(int level, {bool shouldRequestStatus = false}) async {
+    try {
+      if (!_isConnected) {
+        print('❌ Cannot publish gate control: MQTT not connected');
+        return;
+      }
+
+      String command;
+      if (shouldRequestStatus) {
+        command = 'STATUS_REQUEST';
+        print('🚪 Requesting gate status from ESP32...');
+      } else if (level == -1) {
+        command = 'STOP';
+        print('🚪 Sending gate STOP command...');
+      } else if (level >= 0 && level <= 100) {
+        command = level.toString();
+        print('🚪 Sending gate control command: $level%');
+        
+        // Immediately update local state to provide responsive UI
+        _currentGateLevel = level;
+        _gateStatusController.add({
+          'level': level,
+          'isMoving': true,
+          'description': 'Đang di chuyển đến $level%...',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+      } else {
+        print('❌ Invalid gate level: $level');
+        return;
+      }
+
+      publishDeviceCommand(topicGateLevel, command);
+      print('🚪 Gate control command sent: $command');
+      
+      // Update connection status stream
+      _connectionStatusController.add(_isConnected);
+      
+    } catch (e) {
+      print('❌ Error in publishGateControl: $e');
+    }
+  }
+
+  // Deprecated: Cũ - dùng controlGateLevel để tương thích
+  void controlGateLevel(int level) {
+    if (level < 0 || level > 3) return;
+    
+    // Convert old level (0-3) to new percentage (0-100)
+    int percentage = (level * 33.33).round();
+    if (level == 3) percentage = 100; // Đảm bảo level 3 = 100%
+    
+    publishGateControl(percentage);
+    print('🚪 Điều khiển cổng đến mức $level ($percentage%)');
+  }
+
   void controlMotor(String direction) {
-    // direction can be 'FORWARD', 'REVERSE', or 'OFF'
-    publishDeviceCommand(topicMotor, direction);
+    // Tương thích ngược - chuyển đổi sang system mới
+    if (direction == 'FORWARD' || direction == 'ON') {
+      controlGateLevel(_currentGateLevel == 0 ? 3 : 0); // Toggle giữa đóng và mở hoàn toàn
+    } else {
+      publishDeviceCommand(topicMotor, direction); // Vẫn hỗ trợ lệnh cũ
+    }
     
     // Log device state to Firebase asynchronously (with throttling)
     if (_enableFirebase && _shouldWriteDeviceState()) {
@@ -395,28 +509,147 @@ class MqttService {
             return false;
           });
       
-      // Only add power consumption to batch occasionally to save writes
-      _batchService.addToBatch(
-        collection: 'power_consumption_optimized',
-        data: {
-          'device': 'motor',
-          'power': (direction == 'FORWARD' || direction == 'REVERSE') ? 50.0 : 0.0,
-          'voltage': _currentData.voltage,
-          'current': (direction == 'FORWARD' || direction == 'REVERSE') ? 10.0 : 0.0,
-          'room': 'garage',
-          'type': 'motor',
-          'zone': 'entrance',
-          'state': direction,
-        },
-      );
-      
       _lastDeviceWrite = DateTime.now();
+    }
+  }
+
+  // ========== GATE STATE MANAGEMENT ==========
+  
+  void _handleGateStatus(String statusMessage) {
+    try {
+      // Hỗ trợ nhiều format:
+      // Format mới: "level:isMoving:description" (e.g., "75:false:OPEN_75")
+      // Format cũ: "level:description" (e.g., "2:PARTIAL_66")
+      final parts = statusMessage.split(':');
+      
+      if (parts.length >= 3) {
+        // Format mới với isMoving
+        final level = int.tryParse(parts[0]) ?? 0;
+        final isMoving = parts[1].toLowerCase() == 'true';
+        final description = parts[2];
+        
+        _currentGateLevel = level;
+        
+        // Emit to old stream for backward compatibility
+        _gateStateController.add(level);
+        
+        // Emit to new detailed stream
+        _gateStatusController.add({
+          'level': level,
+          'isMoving': isMoving,
+          'description': description,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+        
+        print('🚪 Gate status updated: Level $level%, Moving: $isMoving ($description)');
+        
+        // Save to Firebase
+        if (_enableFirebase) {
+          _saveGateStateToFirebase(level, isMoving: isMoving);
+        }
+        
+      } else if (parts.length >= 2) {
+        // Format cũ - tương thích ngược
+        final level = int.tryParse(parts[0]) ?? 0;
+        _currentGateLevel = level;
+        _gateStateController.add(level);
+        
+        // Convert old level to percentage for new stream
+        int percentage = (level * 33.33).round();
+        if (level == 3) percentage = 100;
+        
+        _gateStatusController.add({
+          'level': percentage,
+          'isMoving': false,
+          'description': parts[1],
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+        
+        print('🚪 Gate status updated (legacy): Level $level -> $percentage% (${parts[1]})');
+      }
+    } catch (e) {
+      print('❌ Error parsing gate status: $e');
+    }
+  }
+  
+  Future<void> _saveGateStateToFirebase(int level, {bool isMoving = false}) async {
+    if (!_enableFirebase || !_shouldWriteDeviceState()) return;
+    
+    try {
+      // Sử dụng GateStateService mới
+      final gateService = GateStateService();
+      
+      await gateService.saveGateState(GateState(
+        level: level,
+        isMoving: isMoving,
+        timestamp: DateTime.now(),
+      ));
+      
+      print('💾 Gate state saved to Firebase: $level%, moving: $isMoving');
+      
+      // Also trigger a status update to sync with HomeScreenViewModel
+      _gateStatusController.add({
+        'level': level,
+        'isMoving': isMoving,
+        'description': _getGateDescription(level, isMoving),
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      
+    } catch (e) {
+      print('❌ Error saving gate state to Firebase: $e');
+    }
+  }
+
+  String _getGateDescription(int level, bool isMoving) {
+    if (isMoving) return 'Đang di chuyển...';
+    
+    switch (level) {
+      case 0: return 'Đóng hoàn toàn';
+      case 25: return 'Mở 1/4 - Người đi bộ';
+      case 50: return 'Mở 1/2 - Xe máy';
+      case 75: return 'Mở 3/4 - Xe hơi nhỏ';
+      case 100: return 'Mở hoàn toàn - Xe tải';
+      default: return 'Mở $level%';
     }
   }
 
   // Compatibility methods for backward compatibility (outdoor ESP32 Dev)
   void controlLed1(bool isOn) => controlLedGate(isOn);
   void controlLed2(bool isOn) => controlLedAround(isOn);
+
+  // ========== GATE STATE INITIALIZATION ==========
+  
+  Future<void> initializeGateState() async {
+    try {
+      final gateService = GateStateService();
+      final GateState currentState = await gateService.getCurrentGateState();
+      _currentGateLevel = currentState.level;
+      // Emit current state to streams
+      _gateStateController.add(_currentGateLevel);
+      _gateStatusController.add({
+        'level': currentState.level,
+        'isMoving': currentState.isMoving,
+        'description': _getGateDescription(currentState.level, currentState.isMoving),
+        'timestamp': currentState.timestamp.millisecondsSinceEpoch,
+      });
+      print('🚪 Gate state initialized from Firebase: ${currentState.level}%');
+      // Request fresh status from ESP32
+      await Future.delayed(const Duration(milliseconds: 500));
+      await publishGateControl(0, shouldRequestStatus: true);
+    } catch (e) {
+      print('❌ Error initializing gate state: $e');
+      
+      // Set default state on error
+      _currentGateLevel = 0;
+      _gateStateController.add(0);
+      _gateStatusController.add({
+        'level': 0,
+        'isMoving': false,
+        'description': 'Đóng hoàn toàn',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+    }
+  }
 
   // ========== ESP32-S3 Indoor Device Controls ==========
   
@@ -476,40 +709,48 @@ class MqttService {
     
     final isOn = command == 'ON';
     
-    // Use batch service for device state (less frequent)
-    _batchService.writeDeviceStateOptimized(deviceId, command, metadata: {
-      'floor': floor,
-      'room': room,
-      'type': 'light',
-      'controller': 'esp32_s3_indoor',
-    }).catchError((error) {
-      print('⚠️ Firebase $deviceId error: $error');
-      return false;
-    });
-    
-    // Only add power consumption to batch occasionally to save writes
-    _batchService.addToBatch(
-      collection: 'power_consumption_optimized',
-      data: {
-        'device': deviceId,
-        'power': isOn ? estimatedPower : 0.0,
-        'voltage': _currentDataInside.voltage,
-        'current': isOn ? (estimatedPower / _currentDataInside.voltage) : 0.0,
+    // Use batch service for device state (HEAVILY THROTTLED - only significant changes)
+    if (_shouldWriteDeviceState() && isOn != (_lastLightStates['led_${floor}_${room}'] ?? false)) {
+      _batchService.writeDeviceStateOptimized(deviceId, command, metadata: {
         'floor': floor,
         'room': room,
         'type': 'light',
         'controller': 'esp32_s3_indoor',
-        'state': command,
-      },
-    );
-    
-    _lastDeviceWrite = DateTime.now();
+      }).catchError((error) {
+        print('⚠️ Firebase $deviceId error: $error');
+        return false;
+      });
+      
+      // Cache the state to avoid duplicate writes
+      _lastLightStates[deviceId] = isOn;
+      
+      // Only add power consumption if state actually changed and power is significant
+      if (isOn && estimatedPower > 15.0) { // Higher threshold for power logging
+        _batchService.addToBatch(
+          collection: 'power_consumption_optimized',
+          data: {
+            'device': deviceId,
+            'power': estimatedPower,
+            'voltage': _currentDataInside.voltage,
+            'current': estimatedPower / _currentDataInside.voltage,
+            'floor': floor,
+            'room': room,
+            'type': 'light',
+            'controller': 'esp32_s3_indoor',
+            'state': command,
+          },
+        );
+      }
+      
+      _lastDeviceWrite = DateTime.now();
+    }
   }
 
   void disconnect() {
     _client?.disconnect();
     _isConnected = false;
     _connectionController.add(false);
+    _connectionStatusController.add(false);
   }
 
   void dispose() {

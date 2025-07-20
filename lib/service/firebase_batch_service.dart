@@ -12,12 +12,12 @@ class FirebaseBatchService {
   // Batch operations queue
   final List<Map<String, dynamic>> _pendingWrites = [];
   Timer? _batchTimer;
-  static const Duration _batchInterval = Duration(seconds: 10); // Batch mỗi 10 giây
-  static const int _maxBatchSize = 10; // Tối đa 10 operations per batch
+  static const Duration _batchInterval = Duration(minutes: 2); // Batch every 2 minutes (was 10 seconds!)
+  static const int _maxBatchSize = 5; // Reduce to 5 operations per batch (was 10)
   
-  // Throttling cho reads
+  // Throttling cho reads - MUCH MORE AGGRESSIVE
   final Map<String, DateTime> _lastReadTime = {};
-  static const Duration _readThrottle = Duration(minutes: 1); // Tối đa 1 read/minute per query
+  static const Duration _readThrottle = Duration(minutes: 5); // Tối đa 1 read/5 minutes per query (was 1 minute!)
 
   /// Thêm operation vào batch queue
   void addToBatch({
@@ -99,12 +99,19 @@ class FirebaseBatchService {
     }
   }
 
-  /// Optimized sensor data write with throttling
+  /// Optimized sensor data write with HEAVY throttling
   Future<bool> writeSensorDataOptimized(SensorData data) async {
-    final queryKey = 'sensor_data_${DateTime.now().minute ~/ 2}'; // Group by 2-minute windows
+    final queryKey = 'sensor_data_${DateTime.now().hour}'; // Group by HOUR windows (was 2-minute!)
     
     if (_shouldThrottleWrite(queryKey)) {
+      print('🚫 Sensor write throttled - too frequent');
       return true; // Skip write if too frequent
+    }
+
+    // Only write if power usage is significant
+    if (data.power < 10.0) {
+      print('🚫 Sensor write skipped - power too low');
+      return true; // Skip if power consumption too low
     }
 
     // Calculate energy metrics once
@@ -132,15 +139,16 @@ class FirebaseBatchService {
     return true;
   }
 
-  /// Optimized device state write with throttling
+  /// Optimized device state write with HEAVY throttling
   Future<bool> writeDeviceStateOptimized(
     String device, 
     String state, {
     Map<String, dynamic>? metadata
   }) async {
-    final queryKey = 'device_${device}_${DateTime.now().minute ~/ 1}'; // Group by 1-minute windows
+    final queryKey = 'device_${device}_${DateTime.now().hour}'; // Group by HOUR windows (was 1-minute!)
     
     if (_shouldThrottleWrite(queryKey)) {
+      print('🚫 Device write throttled: $device');
       return true; // Skip write if too frequent
     }
 
