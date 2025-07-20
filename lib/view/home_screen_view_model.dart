@@ -7,6 +7,7 @@ import 'package:smart_home/service/weather_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
 import 'package:smart_home/service/electricity_bill_service.dart';
 import 'package:smart_home/service/zone_management_service.dart';
+import 'package:smart_home/service/gate_state_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -19,6 +20,7 @@ class HomeScreenViewModel extends BaseModel {
   final MqttService _mqttService = getIt<MqttService>();
   final ElectricityBillService _billService = getIt<ElectricityBillService>();
   final ZoneManagementService _zoneService = getIt<ZoneManagementService>();
+  final GateStateService _gateService = GateStateService();
 
   //-------------VARIABLES-------------//
   String _userName = 'Đang tải...'; // Default name while loading
@@ -47,6 +49,12 @@ class HomeScreenViewModel extends BaseModel {
   bool isHallwayLightOn = false;
   bool isBalconyLightOn = false;
 
+  // Gate state management
+  int _currentGateLevel = 0;
+  bool _isGateMoving = false;
+  String _gateStatusText = 'Đang tải...';
+  StreamSubscription? _gateStatusSubscription;
+
   // Weather data
   WeatherData? _currentWeather;
   List<ForecastData> _forecast = [];
@@ -66,6 +74,7 @@ class HomeScreenViewModel extends BaseModel {
   // Constructor - Load user data immediately
   HomeScreenViewModel() {
     _loadUserData();
+    _initializeGateState();
   }
 
   // Getters
@@ -85,6 +94,11 @@ class HomeScreenViewModel extends BaseModel {
   Map<String, double> get electricityEstimation => _electricityEstimation;
   double get dailyCost => _dailyCost;
   double get monthlyCost => _monthlyCost;
+
+  // Gate state getters
+  int get currentGateLevel => _currentGateLevel;
+  bool get isGateMoving => _isGateMoving;
+  String get gateStatusText => _gateStatusText;
   ElectricityBillService get billService => _billService;
   String get currentDate {
     try {
@@ -105,6 +119,7 @@ class HomeScreenViewModel extends BaseModel {
   void dispose() {
     _sensorSubscription?.cancel();
     _connectionSubscription?.cancel();
+    _gateStatusSubscription?.cancel();
     super.dispose();
   }
 
@@ -291,9 +306,17 @@ class HomeScreenViewModel extends BaseModel {
   }
 
   void toggleMotor() {
+    // DEPRECATED: Use controlGateLevel() or Gate Control Widget instead
+    // This method is kept for legacy UI compatibility only
+    print('⚠️ toggleMotor() is deprecated - use Gate Control Widget for multi-level control');
+    
+    // Don't send any MQTT commands to avoid conflicts with gate_level topic
+    // Just update UI state for legacy compatibility
     isFanON = !isFanON;
-    _mqttService.controlMotor(isFanON ? "FORWARD" : "OFF");
     notifyListeners();
+    
+    // Show warning to user
+    print('💡 Please use the Gate Control Widget for proper gate control');
   }
 
   void controlLed2(bool isOn) {
@@ -407,5 +430,116 @@ class HomeScreenViewModel extends BaseModel {
   void setBalconyLight(bool isOn) {
     isBalconyLightOn = isOn;
     notifyListeners();
+  }
+
+  // ========== GATE STATE MANAGEMENT ==========
+  
+  Future<void> _initializeGateState() async {
+    try {
+      // Load current gate state từ Firebase
+      await _loadCurrentGateState();
+      
+      // Listen to MQTT gate status stream
+      _gateStatusSubscription = _mqttService.gateStatusStream.listen((status) {
+        _currentGateLevel = status['level'] ?? 0;
+        _isGateMoving = status['isMoving'] ?? false;
+        _gateStatusText = _getGateDescription(_currentGateLevel);
+        notifyListeners();
+      });
+      
+      // Request current status từ ESP32
+      _mqttService.publishGateControl(0, shouldRequestStatus: true);
+    } catch (e) {
+      print('❌ Error initializing gate state: $e');
+      _gateStatusText = 'Lỗi kết nối cổng';
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadCurrentGateState() async {
+    try {
+      final currentState = await _gateService.getCurrentGateState();
+      if (currentState != null) {
+        _currentGateLevel = currentState.level;
+        _isGateMoving = currentState.isMoving;
+        _gateStatusText = _getGateDescription(_currentGateLevel);
+        notifyListeners();
+      } else {
+        // No previous state, set defaults
+        _currentGateLevel = 0;
+        _isGateMoving = false;
+        _gateStatusText = 'Đóng hoàn toàn';
+        notifyListeners();
+      }
+    } catch (e) {
+      print('❌ Error loading gate state: $e');
+      _gateStatusText = 'Lỗi tải trạng thái';
+      notifyListeners();
+    }
+  }
+
+  String _getGateDescription(int level) {
+    if (_isGateMoving) return 'Đang di chuyển...';
+    
+    switch (level) {
+      case 0: return 'Đóng hoàn toàn';
+      case 25: return 'Mở 1/4 - Người đi bộ';
+      case 50: return 'Mở 1/2 - Xe máy';
+      case 75: return 'Mở 3/4 - Xe hơi nhỏ';
+      case 100: return 'Mở hoàn toàn - Xe tải';
+      default: return 'Mở $level%';
+    }
+  }
+
+  Future<void> controlGateLevel(int targetLevel) async {
+    if (_isGateMoving || targetLevel == _currentGateLevel) return;
+    
+    try {
+      _isGateMoving = true;
+      _gateStatusText = 'Đang di chuyển đến $targetLevel%...';
+      notifyListeners();
+      
+      // Send MQTT command
+      await _mqttService.publishGateControl(targetLevel);
+      
+      // Save state to Firebase
+      await _gateService.saveGateState(GateState(
+        level: targetLevel,
+        isMoving: true,
+        timestamp: DateTime.now(),
+      ));
+      
+      print('🚪 Gate control initiated: $targetLevel%');
+    } catch (e) {
+      print('❌ Error controlling gate: $e');
+      _isGateMoving = false;
+      _gateStatusText = 'Lỗi điều khiển cổng';
+      notifyListeners();
+    }
+  }
+
+  Future<void> stopGate() async {
+    try {
+      await _mqttService.publishGateControl(-1); // -1 = stop command
+      _isGateMoving = false;
+      _gateStatusText = 'Đã dừng tại $_currentGateLevel%';
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error stopping gate: $e');
+    }
+  }
+
+  Future<void> refreshGateStatus() async {
+    try {
+      _gateStatusText = 'Đang cập nhật...';
+      notifyListeners();
+      
+      await _mqttService.publishGateControl(0, shouldRequestStatus: true);
+      await _loadCurrentGateState();
+    } catch (e) {
+      print('❌ Error refreshing gate status: $e');
+      _gateStatusText = 'Lỗi cập nhật';
+      notifyListeners();
+    }
   }
 }

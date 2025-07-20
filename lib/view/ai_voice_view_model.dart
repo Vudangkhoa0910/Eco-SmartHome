@@ -1432,6 +1432,16 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       {required bool isUser}) async {
     if (_currentUserId == null) return;
 
+    // HEAVY THROTTLING for chat saves - only save important messages
+    if (!isUser && (response == null || response.length < 10)) {
+      return; // Skip saving short or empty AI responses
+    }
+
+    // Only save user messages if they're substantial commands
+    if (isUser && message.length < 5) {
+      return; // Skip saving very short user messages
+    }
+
     try {
       await _firebaseData.writeChatMessage(
         userId: _currentUserId!,
