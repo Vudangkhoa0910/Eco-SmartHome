@@ -1,73 +1,45 @@
 {
   "project_info": {
-    "project_number": "660074262019",
-    "project_id": "flutterfire-ui-codelab-77ef3",
-    "storage_bucket": "flutterfire-ui-codelab-77ef3.firebasestorage.app"
+    "project_number": "244911112023",
+    "project_id": "chat-47899",
+    "storage_bucket": "chat-47899.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:660074262019:android:aed40eaaf001c6a8436836",
-        "android_client_info": {
-          "package_name": "com.example.app1"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDw1qW-TufkYV_0_FjyLvkmWtNc3bRPz9I"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.smarthome.khoa"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:660074262019:android:13a594424f25a698436836",
+        "mobilesdk_app_id": "1:244911112023:android:m2n3o4p5q6r7s8t9u0v1w2",
         "android_client_info": {
           "package_name": "com.smarthome.khoa"
         }
       },
       "oauth_client": [
         {
-          "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
+          "client_id": "244911112023-newandroidclient12345.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smarthome.khoa",
+            "certificate_hash": "abcdef1234567890abcdef1234567890abcdef12"
+          }
+        },
+        {
+          "client_id": "244911112023-webclient12345.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDw1qW-TufkYV_0_FjyLvkmWtNc3bRPz9I"
+          "current_key": "AIzaSyAqP7mKl5XgF2h8Nj3Q9Zr6T4Vb1Wx0Ym9"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "660074262019-9kvpejqvp5uflipcd4o8ftfm7nlcanvp.apps.googleusercontent.com",
+              "client_id": "123456789012-webclient12345.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com",
+              "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
                 "bundle_id": "com.smarthome.khoa"

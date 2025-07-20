@@ -41,49 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCToC9z2MjBAJ4vYsN7ts-_oRlcirjKDJY',
-    appId: '1:660074262019:web:f05e3c5c58e2ca26436836',
-    messagingSenderId: '660074262019',
-    projectId: 'flutterfire-ui-codelab-77ef3',
-    authDomain: 'flutterfire-ui-codelab-77ef3.firebaseapp.com',
-    storageBucket: 'flutterfire-ui-codelab-77ef3.firebasestorage.app',
+    apiKey: 'AIzaSyBQqK9qTbHpYzD8K9QHl5j9kKXJm3v1nYs',
+    appId: '1:244911112023:web:a1b2c3d4e5f6g7h8i9j0k1',
+    messagingSenderId: '244911112023',
+    projectId: 'chat-47899',
+    authDomain: 'chat-47899.firebaseapp.com',
+    storageBucket: 'chat-47899.appspot.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDw1qW-TufkYV_0_FjyLvkmWtNc3bRPz9I',
-    appId: '1:660074262019:android:aed40eaaf001c6a8436836',
-    messagingSenderId: '660074262019',
-    projectId: 'flutterfire-ui-codelab-77ef3',
-    storageBucket: 'flutterfire-ui-codelab-77ef3.firebasestorage.app',
+    apiKey: 'AIzaSyAqP7mKl5XgF2h8Nj3Q9Zr6T4Vb1Wx0Ym9',
+    appId: '1:244911112023:android:m2n3o4p5q6r7s8t9u0v1w2',
+    messagingSenderId: '244911112023',
+    projectId: 'chat-47899',
+    storageBucket: 'chat-47899.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDGMMhMPk_eHxYA00FUJV3qo-oHxOrY5oY',
-    appId: '1:660074262019:ios:e10239a49cb1dd61436836',
-    messagingSenderId: '660074262019',
-    projectId: 'flutterfire-ui-codelab-77ef3',
-    storageBucket: 'flutterfire-ui-codelab-77ef3.firebasestorage.app',
-    iosClientId: '660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com',
+    apiKey: 'AIzaSyBl4hJk7uI8gF5dC2aN3eQ6wX9zP0oM1vB',
+    appId: '1:244911112023:ios:x3y4z5a6b7c8d9e0f1g2h3',
+    messagingSenderId: '244911112023',
+    projectId: 'chat-47899',
+    storageBucket: 'chat-47899.appspot.com',
+    iosClientId: '244911112023-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com',
     iosBundleId: 'com.smarthome.khoa',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDGMMhMPk_eHxYA00FUJV3qo-oHxOrY5oY',
-    appId: '1:660074262019:ios:e10239a49cb1dd61436836',
-    messagingSenderId: '660074262019',
-    projectId: 'flutterfire-ui-codelab-77ef3',
-    storageBucket: 'flutterfire-ui-codelab-77ef3.firebasestorage.app',
-    iosClientId: '660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com',
+    apiKey: 'AIzaSyBl4hJk7uI8gF5dC2aN3eQ6wX9zP0oM1vB',
+    appId: '1:244911112023:ios:x3y4z5a6b7c8d9e0f1g2h3',
+    messagingSenderId: '244911112023',
+    projectId: 'chat-47899',
+    storageBucket: 'chat-47899.appspot.com',
+    iosClientId: '244911112023-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com',
     iosBundleId: 'com.smarthome.khoa',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCToC9z2MjBAJ4vYsN7ts-_oRlcirjKDJY',
-    appId: '1:660074262019:web:e17f1e50c1cdd65e436836',
-    messagingSenderId: '660074262019',
-    projectId: 'flutterfire-ui-codelab-77ef3',
-    authDomain: 'flutterfire-ui-codelab-77ef3.firebaseapp.com',
-    storageBucket: 'flutterfire-ui-codelab-77ef3.firebasestorage.app',
+    apiKey: 'AIzaSyBQqK9qTbHpYzD8K9QHl5j9kKXJm3v1nYs',
+    appId: '1:244911112023:web:w4x5y6z7a8b9c0d1e2f3g4',
+    messagingSenderId: '244911112023',
+    projectId: 'chat-47899',
+    authDomain: 'chat-47899.firebaseapp.com',
+    storageBucket: 'chat-47899.appspot.com',
   );
 
 }

@@ -3,21 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb.apps.googleusercontent.com</string>
+	<string>244911112023-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.660074262019-f048obt9r5ar6nuk4eakhr4b71f34ttb</string>
+	<string>com.googleusercontent.apps.244911112023-abcdefghijklmnopqrstuvwxyz123456</string>
 	<key>API_KEY</key>
-	<string>AIzaSyDGMMhMPk_eHxYA00FUJV3qo-oHxOrY5oY</string>
+	<string>AIzaSyBl4hJk7uI8gF5dC2aN3eQ6wX9zP0oM1vB</string>
 	<key>GCM_SENDER_ID</key>
-	<string>660074262019</string>
+	<string>244911112023</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.smarthome.khoa</string>
 	<key>PROJECT_ID</key>
-	<string>flutterfire-ui-codelab-77ef3</string>
+	<string>chat-47899</string>
 	<key>STORAGE_BUCKET</key>
-	<string>flutterfire-ui-codelab-77ef3.firebasestorage.app</string>
+	<string>chat-47899.appspot.com</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:660074262019:ios:e10239a49cb1dd61436836</string>
+	<string>1:244911112023:ios:x3y4z5a6b7c8d9e0f1g2h3</string>
 </dict>
 </plist>
