@@ -1,49 +1,35 @@
 {
   "project_info": {
     "project_number": "244911112023",
+    "firebase_url": "https://chat-47899-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "chat-47899",
     "storage_bucket": "chat-47899.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:244911112023:android:m2n3o4p5q6r7s8t9u0v1w2",
+        "mobilesdk_app_id": "1:244911112023:android:1e022a783d5b937ba60812",
         "android_client_info": {
           "package_name": "com.smarthome.khoa"
         }
       },
       "oauth_client": [
         {
-          "client_id": "244911112023-newandroidclient12345.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.smarthome.khoa",
-            "certificate_hash": "abcdef1234567890abcdef1234567890abcdef12"
-          }
-        },
-        {
-          "client_id": "244911112023-webclient12345.apps.googleusercontent.com",
+          "client_id": "244911112023-g18iv2ak81gk8fa0p0mi4ouu4quivnam.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAqP7mKl5XgF2h8Nj3Q9Zr6T4Vb1Wx0Ym9"
+          "current_key": "AIzaSyBgdbQgGl8c2UgJX8TwE1EhZHocD5AiUMQ"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "123456789012-webclient12345.apps.googleusercontent.com",
+              "client_id": "244911112023-g18iv2ak81gk8fa0p0mi4ouu4quivnam.apps.googleusercontent.com",
               "client_type": 3
-            },
-            {
-              "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.smarthome.khoa"
-              }
             }
           ]
         }

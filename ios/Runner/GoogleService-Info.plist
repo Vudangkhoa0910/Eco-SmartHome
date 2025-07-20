@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>244911112023-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com</string>
+	<string>244911112023-1f01863ig5sd8rsdgehcpk2al8jk1u6o.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.244911112023-abcdefghijklmnopqrstuvwxyz123456</string>
+	<string>com.googleusercontent.apps.244911112023-1f01863ig5sd8rsdgehcpk2al8jk1u6o</string>
 	<key>API_KEY</key>
-	<string>AIzaSyBl4hJk7uI8gF5dC2aN3eQ6wX9zP0oM1vB</string>
+	<string>AIzaSyACgsismEZLZY6_okEz_OnIEBYJRnayqco</string>
 	<key>GCM_SENDER_ID</key>
 	<string>244911112023</string>
 	<key>PLIST_VERSION</key>
@@ -29,6 +29,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:244911112023:ios:x3y4z5a6b7c8d9e0f1g2h3</string>
+	<string>1:244911112023:ios:305f9963e21204a0a60812</string>
+	<key>DATABASE_URL</key>
+	<string>https://chat-47899-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </dict>
 </plist>
