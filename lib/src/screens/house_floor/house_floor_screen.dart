@@ -4,6 +4,7 @@ import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/src/widgets/gate_device_control_widget.dart';
 
 class HouseFloorScreen extends StatefulWidget {
   final HouseFloor floor;
@@ -362,6 +363,20 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     bool isControllable = _isDeviceControllable(device);
     bool currentState = _getDeviceState(device);
 
+    // Special handling for gate/motor devices
+    if (device.type == 'gate' || device.mqttTopic == 'khoasmarthome/motor') {
+      return GateDeviceControlWidget(
+        deviceName: device.name,
+        deviceColor: device.color,
+        onTap: () {
+          // Optional: Still allow legacy toggle for compatibility
+          if (isControllable) {
+            _toggleDevice(device);
+          }
+        },
+      );
+    }
+
     return GestureDetector(
       onTap: isControllable ? () => _toggleDevice(device) : null,
       child: Container(
@@ -488,7 +503,8 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       case 'khoasmarthome/led2':
         return !_model.isACON; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/motor':
-        return _model.isFanON;
+        // Sử dụng trạng thái cổng thực tế thay vì boolean
+        return _model.currentGateLevel > 0; // Mở nếu level > 0
       case 'khoasmarthome/led_gate':
         return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/led_around':

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
+import 'package:smart_home/src/widgets/gate_control_widget.dart';
 
 class HouseOverviewScreen extends StatelessWidget {
   const HouseOverviewScreen({Key? key}) : super(key: key);
@@ -28,16 +29,29 @@ class HouseOverviewScreen extends StatelessWidget {
               'Tổng quan nhà thông minh',
               style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                 fontWeight: FontWeight.bold,
+                color: Colors.black87,
               ),
             ),
-            SizedBox(height: getProportionateScreenHeight(10)),
+            
+            SizedBox(height: getProportionateScreenHeight(12)),
+            
             Text(
-              'Chọn khu vực để điều khiển thiết bị',
-              style: Theme.of(context).textTheme.titleMedium!.copyWith(
+              'Điều khiển và theo dõi tất cả thiết bị trong nhà',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: Colors.grey[600],
               ),
             ),
-            SizedBox(height: getProportionateScreenHeight(30)),
+            
+            SizedBox(height: getProportionateScreenHeight(20)),
+            
+            // Gate Control Widget - Prominent display
+            GateControlWidget(),
+            
+            SizedBox(height: getProportionateScreenHeight(24)),
+            
+            // Gate Control Section
+            const GateControlWidget(),
+            SizedBox(height: getProportionateScreenHeight(20)),
             
             // Floors List
             Expanded(
