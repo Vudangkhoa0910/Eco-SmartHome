@@ -1,26 +1,21 @@
 import 'package:smart_home/config/size_config.dart';
-import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_home/domain/entities/house_structure.dart';
+import 'device_selection_dialog.dart';
 
 class AddNewDevice extends StatelessWidget {
-  const AddNewDevice({Key? key}) : super(key: key);
+  final Function(SmartDevice device, String roomName, String floorName)?
+      onDeviceAdded;
+
+  const AddNewDevice({Key? key, this.onDeviceAdded}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        print('Add device widget constraints: ${constraints.maxWidth}');
-        
         return GestureDetector(
           onTap: () {
-            print('Add device widget tapped');
-            // Add functionality to add new device
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Add new device functionality'),
-                duration: Duration(seconds: 2),
-              ),
-            );
+            _showDeviceSelectionDialog(context);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -86,6 +81,39 @@ class AddNewDevice extends StatelessWidget {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showDeviceSelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return DeviceSelectionDialog(
+          onDeviceSelected: (device, roomName, floorName) {
+            // Handle the device selection
+            if (onDeviceAdded != null) {
+              onDeviceAdded!(device, roomName, floorName);
+            }
+
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Đã thêm thiết bị "${device.name}" vào $roomName'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+                behavior: SnackBarBehavior.floating,
+                margin: EdgeInsets.only(
+                  bottom: 100,
+                  left: 16,
+                  right: 16,
+                ),
+              ),
+            );
+          },
         );
       },
     );

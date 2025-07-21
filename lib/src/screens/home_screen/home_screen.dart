@@ -44,6 +44,8 @@ class HomeScreen extends StatelessWidget {
       builder: (context, model, child) {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          resizeToAvoidBottomInset: false,
+          floatingActionButtonAnimator: FloatingActionButtonAnimator.scaling,
           appBar: AppBar(
             toolbarHeight: getProportionateScreenHeight(45),
             elevation: 0,
