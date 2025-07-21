@@ -275,4 +275,68 @@ class GateStateService {
       };
     }
   }
+
+  /// Di chuyển cổng theo phần trăm tương đối (so với trạng thái hiện tại)
+  Future<_GateMoveResult> moveGateRelative(int relativePercent) async {
+    try {
+      final current = await getCurrentGateState();
+      int newLevel = (current.level + relativePercent).clamp(0, 100);
+      if (newLevel == current.level) {
+        return _GateMoveResult(
+          success: false,
+          targetLevel: current.level,
+          message: 'Cổng đã ở mức $newLevel%',
+        );
+      }
+      return _GateMoveResult(
+        success: true,
+        targetLevel: newLevel,
+        message: 'Di chuyển cổng đến $newLevel%',
+      );
+    } catch (e) {
+      return _GateMoveResult(
+        success: false,
+        targetLevel: 0,
+        message: 'Lỗi khi lấy trạng thái cổng: $e',
+      );
+    }
+  }
+  
+  /// Di chuyển cổng đến phần trăm tuyệt đối
+  Future<_GateMoveResult> moveGateAbsolute(int targetPercent) async {
+    try {
+      final current = await getCurrentGateState();
+      int newLevel = targetPercent.clamp(0, 100);
+      if (newLevel == current.level) {
+        return _GateMoveResult(
+          success: false,
+          targetLevel: current.level,
+          message: 'Cổng đã ở mức $newLevel%',
+        );
+      }
+      return _GateMoveResult(
+        success: true,
+        targetLevel: newLevel,
+        message: 'Di chuyển cổng đến $newLevel%',
+      );
+    } catch (e) {
+      return _GateMoveResult(
+        success: false,
+        targetLevel: 0,
+        message: 'Lỗi khi lấy trạng thái cổng: $e',
+      );
+    }
+  }
+}
+
+/// Kết quả di chuyển cổng
+class _GateMoveResult {
+  final bool success;
+  final int targetLevel;
+  final String message;
+  _GateMoveResult({
+    required this.success,
+    required this.targetLevel,
+    required this.message,
+  });
 }
