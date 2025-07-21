@@ -126,7 +126,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       'device_id': '2'
     },
 
-    // Motor/Cửa
+    // Motor/Cửa - More alternatives for gate
     'cửa': {
       'type': 'motor',
       'mqtt_id': 'motor_main',
@@ -137,11 +137,21 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       'mqtt_id': 'motor_gate',
       'device': 'Cổng'
     },
+    'motor': {
+      'type': 'motor',
+      'mqtt_id': 'motor_gate',
+      'device': 'Motor cổng'
+    },
+    'motor cổng': {
+      'type': 'motor',
+      'mqtt_id': 'motor_gate',
+      'device': 'Motor cổng'
+    },
   };
 
   // Các từ khóa hành động
-  final List<String> _onKeywords = ['mở', 'bật', 'khởi động', 'sáng'];
-  final List<String> _offKeywords = ['tắt', 'đóng', 'ngắt', 'tối'];
+  final List<String> _onKeywords = ['mở', 'bật', 'khởi động', 'sáng', 'mởi', 'mờ'];
+  final List<String> _offKeywords = ['tắt', 'đóng', 'ngắt', 'tối', 'đống'];
   final List<String> _adjustKeywords = [
     'chỉnh',
     'điều chỉnh',
@@ -205,6 +215,10 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     // Initialize TTS
     await _initializeTts();
 
+    // ===== MQTT CONNECTION - FIX FOR DEVICE CONTROL =====
+    // Connect MQTT service to enable device control
+    await _connectMqttService();
+
     // Load user data
     await _loadUserData();
 
@@ -212,6 +226,17 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
     _isInitializing = false;
     notifyListeners(); // Notify listeners after initialization
+  }
+
+  /// Connect MQTT service for device control
+  Future<void> _connectMqttService() async {
+    try {
+      print('🔌 AI Voice: Connecting to MQTT service...');
+      await _mqttService.connect();
+      print('✅ AI Voice: MQTT service connected successfully');
+    } catch (e) {
+      print('❌ AI Voice: Failed to connect MQTT service: $e');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -466,38 +491,68 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
   Future<void> _executeDeviceCommand(String deviceId, String action) async {
     try {
+      print('🎯 AI Voice: Executing device command - Device: $deviceId, Action: $action');
+      
+      // Check MQTT connection status first
+      if (!_mqttService.isConnected) {
+        print('⚠️ AI Voice: MQTT not connected, attempting to reconnect...');
+        await _connectMqttService();
+        
+        // Wait a bit for connection to establish
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
       final bool isOn = action.toLowerCase() == 'on';
       
       switch (deviceId) {
         case 'led_gate':
+          print('💡 AI Voice: Controlling gate LED - ${isOn ? 'ON' : 'OFF'}');
           _mqttService.controlLedGate(isOn);
           break;
         case 'led_around':
+          print('💡 AI Voice: Controlling around LED - ${isOn ? 'ON' : 'OFF'}');
           _mqttService.controlLedAround(isOn);
           break;
         case 'motor_main':
         case 'motor_gate':
           // Motor commands: OPEN, CLOSE, STOP
+          String motorCommand;
           if (action.toLowerCase() == 'on' || action.toLowerCase() == 'open') {
-            _mqttService.controlMotor('OPEN');
+            motorCommand = 'OPEN';
           } else if (action.toLowerCase() == 'off' || action.toLowerCase() == 'close') {
-            _mqttService.controlMotor('CLOSE');
+            motorCommand = 'CLOSE';
           } else {
-            _mqttService.controlMotor('STOP');
+            motorCommand = 'STOP';
+          }
+          print('🚪 AI Voice: Controlling motor - $motorCommand');
+          _mqttService.controlMotor(motorCommand);
+          
+          // Also try controlling gate by level for percentage-based control
+          if (action.toLowerCase() == 'on' || action.toLowerCase() == 'open') {
+            print('🚪 AI Voice: Also setting gate level to 100%');
+            await _mqttService.publishGateControl(100);
+          } else if (action.toLowerCase() == 'off' || action.toLowerCase() == 'close') {
+            print('🚪 AI Voice: Also setting gate level to 0%');
+            await _mqttService.publishGateControl(0);
           }
           break;
         default:
-          print('Unknown device: $deviceId');
+          print('❌ AI Voice: Unknown device: $deviceId');
       }
+      
+      print('✅ AI Voice: Device command executed successfully');
     } catch (e) {
-      print('Error executing device command: $e');
+      print('❌ AI Voice: Error executing device command: $e');
     }
   }
 
   /// Điều khiển thiết bị thông qua voice command
   Future<void> _controlDeviceByVoice(String deviceKey, String action) async {
     try {
+      print('🗣️ AI Voice: Processing voice command - Device: $deviceKey, Action: $action');
+      
       if (!_deviceCommands.containsKey(deviceKey)) {
+        print('❌ AI Voice: Device key not found: $deviceKey');
         return;
       }
 
@@ -505,6 +560,9 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       final mqttId = deviceInfo['mqtt_id'];
       final roomId = deviceInfo['room_id'];
       final deviceId = deviceInfo['device_id'];
+      final deviceName = deviceInfo['device'];
+
+      print('📋 AI Voice: Device info - MQTT ID: $mqttId, Room: $roomId, Device: $deviceId, Name: $deviceName');
 
       // Điều khiển thông qua MQTT
       await _executeDeviceCommand(mqttId, action);
@@ -513,13 +571,15 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       if (roomId != null && deviceId != null) {
         if (action.toLowerCase() == 'toggle') {
           _roomsViewModel.toggleDevice(roomId, deviceId);
+          print('🔄 AI Voice: Toggled device in UI - Room: $roomId, Device: $deviceId');
         } else {
           // Cập nhật trạng thái thiết bị trong UI
           _updateDeviceStateInUI(roomId, deviceId, action.toLowerCase() == 'on');
+          print('🔄 AI Voice: Updated device state in UI - Room: $roomId, Device: $deviceId, State: ${action.toLowerCase() == 'on'}');
         }
       }
     } catch (e) {
-      print('Error controlling device by voice: $e');
+      print('❌ AI Voice: Error controlling device by voice: $e');
     }
   }
 
@@ -592,6 +652,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
   String _processVietnameseCommand(String command) {
     final lowerCommand = command.toLowerCase();
+    print('🇻🇳 AI Voice: Processing Vietnamese command: "$command"');
 
     // Phân tích lệnh
     String action = '';
@@ -602,6 +663,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     for (String keyword in _onKeywords) {
       if (lowerCommand.contains(keyword)) {
         action = 'on';
+        print('✅ AI Voice: Found ON keyword: $keyword');
         break;
       }
     }
@@ -610,6 +672,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       for (String keyword in _offKeywords) {
         if (lowerCommand.contains(keyword)) {
           action = 'off';
+          print('✅ AI Voice: Found OFF keyword: $keyword');
           break;
         }
       }
@@ -619,6 +682,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       for (String keyword in _adjustKeywords) {
         if (lowerCommand.contains(keyword)) {
           action = 'adjust';
+          print('✅ AI Voice: Found ADJUST keyword: $keyword');
           break;
         }
       }
@@ -628,9 +692,13 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     for (String deviceKey in _deviceCommands.keys) {
       if (lowerCommand.contains(deviceKey)) {
         device = deviceKey;
+        print('✅ AI Voice: Found device: $deviceKey');
         break;
       }
     }
+
+    // Debug log: show analysis result
+    print('📊 AI Voice: Command analysis - Action: "$action", Device: "$device"');
 
     // Xác định nhiệt độ nếu có
     final tempRegex = RegExp(r'(\d+)\s*độ');
@@ -638,23 +706,27 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     if (tempMatch != null) {
       temperature = tempMatch.group(1);
       action = 'adjust';
+      print('🌡️ AI Voice: Found temperature: ${temperature}°C');
     }
 
     // Xử lý lệnh đặc biệt
     if (lowerCommand.contains('chế độ đi ngủ') ||
         lowerCommand.contains('good night')) {
+      print('🌙 AI Voice: Executing night mode');
       _executeNightMode();
       return _handleNightMode();
     }
 
     if (lowerCommand.contains('chế độ ra về') ||
         lowerCommand.contains('về nhà')) {
+      print('🏡 AI Voice: Executing home mode');
       _executeHomeMode();
       return _handleHomeMode();
     }
 
     if (lowerCommand.contains('chế độ tiết kiệm') ||
         lowerCommand.contains('tiết kiệm năng lượng')) {
+      print('🍃 AI Voice: Executing eco mode');
       _executeEcoMode();
       return _handleEcoMode();
     }
@@ -663,6 +735,8 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     if (device.isNotEmpty && _deviceCommands.containsKey(device)) {
       final deviceInfo = _deviceCommands[device]!;
       final deviceName = deviceInfo['device'];
+
+      print('🎯 AI Voice: Executing device control - Device: $deviceName, Action: $action');
 
       // Thực thi lệnh điều khiển thiết bị
       _controlDeviceByVoice(device, action);
@@ -684,6 +758,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     }
 
     // Lệnh không nhận diện được
+    print('❌ AI Voice: Command not recognized - Action: "$action", Device: "$device"');
     return 'Xin lỗi, tôi không hiểu lệnh này. Vui lòng thử lại với các lệnh như "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ". 🤔';
   }
 
@@ -717,49 +792,62 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
   /// Thực thi chế độ đi ngủ
   void _executeNightMode() {
     try {
+      print('🌙 AI Voice: Executing night mode...');
       // Tắt hầu hết đèn, chỉ giữ đèn ngủ
       _controlDeviceByVoice('đèn phòng khách', 'off');
       _controlDeviceByVoice('đèn bếp', 'off');
       _controlDeviceByVoice('đèn cổng', 'off');
+      _controlDeviceByVoice('đèn xung quanh', 'off');
       
       // Bật đèn phòng ngủ với độ sáng thấp
       _controlDeviceByVoice('đèn phòng ngủ', 'on');
       
       // Tắt TV và thiết bị giải trí
       _controlDeviceByVoice('tivi', 'off');
+      
+      print('✅ AI Voice: Night mode executed successfully');
     } catch (e) {
-      print('Error executing night mode: $e');
+      print('❌ AI Voice: Error executing night mode: $e');
     }
   }
 
   /// Thực thi chế độ về nhà
   void _executeHomeMode() {
     try {
+      print('🏡 AI Voice: Executing home mode...');
       // Bật đèn chính
       _controlDeviceByVoice('đèn phòng khách', 'on');
       _controlDeviceByVoice('đèn cổng', 'on');
+      _controlDeviceByVoice('đèn xung quanh', 'on');
       
       // Bật quạt phòng khách
       _controlDeviceByVoice('quạt phòng khách', 'on');
       
       // Mở cổng (nếu có)
       _controlDeviceByVoice('cổng', 'on');
+      
+      print('✅ AI Voice: Home mode executed successfully');
     } catch (e) {
-      print('Error executing home mode: $e');
+      print('❌ AI Voice: Error executing home mode: $e');
     }
   }
 
   /// Thực thi chế độ tiết kiệm năng lượng
   void _executeEcoMode() {
     try {
+      print('🍃 AI Voice: Executing eco mode...');
       // Tắt các thiết bị không cần thiết
       _controlDeviceByVoice('tivi', 'off');
       _controlDeviceByVoice('đèn xung quanh', 'off');
+      _controlDeviceByVoice('đèn bếp', 'off');
       
       // Giảm quạt
       _controlDeviceByVoice('quạt phòng khách', 'off');
+      _controlDeviceByVoice('quạt phòng ngủ', 'off');
+      
+      print('✅ AI Voice: Eco mode executed successfully');
     } catch (e) {
-      print('Error executing eco mode: $e');
+      print('❌ AI Voice: Error executing eco mode: $e');
     }
   }
 
@@ -1585,12 +1673,22 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
 
   @override
   void dispose() {
-    // Remove observer
+    // Remove observer to prevent memory leaks
     WidgetsBinding.instance.removeObserver(this);
 
+    // Cleanup text controller
     _chatController.dispose();
-    _speechToText.cancel();
+    
+    // Stop speech recognition if active
+    if (_isListening) {
+      _speechToText.cancel();
+    }
+    
+    // Cleanup TTS
     _flutterTts.stop();
+    
+    print('🧹 AI Voice: Disposed resources and cleaned up');
+    
     super.dispose();
   }
 
