@@ -5,6 +5,7 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
 import 'package:smart_home/service/mqtt_service.dart'; // Import để sử dụng SensorData
+import 'package:smart_home/service/device_state_service.dart'; // Import device state service
 
 class MqttServiceSimple {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
@@ -24,6 +25,12 @@ class MqttServiceSimple {
   static const String topicMotor = 'khoasmarthome/motor';
   static const String topicGateLevel = 'khoasmarthome/gate_level';
   static const String topicGateStatus = 'khoasmarthome/gate_status';
+  
+  // Device status topics
+  static const String topicDeviceStatus = 'khoasmarthome/device_status';
+  static const String topicLedGateStatus = 'khoasmarthome/led_gate/status';
+  static const String topicLedAroundStatus = 'khoasmarthome/led_around/status';
+  static const String topicStatusRequest = 'khoasmarthome/status_request';
 
   MqttServerClient? _client;
   bool _isConnected = false;
@@ -41,6 +48,9 @@ class MqttServiceSimple {
 
   // Firebase services
   final FirebaseBatchService _batchService = FirebaseBatchService();
+  
+  // Device state service
+  final DeviceStateService _deviceStateService = DeviceStateService();
 
   // Current data
   SensorData _currentData = SensorData.defaultData();
@@ -60,6 +70,10 @@ class MqttServiceSimple {
       _gateStatusController.stream;
   bool get isConnected => _isConnected;
   int get currentGateLevel => _currentGateLevel;
+  
+  // Device state getters
+  DeviceStateService get deviceStateService => _deviceStateService;
+  Stream<Map<String, bool>> get deviceStateStream => _deviceStateService.stateStream;
 
   // Initialize MQTT
   Future<void> initialize() async {
@@ -99,8 +113,14 @@ class MqttServiceSimple {
     _connectionController.add(true);
     print('✅ MQTT Connected');
 
+    // Initialize device states
+    _deviceStateService.initializeDefaultStates();
+    
     // Initialize gate state when connected
     initializeGateState();
+    
+    // Request all device status from ESP32
+    _requestAllDeviceStatus();
   }
 
   // Initialize gate state from Firebase and sync with ESP32
@@ -167,6 +187,10 @@ class MqttServiceSimple {
       topicVoltage,
       topicPower,
       topicGateStatus,
+      // Device status topics
+      topicDeviceStatus,
+      topicLedGateStatus,
+      topicLedAroundStatus,
     ];
 
     for (String topic in topics) {
@@ -188,6 +212,23 @@ class MqttServiceSimple {
 
     if (topic == topicGateStatus) {
       _handleGateStatus(message);
+      return;
+    }
+
+    // Handle device status messages
+    if (topic == topicDeviceStatus) {
+      _deviceStateService.parseDeviceStatusJson(message);
+      return;
+    }
+    
+    // Handle individual device status
+    if (topic == topicLedGateStatus) {
+      _deviceStateService.updateDeviceState('led_gate', message.toUpperCase() == 'ON', source: 'ESP32');
+      return;
+    }
+    
+    if (topic == topicLedAroundStatus) {
+      _deviceStateService.updateDeviceState('led_around', message.toUpperCase() == 'ON', source: 'ESP32');
       return;
     }
 
@@ -483,6 +524,60 @@ class MqttServiceSimple {
   
   Future<bool> closeGateCompletely() => moveGateAbsolute(0);
 
+  // Request all device status from ESP32
+  Future<void> _requestAllDeviceStatus() async {
+    if (!_isConnected || _client == null) return;
+    
+    try {
+      // Wait a bit for ESP32 to be ready
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      print('📡 Requesting all device status from ESP32...');
+      await _client!.publishMessage(
+        topicStatusRequest,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString('ALL_DEVICES').payload!,
+      );
+      
+      // Also request individual device status
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _client!.publishMessage(
+        topicStatusRequest,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString('LED_GATE').payload!,
+      );
+      
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _client!.publishMessage(
+        topicStatusRequest,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString('LED_AROUND').payload!,
+      );
+      
+      print('✅ Device status requests sent');
+    } catch (e) {
+      print('❌ Error requesting device status: $e');
+    }
+  }
+
+  // Public method to request device status
+  Future<void> requestDeviceStatus([String? specificDevice]) async {
+    if (!_isConnected || _client == null) return;
+    
+    try {
+      String command = specificDevice ?? 'ALL_DEVICES';
+      print('📡 Requesting device status: $command');
+      
+      await _client!.publishMessage(
+        topicStatusRequest,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString(command).payload!,
+      );
+    } catch (e) {
+      print('❌ Error requesting device status: $e');
+    }
+  }
+
   void disconnect() {
     _client?.disconnect();
     _isConnected = false;
@@ -496,5 +591,6 @@ class MqttServiceSimple {
     _connectionController.close();
     _gateStateController.close();
     _gateStatusController.close();
+    _deviceStateService.dispose(); // Dispose device state service
   }
 }

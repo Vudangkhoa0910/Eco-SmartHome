@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/device_state_service.dart';
 import 'package:smart_home/src/widgets/gate_device_control_widget.dart';
 
 class HouseFloorScreen extends StatefulWidget {
@@ -24,6 +26,9 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   String? _expandedRoomName;
   final HomeScreenViewModel _model = getIt<HomeScreenViewModel>();
   final MqttService _mqttService = getIt<MqttService>();
+  final DeviceStateService _deviceStateService = DeviceStateService();
+  
+  late StreamSubscription _deviceStateSubscription;
 
   @override
   void initState() {
@@ -32,11 +37,21 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    
+    // Listen to device state changes
+    _deviceStateSubscription = _deviceStateService.stateStream.listen((states) {
+      if (mounted) {
+        setState(() {
+          // Trigger rebuild when device states change
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _deviceStateSubscription.cancel();
     super.dispose();
   }
 
@@ -395,45 +410,48 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min, // Add this to prevent overflow
           children: [
             // Device Icon với hiệu ứng - Smaller
             Container(
-              padding: EdgeInsets.all(getProportionateScreenWidth(6)),
+              padding: EdgeInsets.all(getProportionateScreenWidth(4)), // Reduced from 6
               decoration: BoxDecoration(
                 color: currentState
                     ? device.color.withOpacity(0.2)
                     : Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6), // Reduced from 8
               ),
               child: Icon(
                 device.icon,
                 color: currentState ? device.color : Colors.grey,
-                size: 18,
+                size: 16, // Reduced from 18
               ),
             ),
 
-            SizedBox(height: getProportionateScreenHeight(4)),
+            SizedBox(height: getProportionateScreenHeight(2)), // Reduced from 4
 
             // Device Name - Smaller
-            Text(
-              device.name,
-              style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: currentState ? device.color : Colors.grey[700],
-                    fontSize: 11,
-                  ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Flexible( // Wrap with Flexible to prevent overflow
+              child: Text(
+                device.name,
+                style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: currentState ? device.color : Colors.grey[700],
+                      fontSize: 10, // Reduced from 11
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
 
-            SizedBox(height: getProportionateScreenHeight(2)),
+            SizedBox(height: getProportionateScreenHeight(1)), // Reduced from 2
 
             // Status Indicator - Smaller
             Container(
               padding: EdgeInsets.symmetric(
-                horizontal: getProportionateScreenWidth(4),
-                vertical: getProportionateScreenHeight(1),
+                horizontal: getProportionateScreenWidth(3), // Reduced from 4
+                vertical: getProportionateScreenHeight(0.5), // Reduced from 1
               ),
               decoration: BoxDecoration(
                 color: isControllable
@@ -441,7 +459,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
                         ? Colors.green.withOpacity(0.2)
                         : Colors.grey.withOpacity(0.2))
                     : Colors.orange.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(3), // Reduced from 4
               ),
               child: Text(
                 isControllable ? (currentState ? 'BẬT' : 'TẮT') : 'N/A',
@@ -449,7 +467,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
                   color: isControllable
                       ? (currentState ? Colors.green : Colors.grey)
                       : Colors.orange,
-                  fontSize: 8,
+                  fontSize: 7, // Reduced from 8
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -496,18 +514,26 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   }
 
   bool _getDeviceState(SmartDevice device) {
+    // Extract device id from MQTT topic for device state service
+    String deviceId = _extractDeviceId(device.mqttTopic);
+    
+    // For specific ESP32 devices, use device state service
+    switch (device.mqttTopic) {
+      case 'khoasmarthome/led_gate':
+        return _deviceStateService.getDeviceState('led_gate');
+      case 'khoasmarthome/led_around':
+        return _deviceStateService.getDeviceState('led_around');
+      case 'khoasmarthome/motor':
+        // Sử dụng trạng thái cổng thực tế thay vì boolean
+        return _model.currentGateLevel > 0; // Mở nếu level > 0
+    }
+    
+    // For legacy devices, keep existing logic
     switch (device.mqttTopic) {
       // ESP32 Dev (outdoor) devices
       case 'khoasmarthome/led1':
         return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/led2':
-        return !_model.isACON; // Đảo trạng thái vì ESP32 dùng cực âm
-      case 'khoasmarthome/motor':
-        // Sử dụng trạng thái cổng thực tế thay vì boolean
-        return _model.currentGateLevel > 0; // Mở nếu level > 0
-      case 'khoasmarthome/led_gate':
-        return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
-      case 'khoasmarthome/led_around':
         return !_model.isACON; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/awning':
         return _model.isSpeakerON; // Sử dụng state speaker cho mái che
@@ -554,9 +580,56 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     }
   }
 
+  // Helper function to extract device ID from MQTT topic
+  String _extractDeviceId(String mqttTopic) {
+    switch (mqttTopic) {
+      case 'khoasmarthome/led_gate':
+        return 'led_gate';
+      case 'khoasmarthome/led_around':
+        return 'led_around';
+      case 'inside/kitchen_light':
+        return 'kitchen_light';
+      case 'inside/living_room_light':
+        return 'living_room_light';
+      case 'inside/bedroom_light':
+        return 'bedroom_light';
+      case 'inside/corner_bedroom_light':
+        return 'corner_bedroom_light';
+      case 'inside/yard_bedroom_light':
+        return 'yard_bedroom_light';
+      case 'inside/worship_room_light':
+        return 'worship_room_light';
+      case 'inside/hallway_light':
+        return 'hallway_light';
+      case 'inside/balcony_light':
+        return 'balcony_light';
+      default:
+        // Extract from topic format: prefix/device_name or prefix/device_name/status
+        final parts = mqttTopic.split('/');
+        return parts.length >= 2 ? parts.last : mqttTopic;
+    }
+  }
+
   void _toggleDevice(SmartDevice device) {
+    String deviceId = _extractDeviceId(device.mqttTopic);
+    bool currentState = _getDeviceState(device);
+    bool newState = !currentState;
+    
+    // Update device state service first
+    _deviceStateService.updateDeviceState(deviceId, newState, source: 'UI');
+    
     switch (device.mqttTopic) {
-      // ESP32 Dev (outdoor) devices
+      // ESP32 devices - use direct MQTT control
+      case 'khoasmarthome/led_gate':
+        _mqttService.controlLedGate(newState);
+        print('🔄 UI: LED Gate = $newState via MQTT');
+        break;
+      case 'khoasmarthome/led_around':
+        _mqttService.controlLedAround(newState);
+        print('🔄 UI: LED Around = $newState via MQTT');
+        break;
+        
+      // Legacy ESP32 Dev devices
       case 'khoasmarthome/led1':
         _model.toggleLed1();
         break;
@@ -565,14 +638,6 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         break;
       case 'khoasmarthome/motor':
         _model.toggleMotor();
-        break;
-      case 'khoasmarthome/led_gate':
-        // Điều khiển đèn cổng từ ESP32
-        _model.toggleLed1(); // Sử dụng cùng logic với led1 để điều khiển LED Gate
-        break;
-      case 'khoasmarthome/led_around':
-        // Điều khiển đèn xung quanh từ ESP32
-        _model.toggleLed2(); // Sử dụng cùng logic với led2 để điều khiển LED Around
         break;
       case 'khoasmarthome/awning':
         // Điều khiển mái che
