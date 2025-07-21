@@ -198,12 +198,13 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
 
                 SizedBox(height: getProportionateScreenHeight(15)),
 
-                // Step 2: Device Type Selection
-                _buildStepHeader(2, 'Chọn loại thiết bị', selectedRoom != null),
+                // Step 2: Device Selection from Available Devices
+                _buildStepHeader(
+                    2, 'Chọn thiết bị có sẵn', selectedRoom != null),
                 if (selectedRoom != null) ...[
                   SizedBox(height: getProportionateScreenHeight(5)),
                   Text(
-                    'Các loại thiết bị có sẵn trong ${selectedRoom}:',
+                    'Các thiết bị có sẵn trong ${selectedRoom}:',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -214,28 +215,21 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                 SizedBox(height: getProportionateScreenHeight(10)),
 
                 Container(
-                  height: getProportionateScreenHeight(110),
+                  height: getProportionateScreenHeight(180),
                   child: selectedRoom != null
                       ? () {
-                          final availableTypes =
-                              _getAvailableDeviceTypesForRoom();
-                          if (availableTypes.isEmpty) {
+                          final availableDevices =
+                              _getAvailableDevicesForRoom();
+                          if (availableDevices.isEmpty) {
                             return _buildDisabledSection(
                                 'Không có thiết bị nào trong phòng này');
                           }
-                          return GridView.count(
-                            crossAxisCount: 4,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 4,
-                            childAspectRatio: 0.85,
-                            children: availableTypes.map((deviceType) {
-                              if (availableDeviceTypes
-                                  .containsKey(deviceType)) {
-                                return _buildDeviceTypeCard(deviceType,
-                                    availableDeviceTypes[deviceType]!);
-                              }
-                              return Container(); // Fallback for unknown device types
-                            }).toList(),
+                          return ListView.builder(
+                            itemCount: availableDevices.length,
+                            itemBuilder: (context, index) {
+                              final device = availableDevices[index];
+                              return _buildDeviceCard(device);
+                            },
                           );
                         }()
                       : _buildDisabledSection(
@@ -244,30 +238,30 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
 
                 SizedBox(height: getProportionateScreenHeight(15)),
 
-                // Step 3: Device Name Input
+                // Step 3: Device Name Confirmation
                 _buildStepHeader(
-                    3, 'Đặt tên thiết bị', selectedDeviceType != null),
+                    3, 'Xác nhận thông tin thiết bị', selectedDevice != null),
                 SizedBox(height: getProportionateScreenHeight(10)),
 
                 TextField(
                   controller: deviceNameController,
-                  enabled: selectedDeviceType != null,
+                  enabled: selectedDevice != null,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
-                    hintText: selectedDeviceType != null
-                        ? 'Nhập tên thiết bị...'
-                        : 'Chọn loại thiết bị trước',
+                    labelText: 'Tên thiết bị',
+                    hintText: selectedDevice != null
+                        ? 'Có thể đổi tên thiết bị...'
+                        : 'Chọn thiết bị trước',
                     hintStyle: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 14,
                     ),
                     filled: true,
-                    fillColor: selectedDeviceType != null 
-                        ? Colors.white 
-                        : Colors.grey[50],
+                    fillColor:
+                        selectedDevice != null ? Colors.white : Colors.grey[50],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
@@ -302,6 +296,77 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                     ),
                   ),
                 ),
+
+                if (selectedDevice != null) ...[
+                  SizedBox(height: getProportionateScreenHeight(10)),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blue.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thông tin thiết bị:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              'Loại: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            Text(
+                              _getDeviceTypeName(selectedDevice!.type),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              'MQTT Topic: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                selectedDevice!.mqttTopic,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                  fontFamily: 'monospace',
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 SizedBox(height: getProportionateScreenHeight(20)),
 
@@ -345,8 +410,8 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _canAddDevice() 
-                              ? Color(0xFF6B73FF) 
+                          backgroundColor: _canAddDevice()
+                              ? Color(0xFF6B73FF)
                               : Colors.grey[400],
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(
@@ -370,8 +435,8 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
     );
   }
 
-  // Get available device types for selected room
-  List<String> _getAvailableDeviceTypesForRoom() {
+  // Get available devices for selected room
+  List<SmartDevice> _getAvailableDevicesForRoom() {
     if (selectedFloor == null || selectedRoom == null) {
       return [];
     }
@@ -380,29 +445,124 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
     final floor = floors.firstWhere((f) => f.name == selectedFloor);
     final room = floor.rooms.firstWhere((r) => r.name == selectedRoom);
 
-    // Get unique device types from the selected room
-    final Set<String> roomDeviceTypes =
-        room.devices.map((device) => device.type).toSet();
-
-    return roomDeviceTypes.toList();
+    // Return all devices from the selected room
+    return room.devices;
   }
 
-  // Get count of each device type in selected room
-  Map<String, int> _getDeviceTypeCountInRoom() {
-    if (selectedFloor == null || selectedRoom == null) {
-      return {};
+  SmartDevice? selectedDevice;
+
+  Widget _buildDeviceCard(SmartDevice device) {
+    final isSelected = selectedDevice?.name == device.name;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedDevice = device;
+            selectedDeviceType = device.type;
+            deviceNameController.text = device.name;
+          });
+        },
+        child: Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? device.color.withOpacity(0.1)
+                : Colors.grey.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? device.color : Colors.grey.withOpacity(0.3),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: device.color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  device.icon,
+                  color: device.color,
+                  size: 20,
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      device.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? device.color : Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Loại: ${_getDeviceTypeName(device.type)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      'Topic: ${device.mqttTopic}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[500],
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: device.color,
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getDeviceTypeName(String deviceType) {
+    switch (deviceType) {
+      case 'light':
+        return 'Đèn LED';
+      case 'gate':
+        return 'Cổng tự động';
+      case 'awning':
+        return 'Mái che';
+      case 'sprinkler':
+        return 'Hệ thống tưới';
+      case 'ac':
+        return 'Điều hòa';
+      case 'speaker':
+        return 'Loa thông minh';
+      case 'fan':
+        return 'Quạt';
+      case 'tv':
+        return 'TV thông minh';
+      case 'camera':
+        return 'Camera an ninh';
+      case 'sensor':
+        return 'Cảm biến';
+      case 'switch':
+        return 'Công tắc';
+      default:
+        return deviceType;
     }
-
-    final floors = HouseData.getHouseStructure();
-    final floor = floors.firstWhere((f) => f.name == selectedFloor);
-    final room = floor.rooms.firstWhere((r) => r.name == selectedRoom);
-
-    final Map<String, int> deviceCount = {};
-    for (final device in room.devices) {
-      deviceCount[device.type] = (deviceCount[device.type] ?? 0) + 1;
-    }
-
-    return deviceCount;
   }
 
   Widget _buildStepHeader(int step, String title, bool isActive) {
@@ -504,7 +664,7 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      item.child is Text 
+                      item.child is Text
                           ? (item.child as Text).data ?? ''
                           : item.value ?? '',
                       style: TextStyle(
@@ -521,68 +681,6 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDeviceTypeCard(
-      String deviceType, Map<String, dynamic> deviceInfo) {
-    final isSelected = selectedDeviceType == deviceType;
-    final deviceCounts = _getDeviceTypeCountInRoom();
-    final count = deviceCounts[deviceType] ?? 0;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedDeviceType = deviceType;
-          deviceNameController.text = deviceInfo['name'];
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? deviceInfo['color'].withOpacity(0.2)
-              : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? deviceInfo['color'] : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              deviceInfo['icon'],
-              color: isSelected ? deviceInfo['color'] : Colors.grey,
-              size: 18,
-            ),
-            SizedBox(height: 2),
-            Text(
-              _getShortDeviceName(deviceType),
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? deviceInfo['color'] : Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (count > 0) ...[
-              SizedBox(height: 1),
-              Text(
-                '($count có sẵn)',
-                style: TextStyle(
-                  fontSize: 7,
-                  color: isSelected ? deviceInfo['color'] : Colors.grey[500],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
@@ -606,61 +704,23 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
   }
 
   bool _canAddDevice() {
-    return selectedDeviceType != null &&
+    return selectedDevice != null &&
         deviceNameController.text.isNotEmpty &&
         selectedFloor != null &&
         selectedRoom != null;
   }
 
-  String _getShortDeviceName(String deviceType) {
-    switch (deviceType) {
-      case 'light':
-        return 'Đèn';
-      case 'gate':
-        return 'Cổng';
-      case 'awning':
-        return 'Mái che';
-      case 'sprinkler':
-        return 'Tưới';
-      case 'ac':
-        return 'Điều hòa';
-      case 'speaker':
-        return 'Loa';
-      case 'fan':
-        return 'Quạt';
-      case 'tv':
-        return 'TV';
-      case 'camera':
-        return 'Camera';
-      case 'sensor':
-        return 'Cảm biến';
-      case 'switch':
-        return 'Công tắc';
-      default:
-        return deviceType.toUpperCase();
-    }
-  }
-
   void _addDevice() {
-    if (!_canAddDevice()) return;
+    if (!_canAddDevice() || selectedDevice == null) return;
 
-    final deviceInfo = availableDeviceTypes[selectedDeviceType]!;
-
-    // Generate MQTT topic based on device name
-    final deviceNameSlug = deviceNameController.text
-        .toLowerCase()
-        .replaceAll(' ', '_')
-        .replaceAll(RegExp(r'[^\w_]'), '');
-
-    final mqttTopic = '${deviceInfo['mqttTopicPrefix']}$deviceNameSlug';
-
+    // Create a copy of the selected device with custom name if changed
     final newDevice = SmartDevice(
-      name: deviceNameController.text,
-      type: selectedDeviceType!,
-      isOn: false,
-      icon: deviceInfo['icon'],
-      mqttTopic: mqttTopic,
-      color: deviceInfo['color'],
+      name: deviceNameController.text.trim(),
+      type: selectedDevice!.type,
+      isOn: false, // Start with device off
+      icon: selectedDevice!.icon,
+      mqttTopic: selectedDevice!.mqttTopic, // Use the original MQTT topic
+      color: selectedDevice!.color,
     );
 
     widget.onDeviceSelected(newDevice, selectedRoom!, selectedFloor!);
