@@ -27,7 +27,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   final HomeScreenViewModel _model = getIt<HomeScreenViewModel>();
   final MqttService _mqttService = getIt<MqttService>();
   final DeviceStateService _deviceStateService = DeviceStateService();
-  
+
   late StreamSubscription _deviceStateSubscription;
 
   @override
@@ -37,7 +37,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // Listen to device state changes
     _deviceStateSubscription = _deviceStateService.stateStream.listen((states) {
       if (mounted) {
@@ -414,7 +414,8 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
           children: [
             // Device Icon với hiệu ứng - Smaller
             Container(
-              padding: EdgeInsets.all(getProportionateScreenWidth(4)), // Reduced from 6
+              padding: EdgeInsets.all(
+                  getProportionateScreenWidth(4)), // Reduced from 6
               decoration: BoxDecoration(
                 color: currentState
                     ? device.color.withOpacity(0.2)
@@ -431,13 +432,15 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
             SizedBox(height: getProportionateScreenHeight(2)), // Reduced from 4
 
             // Device Name - Smaller
-            Flexible( // Wrap with Flexible to prevent overflow
+            Flexible(
+              // Wrap with Flexible to prevent overflow
               child: Text(
                 device.name,
                 style: Theme.of(context).textTheme.bodySmall!.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: currentState ? device.color : Colors.grey[700],
-                      fontSize: 10, // Reduced from 11
+                      color: device
+                          .textColor, // Sử dụng textColor thay vì logic điều kiện
+                      fontSize: 11,
                     ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -490,19 +493,19 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'khoasmarthome/yard_main_light', // Đèn sân chính
       'khoasmarthome/fish_pond_light', // Đèn khu bể cá
       'khoasmarthome/awning_light', // Đèn mái hiên
-      
+
       // ESP32-S3 (indoor) topics - Floor 1
       'inside/kitchen_light', // Đèn bếp lớn
       'inside/living_room_light', // Đèn phòng khách
       'inside/bedroom_light', // Đèn phòng ngủ
-      
+
       // ESP32-S3 (indoor) topics - Floor 2
       'inside/corner_bedroom_light', // Đèn phòng ngủ góc
       'inside/yard_bedroom_light', // Đèn phòng ngủ sân
       'inside/worship_room_light', // Đèn phòng thờ
       'inside/hallway_light', // Đèn hành lang
       'inside/balcony_light', // Đèn ban công lớn
-      
+
       // Legacy topics for compatibility
       'khoasmarthome/living_room_light', // Đèn phòng khách (legacy)
       'khoasmarthome/kitchen_light', // Đèn phòng bếp (legacy)
@@ -516,7 +519,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   bool _getDeviceState(SmartDevice device) {
     // Extract device id from MQTT topic for device state service
     String deviceId = _extractDeviceId(device.mqttTopic);
-    
+
     // For specific ESP32 devices, use device state service
     switch (device.mqttTopic) {
       case 'khoasmarthome/led_gate':
@@ -527,7 +530,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         // Sử dụng trạng thái cổng thực tế thay vì boolean
         return _model.currentGateLevel > 0; // Mở nếu level > 0
     }
-    
+
     // For legacy devices, keep existing logic
     switch (device.mqttTopic) {
       // ESP32 Dev (outdoor) devices
@@ -543,7 +546,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.isLightFav; // Sử dụng state favourite cho đèn bể cá
       case 'khoasmarthome/awning_light':
         return _model.isACFav; // Sử dụng AC favourite cho đèn mái hiên
-      
+
       // ESP32-S3 (indoor) devices - Floor 1
       case 'inside/kitchen_light':
         return _model.isKitchenLightOn; // State riêng cho đèn bếp
@@ -551,10 +554,11 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.isLivingRoomLightOn; // State riêng cho đèn phòng khách
       case 'inside/bedroom_light':
         return _model.isBedroomLightOn; // State riêng cho đèn phòng ngủ
-      
+
       // ESP32-S3 (indoor) devices - Floor 2
       case 'inside/corner_bedroom_light':
-        return _model.isCornerBedroomLightOn; // State riêng cho đèn phòng ngủ góc
+        return _model
+            .isCornerBedroomLightOn; // State riêng cho đèn phòng ngủ góc
       case 'inside/yard_bedroom_light':
         return _model.isYardBedroomLightOn; // State riêng cho đèn phòng ngủ sân
       case 'inside/worship_room_light':
@@ -563,18 +567,21 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.isHallwayLightOn; // State riêng cho đèn hành lang
       case 'inside/balcony_light':
         return _model.isBalconyLightOn; // State riêng cho đèn ban công
-      
+
       // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
-        return _model.isSpeakerFav; // Sử dụng speaker favourite cho đèn phòng khách (legacy)
+        return _model
+            .isSpeakerFav; // Sử dụng speaker favourite cho đèn phòng khách (legacy)
       case 'khoasmarthome/kitchen_light':
         return _model.isFanFav; // Sử dụng fan favourite cho đèn bếp (legacy)
       case 'khoasmarthome/bedroom_light':
-        return _model.isLightOn; // Sử dụng light state cho đèn phòng ngủ (legacy)
+        return _model
+            .isLightOn; // Sử dụng light state cho đèn phòng ngủ (legacy)
       case 'khoasmarthome/stairs_light':
         return _model.isACON; // Sử dụng AC state cho đèn cầu thang (legacy)
       case 'khoasmarthome/bathroom_light':
-        return _model.isSpeakerON; // Sử dụng speaker state cho đèn vệ sinh (legacy)
+        return _model
+            .isSpeakerON; // Sử dụng speaker state cho đèn vệ sinh (legacy)
       default:
         return device.isOn;
     }
@@ -614,10 +621,10 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     String deviceId = _extractDeviceId(device.mqttTopic);
     bool currentState = _getDeviceState(device);
     bool newState = !currentState;
-    
+
     // Update device state service first
     _deviceStateService.updateDeviceState(deviceId, newState, source: 'UI');
-    
+
     switch (device.mqttTopic) {
       // ESP32 devices - use direct MQTT control
       case 'khoasmarthome/led_gate':
@@ -628,7 +635,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         _mqttService.controlLedAround(newState);
         print('🔄 UI: LED Around = $newState via MQTT');
         break;
-        
+
       // Legacy ESP32 Dev devices
       case 'khoasmarthome/led1':
         _model.toggleLed1();
@@ -655,7 +662,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         // Điều khiển đèn mái hiên
         _model.acFav(); // Sử dụng AC favourite toggle cho đèn mái hiên
         break;
-      
+
       // ESP32-S3 (indoor) devices - Floor 1
       case 'inside/kitchen_light':
         // Điều khiển đèn bếp trong nhà
@@ -672,7 +679,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         _model.toggleBedroomLight();
         _mqttService.controlBedroomLight(_model.isBedroomLightOn);
         break;
-      
+
       // ESP32-S3 (indoor) devices - Floor 2
       case 'inside/corner_bedroom_light':
         // Điều khiển đèn phòng ngủ góc
@@ -699,11 +706,12 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         _model.toggleBalconyLight();
         _mqttService.controlBalconyLight(_model.isBalconyLightOn);
         break;
-      
+
       // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
         // Điều khiển đèn phòng khách (legacy)
-        _model.speakerFav(); // Sử dụng speaker favourite toggle cho đèn phòng khách
+        _model
+            .speakerFav(); // Sử dụng speaker favourite toggle cho đèn phòng khách
         break;
       case 'khoasmarthome/kitchen_light':
         // Điều khiển đèn phòng bếp (legacy)

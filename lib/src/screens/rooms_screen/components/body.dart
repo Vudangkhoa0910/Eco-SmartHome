@@ -141,10 +141,10 @@ class Body extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: floor.name.contains('Sân')
-                  ? [const Color(0xFF4CAF50), const Color(0xFF2E7D32)]
+                  ? [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)]
                   : floor.name.contains('Tầng 1')
-                      ? [const Color(0xFF2196F3), const Color(0xFF1976D2)]
-                      : [const Color(0xFF9C27B0), const Color(0xFF7B1FA2)],
+                      ? [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)]
+                      : [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

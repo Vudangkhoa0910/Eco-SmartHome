@@ -45,6 +45,7 @@ class SmartDevice {
   final IconData icon;
   final String mqttTopic;
   final Color color;
+  final Color textColor; // Thêm thuộc tính textColor
 
   SmartDevice({
     required this.name,
@@ -53,6 +54,7 @@ class SmartDevice {
     required this.icon,
     required this.mqttTopic,
     required this.color,
+    this.textColor = Colors.black, // Giá trị mặc định là Colors.black
   });
 
   SmartDevice copyWith({
@@ -62,6 +64,7 @@ class SmartDevice {
     IconData? icon,
     String? mqttTopic,
     Color? color,
+    Color? textColor,
   }) {
     return SmartDevice(
       name: name ?? this.name,
@@ -70,6 +73,7 @@ class SmartDevice {
       icon: icon ?? this.icon,
       mqttTopic: mqttTopic ?? this.mqttTopic,
       color: color ?? this.color,
+      textColor: textColor ?? this.textColor,
     );
   }
 }
@@ -83,14 +87,14 @@ class HouseData {
         name: 'Sân',
         description: 'Khu vực ngoài trời',
         icon: Icons.yard,
-        color: Colors.green,
+        color: Color(0xFF888DF2),
         rooms: [
           HouseRoom(
             name: 'Cổng chính',
             type: 'entrance',
             description: 'Hệ thống cổng và an ninh',
             icon: Icons.door_sliding,
-            color: Colors.brown,
+            color: Color(0xFF868AF2),
             devices: [
               SmartDevice(
                 name: 'Cổng điện',
@@ -98,7 +102,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.garage_outlined,
                 mqttTopic: 'khoasmarthome/motor',
-                color: Colors.brown,
+                color: Color(0xFF8183F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Đèn cổng',
@@ -106,7 +111,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb_outline,
                 mqttTopic: 'khoasmarthome/led_gate',
-                color: Colors.amber,
+                color: Color(0xFF7F80F2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -115,7 +121,7 @@ class HouseData {
             type: 'yard',
             description: 'Khu vực sân vườn',
             icon: Icons.yard,
-            color: Colors.green,
+            color: Color(0xFF7C7DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn sân',
@@ -123,7 +129,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'khoasmarthome/led_around',
-                color: Colors.amber,
+                color: Color(0xFF7A79F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Mái che',
@@ -131,7 +138,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.local_parking,
                 mqttTopic: 'khoasmarthome/awning',
-                color: Colors.brown,
+                color: Color(0xFF7A79F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Đèn sân chính',
@@ -139,7 +147,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.wb_incandescent,
                 mqttTopic: 'khoasmarthome/yard_main_light',
-                color: Colors.amber,
+                color: Color(0xFF7776F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Đèn khu bể cá',
@@ -147,7 +156,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.waves,
                 mqttTopic: 'khoasmarthome/fish_pond_light',
-                color: Colors.blue,
+                color: Color(0xFF7573F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Đèn mái hiên',
@@ -155,7 +165,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.wb_sunny,
                 mqttTopic: 'khoasmarthome/awning_light',
-                color: Colors.orange,
+                color: Color(0xFF7270F2),
+                textColor: Colors.black,
               ),
               SmartDevice(
                 name: 'Hệ thống tưới',
@@ -163,7 +174,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.water_drop,
                 mqttTopic: 'khoasmarthome/sprinkler',
-                color: Colors.blue,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -175,14 +187,14 @@ class HouseData {
         name: 'Tầng 1',
         description: 'Tầng trệt',
         icon: Icons.home,
-        color: Colors.blue,
+        color: Color(0xFF716DF2),
         rooms: [
           HouseRoom(
             name: 'Phòng khách',
             type: 'living_room',
             description: 'Khu vực sinh hoạt chung',
             icon: Icons.weekend,
-            color: Colors.orange,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn phòng khách',
@@ -190,7 +202,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb_outline,
                 mqttTopic: 'inside/living_room_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -199,7 +212,7 @@ class HouseData {
             type: 'kitchen',
             description: 'Khu vực nấu ăn',
             icon: Icons.kitchen,
-            color: Colors.red,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn bếp',
@@ -207,7 +220,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'inside/kitchen_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -216,7 +230,7 @@ class HouseData {
             type: 'bedroom',
             description: 'Phòng ngủ tầng trệt',
             icon: Icons.bed,
-            color: Colors.purple,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn ngủ',
@@ -224,7 +238,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.bedtime,
                 mqttTopic: 'inside/bedroom_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -236,14 +251,14 @@ class HouseData {
         name: 'Tầng 2',
         description: 'Tầng lầu',
         icon: Icons.home_work,
-        color: Colors.indigo,
+        color: Color(0xFF716DF2),
         rooms: [
           HouseRoom(
             name: 'Phòng ngủ sân',
             type: 'yard_bedroom',
             description: 'Phòng ngủ hướng sân (Room 1)',
             icon: Icons.single_bed,
-            color: Colors.pink,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn phòng ngủ sân',
@@ -251,7 +266,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'inside/yard_bedroom_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -260,7 +276,7 @@ class HouseData {
             type: 'corner_bedroom',
             description: 'Phòng ngủ góc (Room 2)',
             icon: Icons.bed,
-            color: Colors.purple,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn phòng ngủ góc',
@@ -268,7 +284,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'inside/corner_bedroom_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -277,7 +294,7 @@ class HouseData {
             type: 'worship_room',
             description: 'Khu vực thờ cúng',
             icon: Icons.temple_buddhist,
-            color: Colors.deepOrange,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn thờ',
@@ -285,7 +302,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'inside/worship_room_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -294,7 +312,7 @@ class HouseData {
             type: 'hallway',
             description: 'Hành lang tầng 2',
             icon: Icons.map,
-            color: Colors.grey,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn hành lang',
@@ -302,7 +320,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb,
                 mqttTopic: 'inside/hallway_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
@@ -311,7 +330,7 @@ class HouseData {
             type: 'large_balcony',
             description: 'Ban công tầng 2',
             icon: Icons.deck,
-            color: Colors.lightGreen,
+            color: Color(0xFF716DF2),
             devices: [
               SmartDevice(
                 name: 'Đèn ban công',
@@ -319,7 +338,8 @@ class HouseData {
                 isOn: false,
                 icon: Icons.lightbulb_outline,
                 mqttTopic: 'inside/balcony_light',
-                color: Colors.amber,
+                color: Color(0xFF716DF2),
+                textColor: Colors.black,
               ),
             ],
           ),
