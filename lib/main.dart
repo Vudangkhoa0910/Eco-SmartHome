@@ -5,6 +5,7 @@ import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/routes/routes.dart';
 import 'package:smart_home/service/navigation_service.dart';
+import 'package:smart_home/service/theme_service.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
 import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
 import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
@@ -36,6 +37,14 @@ void main() async {
     print('Date formatting initialized');
   } catch (e) {
     print('Failed to initialize date formatting: $e');
+  }
+
+  // Initialize Theme Service
+  try {
+    await ThemeService.instance.initialize();
+    print('Theme service initialized');
+  } catch (e) {
+    print('Failed to initialize theme service: $e');
   }
 
   setupLocator();
