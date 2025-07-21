@@ -444,6 +444,17 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Thực hiện lệnh nhanh từ UI
+  void executeVoiceCommand(String command) {
+    if (command.trim().isEmpty) return;
+    
+    // Set recognized text to show what command was executed
+    _recognizedText = command;
+    
+    // Process the command directly
+    _processCommand(command);
+  }
+
   /// Xử lý câu hỏi tổng quát bằng Gemini AI
   Future<String> _processGeneralQuestion(String question) async {
     try {
