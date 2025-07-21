@@ -3,11 +3,75 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/rooms_view_model.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
+import 'package:smart_home/service/theme_service.dart';
+import 'package:smart_home/src/widgets/theme_color_picker.dart';
 import 'room_card.dart';
 
-class Body extends StatelessWidget {
+class Body extends StatefulWidget {
   final RoomsViewModel model;
   const Body({Key? key, required this.model}) : super(key: key);
+
+  @override
+  State<Body> createState() => _BodyState();
+}
+
+class _BodyState extends State<Body> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize theme service
+    ThemeService.instance.initialize();
+    
+    // Listen to theme changes
+    ThemeService.instance.themeNotifier.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeService.instance.themeNotifier.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        // Rebuild when theme changes
+      });
+    }
+  }
+
+  void _showThemePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                child: ThemeColorPicker(
+                  onThemeChanged: (theme) {
+                    setState(() {
+                      // Rebuild with new theme
+                    });
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,26 +102,69 @@ class Body extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatItem(context, 'Tổng số phòng',
-                    '${model.rooms.length}', Icons.home),
+                    '${widget.model.rooms.length}', Icons.home),
                 _buildDivider(context),
                 _buildStatItem(context, 'Thiết bị hoạt động',
-                    '${model.totalActiveDevices}', Icons.power),
+                    '${widget.model.totalActiveDevices}', Icons.power),
                 _buildDivider(context),
                 _buildStatItem(context, 'Năng lượng',
-                    '${model.totalEnergyUsage}kW', Icons.bolt),
+                    '${widget.model.totalEnergyUsage}kW', Icons.bolt),
               ],
             ),
           ),
 
           SizedBox(height: getProportionateScreenHeight(20)),
 
-          // House Area Management - Đây là tính năng từ nút xanh được đưa ra trực tiếp
-          Text(
-            'Quản lý khu vực nhà',
-            style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+          // House Area Management - Đây là tính năng từ nút xanh được đưa ra trực tiếp  
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Quản lý khu vực nhà',
+                style: Theme.of(context).textTheme.displayMedium!.copyWith(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              GestureDetector(
+                onTap: _showThemePicker,
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: ThemeService.instance.currentPalette.gradientColors.take(2).toList(),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ThemeService.instance.currentPalette.primaryColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.palette,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Theme',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              ),
+            ],
           ),
 
           SizedBox(height: getProportionateScreenHeight(15)),
@@ -140,11 +247,7 @@ class Body extends StatelessWidget {
           padding: EdgeInsets.all(getProportionateScreenWidth(15)),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: floor.name.contains('Sân')
-                  ? [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)]
-                  : floor.name.contains('Tầng 1')
-                      ? [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)]
-                      : [const Color(0xFFAB04F2), const Color(0xFFBBD8F2)],
+              colors: ThemeService.instance.getFloorGradient(floor.name),
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -166,8 +269,14 @@ class Body extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  floor.name.contains('Sân') ? Icons.grass : Icons.home,
-                  color: Colors.white,
+                  floor.name.contains('Sân') 
+                      ? Icons.grass 
+                      : floor.name.contains('Tầng 1')
+                          ? Icons.home
+                          : floor.name.contains('Tầng 2')
+                              ? Icons.home_work
+                              : Icons.roofing,
+                  color: ThemeService.instance.getFloorIconColor(floor.name),
                   size: 24,
                 ),
               ),
@@ -178,8 +287,8 @@ class Body extends StatelessWidget {
                   children: [
                     Text(
                       floor.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: ThemeService.instance.getFloorTextColor(floor.name),
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -187,7 +296,7 @@ class Body extends StatelessWidget {
                     Text(
                       floor.description,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: ThemeService.instance.getFloorTextColor(floor.name).withOpacity(0.8),
                         fontSize: 12,
                       ),
                     ),
@@ -200,13 +309,13 @@ class Body extends StatelessWidget {
                             vertical: getProportionateScreenHeight(4),
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: ThemeService.instance.getFloorBadgeColor(floor.name),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${floor.rooms.length} khu vực',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: ThemeService.instance.getFloorTextColor(floor.name),
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -219,13 +328,13 @@ class Body extends StatelessWidget {
                             vertical: getProportionateScreenHeight(4),
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: ThemeService.instance.getFloorBadgeColor(floor.name),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${floor.totalDevices} thiết bị',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: ThemeService.instance.getFloorTextColor(floor.name),
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -238,7 +347,7 @@ class Body extends StatelessWidget {
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.white.withOpacity(0.7),
+                color: ThemeService.instance.getFloorTextColor(floor.name).withOpacity(0.7),
                 size: 16,
               ),
             ],
