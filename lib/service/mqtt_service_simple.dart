@@ -448,7 +448,7 @@ class MqttServiceSimple {
           percentage = 0;
       }
 
-      await gateService.saveGateState(GateState(
+      await gateService.saveGateState(GateState.withAutoStatus(
         level: percentage,
         isMoving: false,
         timestamp: DateTime.now(),

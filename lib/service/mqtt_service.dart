@@ -579,7 +579,7 @@ class MqttService {
       // Sử dụng GateStateService mới
       final gateService = GateStateService();
       
-      await gateService.saveGateState(GateState(
+      await gateService.saveGateState(GateState.withAutoStatus(
         level: level,
         isMoving: isMoving,
         timestamp: DateTime.now(),

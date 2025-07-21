@@ -503,7 +503,7 @@ class HomeScreenViewModel extends BaseModel {
       await _mqttService.publishGateControl(targetLevel);
       
       // Save state to Firebase
-      await _gateService.saveGateState(GateState(
+      await _gateService.saveGateState(GateState.withAutoStatus(
         level: targetLevel,
         isMoving: true,
         timestamp: DateTime.now(),

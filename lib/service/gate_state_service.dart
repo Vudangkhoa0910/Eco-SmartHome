@@ -1,14 +1,38 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Trạng thái hoạt động của cổng
+enum GateStatus {
+  opening('opening', 'Đang mở', '🔓⬆️'),
+  closing('closing', 'Đang đóng', '🔒⬇️'),
+  open('open', 'Đã mở', '🔓'),
+  closed('closed', 'Đã đóng', '🔒'),
+  stopped('stopped', 'Đã dừng', '⏹️'),
+  error('error', 'Lỗi', '❌');
+
+  const GateStatus(this.value, this.description, this.icon);
+  final String value;
+  final String description;
+  final String icon;
+
+  static GateStatus fromString(String value) {
+    for (final status in GateStatus.values) {
+      if (status.value == value) return status;
+    }
+    return GateStatus.closed; // Default
+  }
+}
+
 /// Model cho trạng thái cổng
 class GateState {
   final int level;
   final bool isMoving;
+  final GateStatus status;
   final DateTime timestamp;
 
   const GateState({
     required this.level,
     required this.isMoving,
+    required this.status,
     required this.timestamp,
   });
 
@@ -16,6 +40,9 @@ class GateState {
     return {
       'level': level,
       'isMoving': isMoving,
+      'status': status.value,
+      'status_description': status.description,
+      'status_icon': status.icon,
       'timestamp': timestamp.millisecondsSinceEpoch,
       'created_at': timestamp,
     };
@@ -25,6 +52,7 @@ class GateState {
     return GateState(
       level: map['level'] ?? 0,
       isMoving: map['isMoving'] ?? false,
+      status: GateStatus.fromString(map['status'] ?? 'closed'),
       timestamp: map['timestamp'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['timestamp'])
           : DateTime.now(),
@@ -32,24 +60,59 @@ class GateState {
   }
 
   String get description {
-    if (isMoving) return 'Đang di chuyển...';
+    // Ưu tiên hiển thị status description nếu có
+    if (isMoving) {
+      return status.description;
+    }
+    
+    // Hiển thị mô tả theo level khi không di chuyển
     switch (level) {
-      case 0: return 'Đóng hoàn toàn';
+      case 0: return 'Đóng hoàn toàn - ${status.description}';
       case 25: return 'Mở 1/4 - Người đi bộ';
       case 50: return 'Mở 1/2 - Xe máy';
       case 75: return 'Mở 3/4 - Xe hơi nhỏ';
       case 100: return 'Mở hoàn toàn - Xe tải';
-      default: return 'Mở $level%';
+      default: return 'Mở $level% - ${status.description}';
     }
   }
 
   String get icon {
-    if (isMoving) return '🔄';
+    // Ưu tiên icon của status khi đang di chuyển
+    if (isMoving) return status.icon;
+    
+    // Icon theo level khi không di chuyển
     if (level <= 0) return '🔒';
     if (level <= 25) return '🚶';
     if (level <= 50) return '🏍️';
     if (level <= 75) return '🚗';
     return '🚛';
+  }
+
+  /// Phương thức tiện ích để tạo GateState với status tự động
+  factory GateState.withAutoStatus({
+    required int level,
+    required bool isMoving,
+    DateTime? timestamp,
+    GateStatus? forcedStatus,
+  }) {
+    GateStatus status;
+    
+    if (forcedStatus != null) {
+      status = forcedStatus;
+    } else if (isMoving) {
+      // Xác định status dựa trên level khi đang di chuyển
+      status = level > 50 ? GateStatus.opening : GateStatus.closing;
+    } else {
+      // Xác định status khi không di chuyển
+      status = level > 0 ? GateStatus.open : GateStatus.closed;
+    }
+
+    return GateState(
+      level: level,
+      isMoving: isMoving,
+      status: status,
+      timestamp: timestamp ?? DateTime.now(),
+    );
   }
 }
 
@@ -95,7 +158,7 @@ class GateStateService {
           .doc('main_gate')
           .set(data, SetOptions(merge: true));
       
-      print('✅ Gate state saved successfully');
+      print('✅ Gate state saved successfully: ${gateState.status.description} (${gateState.level}%)');
       return true;
     } catch (e) {
       print('❌ Error saving gate state: $e');
@@ -109,10 +172,9 @@ class GateStateService {
     required GateLevel level,
     String? location,
   }) async {
-    final gateState = GateState(
+    final gateState = GateState.withAutoStatus(
       level: level.percentage,
       isMoving: false,
-      timestamp: DateTime.now(),
     );
     return saveGateState(gateState);
   }
@@ -128,19 +190,19 @@ class GateStateService {
       if (doc.exists) {
         final data = doc.data()!;
         // Try new format first
-        if (data.containsKey('level') && data.containsKey('isMoving')) {
+        if (data.containsKey('level') && data.containsKey('status')) {
           return GateState.fromMap(data);
         }
         // Fallback to legacy format
         final percentage = data['percentage'] ?? 0;
-        return GateState(
+        return GateState.withAutoStatus(
           level: percentage,
           isMoving: false,
           timestamp: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
       }
       // Return default state if no data found
-      return GateState(
+      return GateState.withAutoStatus(
         level: 0,
         isMoving: false,
         timestamp: DateTime.now(),
@@ -148,7 +210,7 @@ class GateStateService {
     } catch (e) {
       print('❌ Error getting current gate state: $e');
       // Return default state on error
-      return GateState(
+      return GateState.withAutoStatus(
         level: 0,
         isMoving: false,
         timestamp: DateTime.now(),
@@ -326,6 +388,83 @@ class GateStateService {
         message: 'Lỗi khi lấy trạng thái cổng: $e',
       );
     }
+  }
+
+  /// Cập nhật trạng thái cổng đang mở
+  Future<bool> setGateOpening(int currentLevel) async {
+    final gateState = GateState.withAutoStatus(
+      level: currentLevel,
+      isMoving: true,
+      forcedStatus: GateStatus.opening,
+    );
+    return saveGateState(gateState);
+  }
+
+  /// Cập nhật trạng thái cổng đang đóng
+  Future<bool> setGateClosing(int currentLevel) async {
+    final gateState = GateState.withAutoStatus(
+      level: currentLevel,
+      isMoving: true,
+      forcedStatus: GateStatus.closing,
+    );
+    return saveGateState(gateState);
+  }
+
+  /// Cập nhật trạng thái cổng đã mở hoàn tất
+  Future<bool> setGateOpened(int finalLevel) async {
+    final gateState = GateState.withAutoStatus(
+      level: finalLevel,
+      isMoving: false,
+      forcedStatus: finalLevel > 0 ? GateStatus.open : GateStatus.closed,
+    );
+    return saveGateState(gateState);
+  }
+
+  /// Cập nhật trạng thái cổng đã đóng hoàn tất
+  Future<bool> setGateClosed() async {
+    final gateState = GateState.withAutoStatus(
+      level: 0,
+      isMoving: false,
+      forcedStatus: GateStatus.closed,
+    );
+    return saveGateState(gateState);
+  }
+
+  /// Cập nhật trạng thái cổng bị dừng
+  Future<bool> setGateStopped(int currentLevel) async {
+    final gateState = GateState.withAutoStatus(
+      level: currentLevel,
+      isMoving: false,
+      forcedStatus: GateStatus.stopped,
+    );
+    return saveGateState(gateState);
+  }
+
+  /// Cập nhật trạng thái cổng gặp lỗi
+  Future<bool> setGateError(int currentLevel, {String? errorMessage}) async {
+    final gateState = GateState.withAutoStatus(
+      level: currentLevel,
+      isMoving: false,
+      forcedStatus: GateStatus.error,
+    );
+    
+    // Lưu thêm thông tin lỗi nếu có
+    final success = await saveGateState(gateState);
+    if (success && errorMessage != null) {
+      try {
+        await _firestore
+            .collection(_gateStateCollection)
+            .doc('main_gate')
+            .update({
+          'error_message': errorMessage,
+          'error_timestamp': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        print('❌ Error saving error message: $e');
+      }
+    }
+    
+    return success;
   }
 }
 
