@@ -104,15 +104,18 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
             end: Alignment.bottomRight,
             colors: Theme.of(context).brightness == Brightness.dark
                 ? [
-                    const Color(0xFF0A0E27),
-                    const Color(0xFF1E2749),
-                    const Color(0xFF2D3561),
+                    const Color(0xFF1A1B3E),
+                    const Color(0xFF2D2B69),
+                    const Color(0xFF4A4A8A),
                   ]
                 : [
-                    const Color(0xFFE3F2FD),
-                    const Color(0xFFBBDEFB),
-                    const Color(0xFF90CAF9),
+                    const Color(0xFFF0F8FF), // Alice Blue - very light blue
+                    const Color(0xFFE6F3FF), // Light blue
+                    const Color(0xFFD6EAF8), // Soft blue
+                    const Color(0xFFE8DAEF), // Light lavender
+                    const Color(0xFFF8F9FA), // Almost white
                   ],
+            stops: const [0.0, 0.3, 0.6, 0.8, 1.0],
           ),
         ),
         child: SafeArea(
@@ -148,15 +151,22 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           // Back Button with Modern Design
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: IconButton(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(
                 Icons.arrow_back_ios_new,
-                color: Colors.white,
+                color: Colors.black87,
                 size: 20,
               ),
             ),
@@ -176,7 +186,14 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Colors.black,
+                    shadows: [
+                      Shadow(
+                        offset: const Offset(1, 1),
+                        blurRadius: 2,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -195,8 +212,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   Text(
                     widget.model.speechEnabled ? 'Online' : 'Offline',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.black,
                       fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      shadows: [
+                        Shadow(
+                          offset: const Offset(0.5, 0.5),
+                          blurRadius: 1,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -209,12 +234,19 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           // Settings Menu with Modern Design
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
+              icon: const Icon(Icons.more_vert, color: Colors.black87, size: 24),
               color: Theme.of(context).cardColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               onSelected: (value) {
@@ -235,9 +267,9 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   value: 'chat',
                   child: Row(
                     children: [
-                      Icon(Icons.chat_bubble_outline, size: 20),
+                      Icon(Icons.chat_bubble_outline, size: 24, color: Colors.blue[700]),
                       const SizedBox(width: 12),
-                      Text('Chat Mode'),
+                      Text('Chat Mode', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -245,9 +277,9 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   value: 'commands',
                   child: Row(
                     children: [
-                      Icon(Icons.tune, size: 20),
+                      Icon(Icons.tune, size: 24, color: Colors.purple[700]),
                       const SizedBox(width: 12),
-                      Text('Commands'),
+                      Text('Commands', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -255,9 +287,9 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   value: 'settings',
                   child: Row(
                     children: [
-                      Icon(Icons.settings, size: 20),
+                      Icon(Icons.settings, size: 24, color: Colors.grey[700]),
                       const SizedBox(width: 12),
-                      Text('Settings'),
+                      Text('Settings', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -276,12 +308,12 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
       ),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.25),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withOpacity(0.4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -326,16 +358,30 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                     Text(
                       _getStatusTitle(),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.5, 0.5),
+                            blurRadius: 1,
+                            color: Colors.white,
+                          ),
+                        ],
                       ),
                     ),
                     Text(
                       _getStatusSubtitle(),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.black.withOpacity(0.8),
                         fontSize: 12,
+                        shadows: [
+                          Shadow(
+                            offset: const Offset(0.5, 0.5),
+                            blurRadius: 1,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -375,9 +421,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                           Text(
                             'Nhận diện:',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.black.withOpacity(0.9),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
+                              shadows: [
+                                Shadow(
+                                  offset: const Offset(0.5, 0.5),
+                                  blurRadius: 1,
+                                  color: Colors.white.withOpacity(0.8),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -388,12 +441,19 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                             ? (widget.model.isListening ? 'Đang lắng nghe...' : 'Chưa có văn bản')
                             : widget.model.recognizedText,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           fontStyle: widget.model.recognizedText.isEmpty 
                               ? FontStyle.italic 
                               : FontStyle.normal,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(0.5, 0.5),
+                              blurRadius: 1,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -444,9 +504,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   Text(
                     widget.model.aiResponse,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0.5, 0.5),
+                          blurRadius: 1,
+                          color: Colors.white,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -501,8 +568,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                 child: GestureDetector(
                   onTap: widget.model.toggleListening,
                   child: Container(
-                    width: 160, // Reduced from 200
-                    height: 160, // Reduced from 200
+                    width: 180, // Increased from 160 for better visibility
+                    height: 180, // Increased from 160 for better visibility
                     decoration: BoxDecoration(
                       gradient: RadialGradient(
                         colors: [
@@ -515,7 +582,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                       shape: BoxShape.circle,
                     ),
                     child: Container(
-                      margin: const EdgeInsets.all(16), // Reduced from 20
+                      margin: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
@@ -536,12 +603,27 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                               ),
                             )
                           : Center(
-                              child: Lottie.asset(
-                                'assets/Lottie/mic.json',
-                                width: 60, // Reduced from 80
-                                height: 60, // Reduced from 80
-                                animate: widget.model.isListening,
-                                repeat: widget.model.isListening,
+                              child: Container(
+                                width: 80, // Increased mic icon container size
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: widget.model.isListening 
+                                      ? Colors.red.withOpacity(0.8)
+                                      : Colors.red.withOpacity(0.6),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.4),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  widget.model.isListening ? Icons.mic : Icons.mic_none,
+                                  color: Colors.white,
+                                  size: 40, // Larger mic icon
+                                ),
                               ),
                             ),
                     ),
@@ -553,24 +635,66 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           
           const SizedBox(height: 24), // Reduced from 40
           
-          // Instruction Text
+          // Instruction Text with Auto-stop Timer Indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              widget.model.isListening
-                  ? 'Đang lắng nghe...\nHãy nói câu lệnh của bạn'
-                  : widget.model.isProcessing
-                      ? 'Đang xử lý...\nVui lòng đợi'
-                      : widget.model.speechEnabled
-                          ? 'Chạm vào mic để bắt đầu\nnói với trợ lý AI'
-                          : 'Cần cấp quyền microphone\nđể sử dụng tính năng này',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                height: 1.5,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  widget.model.isListening
+                      ? 'Đang lắng nghe...\nHãy nói câu lệnh của bạn'
+                      : widget.model.isProcessing
+                          ? 'Đang xử lý...\nVui lòng đợi'
+                          : widget.model.speechEnabled
+                              ? 'Chạm vào mic để bắt đầu\nnói với trợ lý AI'
+                              : 'Cần cấp quyền microphone\nđể sử dụng tính năng này',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.5,
+                    shadows: [
+                      Shadow(
+                        offset: const Offset(0.5, 0.5),
+                        blurRadius: 1,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Auto-stop progress indicator when listening
+                if (widget.model.isListening && widget.model.recognizedText.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tự động xử lý sau 1.5s...',
+                          style: TextStyle(
+                            color: Colors.orange.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
           
@@ -619,9 +743,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
         Text(
           'Lệnh nhanh',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.black,
             fontSize: 14,
             fontWeight: FontWeight.w600,
+            shadows: [
+              Shadow(
+                offset: const Offset(0.5, 0.5),
+                blurRadius: 1,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -662,9 +793,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                       child: Text(
                         cmd['text'] as String,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(0.5, 0.5),
+                              blurRadius: 1,
+                              color: Colors.white,
+                            ),
+                          ],
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 1,
@@ -782,9 +920,16 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           Text(
             'Bắt đầu cuộc trò chuyện',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.black,
               fontSize: 18,
               fontWeight: FontWeight.w600,
+              shadows: [
+                Shadow(
+                  offset: const Offset(0.5, 0.5),
+                  blurRadius: 1,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -792,8 +937,15 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
             'Gửi tin nhắn hoặc sử dụng giọng nói\nđể điều khiển smart home',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.black.withOpacity(0.8),
               fontSize: 14,
+              shadows: [
+                Shadow(
+                  offset: const Offset(0.5, 0.5),
+                  blurRadius: 1,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ],
             ),
           ),
         ],
@@ -848,9 +1000,17 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                   child: Text(
                     message['message'] as String,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Colors.black,
                       fontSize: 13,
                       height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(0.3, 0.3),
+                          blurRadius: 0.5,
+                          color: Colors.white,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -891,20 +1051,36 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: TextField(
                 controller: _chatController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14, // Giảm kích thước chữ
+                ),
                 decoration: InputDecoration(
                   hintText: 'Nhập tin nhắn hoặc câu lệnh...',
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  hintStyle: TextStyle(
+                    color: Colors.black.withOpacity(0.5),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14, // Giảm kích thước hint text
+                  ),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                  isDense: true, // Giảm chiều cao
                 ),
                 onSubmitted: (text) {
                   if (text.trim().isNotEmpty) {
@@ -936,7 +1112,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
               icon: const Icon(
                 Icons.send,
                 color: Colors.white,
-                size: 20,
+                size: 22, // Tăng kích thước
               ),
             ),
           ),
@@ -946,17 +1122,24 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: widget.model.isListening 
-                    ? [const Color(0xFFEF5350), const Color(0xFFFF7043)]
-                    : [const Color(0xFF42A5F5), const Color(0xFF1E88E5)],
+                    ? [const Color(0xFFEF5350), const Color(0xFFD32F2F)] // Darker red when listening
+                    : [const Color(0xFFE53935), const Color(0xFFB71C1C)], // Red when not listening
               ),
               borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withOpacity(0.4),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
             child: IconButton(
               onPressed: widget.model.toggleListening,
               icon: Icon(
                 widget.model.isListening ? Icons.mic : Icons.mic_none,
                 color: Colors.white,
-                size: 20,
+                size: 24, // Larger icon in chat
               ),
             ),
           ),
@@ -1023,16 +1206,25 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
           children: [
             Icon(
               icon,
-              color: Colors.white,
-              size: 20,
+              color: isActive 
+                  ? Colors.blue[700] 
+                  : Colors.black87, // Màu đen nổi bật thay vì trắng
+              size: 26, // Tăng kích thước icon
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.black87, // Đổi từ black thành black87 cho đồng nhất
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+                shadows: [
+                  Shadow(
+                    offset: const Offset(0.3, 0.3),
+                    blurRadius: 0.5,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ],
               ),
             ),
           ],

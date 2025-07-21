@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:smart_home/provider/base_model.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -23,6 +24,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
   List<String> _commandHistory = [];
   List<Map<String, dynamic>> _chatMessages = [];
   List<Map<String, dynamic>> _customCommands = [];
+  Timer? _autoStopTimer;
 
   // Firebase services
   final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
@@ -282,8 +284,14 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
         onStatus: (status) {
           print('Speech status: $status');
           if (status == 'done' || status == 'notListening') {
-            _isListening = false;
-            notifyListeners();
+            // Auto-process command when speech naturally ends
+            if (_isListening && _recognizedText.isNotEmpty) {
+              print('🔄 Speech naturally ended, auto-processing command: $_recognizedText');
+              _autoStopAndProcess();
+            } else {
+              _isListening = false;
+              notifyListeners();
+            }
           }
         },
         onError: (errorNotification) {
@@ -363,12 +371,38 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       _aiResponse = '';
       notifyListeners();
 
+      // Start auto-stop timer for 1.5 seconds
+      _autoStopTimer?.cancel();
+      _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (_isListening && _recognizedText.isNotEmpty) {
+          print('🕐 Timer auto-stopping and processing command after 1.5s with text: $_recognizedText');
+          _autoStopAndProcess();
+        } else if (_isListening) {
+          print('🕐 Timer auto-stopping without text after 1.5s');
+          _isListening = false;
+          _autoStopTimer?.cancel();
+          notifyListeners();
+          _speechToText.stop();
+        }
+      });
+
       try {
         await _speechToText.listen(
           onResult: (result) {
             _recognizedText = result.recognizedWords;
             print('Recognized: $_recognizedText');
             notifyListeners();
+            
+            // If we have final results and some text, restart the auto-stop timer
+            if (result.finalResult && _recognizedText.isNotEmpty) {
+              _autoStopTimer?.cancel();
+              _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
+                if (_isListening) {
+                  print('🕐 Final result timer auto-stopping and processing command with: $_recognizedText');
+                  _autoStopAndProcess();
+                }
+              });
+            }
           },
           listenFor: const Duration(seconds: 30),
           pauseFor: const Duration(seconds: 3),
@@ -382,6 +416,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       } catch (e) {
         print('Listen error: $e');
         _isListening = false;
+        _autoStopTimer?.cancel();
         notifyListeners();
       }
     }
@@ -391,6 +426,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
   Future<void> stopListening() async {
     if (_isListening) {
       _isListening = false;
+      _autoStopTimer?.cancel(); // Cancel auto-stop timer
       notifyListeners();
       await _speechToText.stop();
 
@@ -400,6 +436,21 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       if (_recognizedText.isNotEmpty) {
         _processCommand(_recognizedText);
       }
+    }
+  }
+
+  // Auto-stop and process command (for timer auto-execution)
+  Future<void> _autoStopAndProcess() async {
+    if (_isListening && _recognizedText.isNotEmpty) {
+      _isListening = false;
+      _autoStopTimer?.cancel(); // Cancel auto-stop timer
+      notifyListeners();
+      await _speechToText.stop();
+
+      print('🔄 Auto-stopped listening and processing command: $_recognizedText');
+
+      // Automatically process the command
+      _processCommand(_recognizedText);
     }
   }
 
@@ -1686,6 +1737,9 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
   void dispose() {
     // Remove observer to prevent memory leaks
     WidgetsBinding.instance.removeObserver(this);
+
+    // Cancel auto-stop timer
+    _autoStopTimer?.cancel();
 
     // Cleanup text controller
     _chatController.dispose();
