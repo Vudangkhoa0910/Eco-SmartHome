@@ -97,6 +97,10 @@ bool awningOpen = false;
 // Điều khiển cổng và đèn cổng - BỔ SUNG MQTT CHO ĐA MỨC ĐỘ
 #define TOPIC_LED_GATE    "khoasmarthome/led_gate"
 #define TOPIC_LED_AROUND  "khoasmarthome/led_around"
+// Status reporting topics
+#define TOPIC_LED_GATE_STATUS    "khoasmarthome/led_gate/status"
+#define TOPIC_LED_AROUND_STATUS  "khoasmarthome/led_around/status"
+#define TOPIC_DEVICE_STATUS      "khoasmarthome/device_status"
 #define TOPIC_MOTOR       "khoasmarthome/motor"
 #define TOPIC_GATE_LEVEL  "khoasmarthome/gate_level"     // Topic mới cho điều khiển mức độ
 #define TOPIC_GATE_STATUS "khoasmarthome/gate_status"    // Topic báo trạng thái
@@ -121,6 +125,11 @@ PubSubClient client(espClient);
 
 unsigned long lastMsg = 0;
 #define MSG_INTERVAL 5000
+
+// Current device states - for persistence and reporting
+bool ledGateState = false;    // true = ON, false = OFF
+bool ledAroundState = false;
+// Add more device states as needed for other devices
 
 // Điều khiển motor cổng - CẢI TIẾN ĐA MỨC ĐỘ
 unsigned long motorRunTime = 7000;  // Thời gian mở hoàn toàn 
@@ -167,13 +176,31 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("📩 Message [%s]: %s\n", topic, message.c_str());
 
   // Điều khiển cổng và đèn cổng - BỔ SUNG MQTT CHO ĐA MỨC ĐỘ
-  if (String(topic) == TOPIC_LED_GATE)
-    digitalWrite(LED_GATE_PIN, message == "ON" ? HIGH : LOW);
+  if (String(topic) == TOPIC_LED_GATE) {
+    // Rơ le active LOW: GPIO LOW = relay ON = đèn sáng
+    bool newState = (message == "ON");
+    digitalWrite(LED_GATE_PIN, newState ? LOW : HIGH);
+    ledGateState = newState;  // Update state tracking
+    
+    Serial.printf("💡 LED Gate set to %s (GPIO: %s)\n", 
+                  message.c_str(), 
+                  (newState ? "LOW" : "HIGH"));
+    
+    // Report status back to MQTT
+    publishDeviceStatus("led_gate", newState);
+  }
   else if (String(topic) == TOPIC_LED_AROUND) {
-    // Nếu rơ le active LOW: khi GPIO xuống LOW thì rơ le đóng, đèn sáng
-    // Nếu rơ le active HIGH: khi GPIO lên HIGH thì rơ le đóng, đèn sáng
-    // Đa số module rơ le 1 kênh dùng opto sẽ active LOW
-    digitalWrite(LED_AROUND_PIN, message == "ON" ? LOW : HIGH);
+    // Rơ le active LOW: GPIO LOW = relay ON = đèn sáng
+    bool newState = (message == "ON");
+    digitalWrite(LED_AROUND_PIN, newState ? LOW : HIGH);
+    ledAroundState = newState;  // Update state tracking
+    
+    Serial.printf("💡 LED Around set to %s (GPIO: %s)\n", 
+                  message.c_str(), 
+                  (newState ? "LOW" : "HIGH"));
+    
+    // Report status back to MQTT
+    publishDeviceStatus("led_around", newState);
   }
   // Điều khiển motor cổng - CẢI TIẾN ĐA MỨC ĐỘ
   else if (String(topic) == TOPIC_GATE_LEVEL && !motorRunning) {
@@ -220,6 +247,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
   else if (String(topic) == "khoasmarthome/status_request") {
     if (message == "GATE_STATUS") {
       publishGateStatus(); // Send current gate status immediately
+    } else if (message == "ALL_DEVICES") {
+      publishAllDeviceStatus(); // Send all device status
+    } else if (message == "LED_GATE") {
+      publishDeviceStatus("led_gate", ledGateState);
+    } else if (message == "LED_AROUND") {
+      publishDeviceStatus("led_around", ledAroundState);
     }
   }
   // Logic cũ cho tương thích ngược - DISABLED để tránh xung đột với gate_level
@@ -348,8 +381,8 @@ void setup() {
   pinMode(LED_BATHROOM_PIN, OUTPUT);
 
   // Tắt tất cả đèn ban đầu
-  digitalWrite(LED_GATE_PIN, LOW);
-  digitalWrite(LED_AROUND_PIN, LOW);
+  digitalWrite(LED_GATE_PIN, HIGH);        // ESP32 active LOW - HIGH = OFF
+  digitalWrite(LED_AROUND_PIN, HIGH);      // ESP32 active LOW - HIGH = OFF
   digitalWrite(LED_YARD_MAIN_PIN, LOW);
   digitalWrite(LED_FISH_POND_PIN, LOW);
   digitalWrite(LED_AWNING_AREA_PIN, LOW);
@@ -358,6 +391,10 @@ void setup() {
   digitalWrite(LED_BEDROOM_PIN, LOW);
   digitalWrite(LED_STAIRS_PIN, LOW);
   digitalWrite(LED_BATHROOM_PIN, LOW);
+
+  // Initialize device states
+  ledGateState = false;    // OFF
+  ledAroundState = false;  // OFF
 
   // Cấu hình cảm biến (giữ nguyên)
   Wire.begin(32, 33);  // INA219 SDA, SCL
@@ -379,6 +416,10 @@ void setup() {
   Serial.println("   🏠 Servo Awning");
   Serial.println("   🌿 Yard & Fish Pond Lights");
   Serial.println("   🏘️ Indoor Lights (5 rooms)");
+  
+  // Publish initial device status after 3 seconds
+  delay(3000);
+  publishAllDeviceStatus();
 }
 
 void loop() {
@@ -512,4 +553,35 @@ void publishGateStatus() {
   client.publish(TOPIC_GATE_STATUS, message.c_str());
   Serial.printf("📡 Gate status published: %s%% (level %d) - %s\n", 
                 percentage, gateLevel, description.c_str());
+}
+
+// NEW: Publish individual device status
+void publishDeviceStatus(const char* deviceName, bool isOn) {
+  if (!client.connected()) return;
+  
+  String topic = "khoasmarthome/" + String(deviceName) + "/status";
+  String message = isOn ? "ON" : "OFF";
+  
+  client.publish(topic.c_str(), message.c_str());
+  Serial.printf("📡 Device status published: %s = %s\n", deviceName, message.c_str());
+  
+  // Also publish to general device status topic with JSON format
+  String jsonStatus = "{\"device\":\"" + String(deviceName) + "\",\"state\":\"" + message + "\",\"timestamp\":" + String(millis()) + "}";
+  client.publish(TOPIC_DEVICE_STATUS, jsonStatus.c_str());
+}
+
+// NEW: Publish all device status at once
+void publishAllDeviceStatus() {
+  if (!client.connected()) return;
+  
+  Serial.println("📡 Publishing all device status...");
+  
+  // Publish individual device status
+  publishDeviceStatus("led_gate", ledGateState);
+  publishDeviceStatus("led_around", ledAroundState);
+  
+  // Publish gate status
+  publishGateStatus();
+  
+  Serial.println("✅ All device status published");
 }
