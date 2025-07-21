@@ -2,58 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
-import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
+import 'package:smart_home/service/mqtt_service.dart'; // Import để sử dụng SensorData
 
-class SensorData {
-  final double temperature;
-  final double humidity;
-  final double power;
-  final double voltage;
-  final double current;
-  final DateTime lastUpdated;
-
-  SensorData({
-    required this.temperature,
-    required this.humidity,
-    required this.power,
-    required this.voltage,
-    required this.current,
-    required this.lastUpdated,
-  });
-
-  SensorData copyWith({
-    double? temperature,
-    double? humidity,
-    double? power,
-    double? voltage,
-    double? current,
-    DateTime? lastUpdated,
-  }) {
-    return SensorData(
-      temperature: temperature ?? this.temperature,
-      humidity: humidity ?? this.humidity,
-      power: power ?? this.power,
-      voltage: voltage ?? this.voltage,
-      current: current ?? this.current,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
-    );
-  }
-
-  static SensorData defaultData() {
-    return SensorData(
-      temperature: 0.0,
-      humidity: 0.0,
-      power: 0.0,
-      voltage: 0.0,
-      current: 0.0,
-      lastUpdated: DateTime.now(),
-    );
-  }
-}
-
-class MqttService {
+class MqttServiceSimple {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
   static const int _port = 8883;
   static const String _username = 'af07dd3c';
@@ -77,13 +30,16 @@ class MqttService {
   bool _enableFirebase = true;
 
   // StreamControllers
-  final StreamController<SensorData> _sensorDataController = StreamController<SensorData>.broadcast();
-  final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
-  final StreamController<int> _gateStateController = StreamController<int>.broadcast();
-  final StreamController<Map<String, dynamic>> _gateStatusController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<SensorData> _sensorDataController =
+      StreamController<SensorData>.broadcast();
+  final StreamController<bool> _connectionController =
+      StreamController<bool>.broadcast();
+  final StreamController<int> _gateStateController =
+      StreamController<int>.broadcast();
+  final StreamController<Map<String, dynamic>> _gateStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Firebase services
-  final FirebaseDataService _firebaseData = FirebaseDataService();
   final FirebaseBatchService _batchService = FirebaseBatchService();
 
   // Current data
@@ -95,13 +51,13 @@ class MqttService {
   DateTime? _lastDeviceWrite;
   static const Duration _firebaseWriteInterval = Duration(minutes: 5);
   static const Duration _deviceWriteInterval = Duration(seconds: 30);
-  final Map<String, bool> _lastLightStates = {};
 
   // Getters
   Stream<SensorData> get sensorDataStream => _sensorDataController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<int> get gateStateStream => _gateStateController.stream;
-  Stream<Map<String, dynamic>> get gateStatusStream => _gateStatusController.stream;
+  Stream<Map<String, dynamic>> get gateStatusStream =>
+      _gateStatusController.stream;
   bool get isConnected => _isConnected;
   int get currentGateLevel => _currentGateLevel;
 
@@ -142,7 +98,7 @@ class MqttService {
     _isConnected = true;
     _connectionController.add(true);
     print('✅ MQTT Connected');
-    
+
     // Initialize gate state when connected
     initializeGateState();
   }
@@ -152,7 +108,7 @@ class MqttService {
     try {
       final gateService = GateStateService();
       final GateState currentState = await gateService.getCurrentGateState();
-      
+
       // Convert percentage back to ESP32 level
       int level;
       if (currentState.level <= 0) {
@@ -164,26 +120,27 @@ class MqttService {
       } else {
         level = 3;
       }
-      
+
       _currentGateLevel = level;
       _gateStateController.add(level);
-      
+
       // Emit to status stream
       _gateStatusController.add({
         'level': currentState.level,
         'isMoving': currentState.isMoving,
-        'description': _getGateDescription(currentState.level, currentState.isMoving),
+        'description':
+            _getGateDescription(currentState.level, currentState.isMoving),
         'timestamp': currentState.timestamp.millisecondsSinceEpoch,
       });
-      
+
       print('🚪 Gate state initialized: ${currentState.level}% (Level $level)');
-      
+
       // Request fresh status from ESP32
       await Future.delayed(const Duration(milliseconds: 500));
       await publishGateControl(0, shouldRequestStatus: true);
     } catch (e) {
       print('❌ Error initializing gate state: $e');
-      
+
       // Set default state on error
       _currentGateLevel = 0;
       _gateStateController.add(0);
@@ -218,9 +175,10 @@ class MqttService {
 
     _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
       final recMess = c![0].payload as MqttPublishMessage;
-      final pt = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+      final pt =
+          MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
       final topic = c[0].topic;
-      
+
       _handleMessage(topic, pt);
     });
   }
@@ -272,51 +230,68 @@ class MqttService {
       if (parts.length >= 2) {
         final level = int.tryParse(parts[0]) ?? 0;
         final status = parts[1];
-        
+
         _currentGateLevel = level;
         _gateStateController.add(level);
-        
+
         // Convert ESP32 level to percentage for UI
         int percentage;
         switch (level) {
-          case 0: percentage = 0; break;
-          case 1: percentage = 25; break;  // Show as 25% instead of 33%
-          case 2: percentage = 50; break;  // Show as 50% instead of 66%
-          case 3: percentage = 100; break;
-          default: percentage = 0;
+          case 0:
+            percentage = 0;
+            break;
+          case 1:
+            percentage = 25;
+            break; // Show as 25% instead of 33%
+          case 2:
+            percentage = 50;
+            break; // Show as 50% instead of 66%
+          case 3:
+            percentage = 100;
+            break;
+          default:
+            percentage = 0;
         }
-        
+
         // Emit to new status stream for GateDeviceControlWidget
         _gateStatusController.add({
           'level': percentage,
           'isMoving': status.contains('MOVING') || status.contains('RUNNING'),
-          'description': _getGateDescription(percentage, status.contains('MOVING')),
+          'description':
+              _getGateDescription(percentage, status.contains('MOVING')),
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
-        
+
         print('🚪 Gate status updated: Level $level -> $percentage% ($status)');
       }
     } catch (e) {
       print('❌ Error parsing gate status: $e');
     }
   }
-  
+
   String _getGateDescription(int percentage, bool isMoving) {
     if (isMoving) return 'Đang di chuyển...';
-    
+
     switch (percentage) {
-      case 0: return 'Đóng hoàn toàn';
-      case 25: return 'Mở 1/4 - Người đi bộ';
-      case 50: return 'Mở 1/2 - Xe máy';
-      case 75: return 'Mở 3/4 - Xe hơi nhỏ';
-      case 100: return 'Mở hoàn toàn - Xe tải';
-      default: return 'Mở $percentage%';
+      case 0:
+        return 'Đóng hoàn toàn';
+      case 25:
+        return 'Mở 1/4 - Người đi bộ';
+      case 50:
+        return 'Mở 1/2 - Xe máy';
+      case 75:
+        return 'Mở 3/4 - Xe hơi nhỏ';
+      case 100:
+        return 'Mở hoàn toàn - Xe tải';
+      default:
+        return 'Mở $percentage%';
     }
   }
 
   bool _shouldWriteToFirebase() {
     if (_lastFirebaseWrite == null) return true;
-    return DateTime.now().difference(_lastFirebaseWrite!) >= _firebaseWriteInterval;
+    return DateTime.now().difference(_lastFirebaseWrite!) >=
+        _firebaseWriteInterval;
   }
 
   bool _shouldWriteDeviceState() {
@@ -346,10 +321,10 @@ class MqttService {
 
   void controlGateLevel(int level) {
     if (level < 0 || level > 3) return;
-    
+
     publishDeviceCommand(topicGateLevel, level.toString());
     print('🚪 Điều khiển cổng đến mức $level');
-    
+
     // Save to Firebase
     if (_enableFirebase) {
       _saveGateStateToFirebase(level);
@@ -357,10 +332,11 @@ class MqttService {
   }
 
   // NEW: Control gate by percentage (0-100%) - convert to ESP32 levels
-  Future<void> publishGateControl(int percentage, {bool shouldRequestStatus = false}) async {
+  Future<void> publishGateControl(int percentage,
+      {bool shouldRequestStatus = false}) async {
     try {
       int level;
-      
+
       // Convert percentage to ESP32 level format
       if (percentage <= 0) {
         level = 0; // Closed
@@ -371,27 +347,26 @@ class MqttService {
       } else {
         level = 3; // 100% open
       }
-      
+
       if (shouldRequestStatus) {
         // Request current status from ESP32
         publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
         print('📡 Requesting gate status from ESP32');
         return;
       }
-      
+
       // Send level command to ESP32
       publishDeviceCommand(topicGateLevel, level.toString());
       print('🚪 Gate control: $percentage% -> Level $level sent to ESP32');
-      
+
       // Update local state immediately for responsive UI
       _currentGateLevel = level;
       _gateStateController.add(level);
-      
+
       // Save to Firebase
       if (_enableFirebase) {
         _saveGateStateToFirebase(level);
       }
-      
     } catch (e) {
       print('❌ Error controlling gate: $e');
       rethrow;
@@ -409,26 +384,35 @@ class MqttService {
 
   Future<void> _saveGateStateToFirebase(int level) async {
     if (!_enableFirebase || !_shouldWriteDeviceState()) return;
-    
+
     try {
       final gateService = GateStateService();
-      
+
       // Convert ESP32 level to percentage for Firebase
       int percentage;
       switch (level) {
-        case 0: percentage = 0; break;
-        case 1: percentage = 25; break;
-        case 2: percentage = 50; break;
-        case 3: percentage = 100; break;
-        default: percentage = 0;
+        case 0:
+          percentage = 0;
+          break;
+        case 1:
+          percentage = 25;
+          break;
+        case 2:
+          percentage = 50;
+          break;
+        case 3:
+          percentage = 100;
+          break;
+        default:
+          percentage = 0;
       }
-      
+
       await gateService.saveGateState(GateState(
         level: percentage,
         isMoving: false,
         timestamp: DateTime.now(),
       ));
-      
+
       _lastDeviceWrite = DateTime.now();
       print('✅ Gate state saved to Firebase: $percentage%');
     } catch (e) {
@@ -439,6 +423,65 @@ class MqttService {
   // Compatibility methods
   void controlLed1(bool isOn) => controlLedGate(isOn);
   void controlLed2(bool isOn) => controlLedAround(isOn);
+
+  // ========== ENHANCED GATE CONTROL WITH FIREBASE STATE SYNC ==========
+  
+  /// Enhanced gate control with relative movement based on Firebase state
+  Future<bool> moveGateRelative(int relativePercent) async {
+    try {
+      final gateService = GateStateService();
+      final result = await gateService.moveGateRelative(relativePercent);
+      
+      if (!result.success) {
+        print('❌ Gate control failed: ${result.message}');
+        return false;
+      }
+
+      print('🚪 ${result.message}');
+      
+      // Send MQTT command with new target level
+      await publishGateControl(result.targetLevel);
+      
+      return true;
+    } catch (e) {
+      print('❌ Error in relative gate movement: $e');
+      return false;
+    }
+  }
+
+  /// Enhanced gate control with absolute positioning based on Firebase state
+  Future<bool> moveGateAbsolute(int targetPercent) async {
+    try {
+      final gateService = GateStateService();
+      final result = await gateService.moveGateAbsolute(targetPercent);
+      
+      if (!result.success) {
+        print('❌ Gate control failed: ${result.message}');
+        return false;
+      }
+
+      print('🚪 ${result.message}');
+      
+      // Send MQTT command with target level
+      await publishGateControl(result.targetLevel);
+      
+      return true;
+    } catch (e) {
+      print('❌ Error in absolute gate movement: $e');
+      return false;
+    }
+  }
+
+  /// Convenience methods for common gate operations
+  Future<bool> openGateMore(int additionalPercent) => 
+      moveGateRelative(additionalPercent);
+  
+  Future<bool> closeGatePartially(int reducePercent) => 
+      moveGateRelative(-reducePercent);
+  
+  Future<bool> openGateFully() => moveGateAbsolute(100);
+  
+  Future<bool> closeGateCompletely() => moveGateAbsolute(0);
 
   void disconnect() {
     _client?.disconnect();
