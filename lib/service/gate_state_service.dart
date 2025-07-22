@@ -28,23 +28,34 @@ class GateState {
   final bool isMoving;
   final GateStatus status;
   final DateTime timestamp;
+  
+  // Simplified fields for command-based logic
+  final String? lastCommand;        // Last command sent to gate ('OPEN_TO_75', 'CLOSE', etc.)
+  final String? direction;          // 'opening', 'closing', null
+  final int? targetLevel;           // Target level for current operation (0-100)
 
   const GateState({
     required this.level,
     required this.isMoving,
     required this.status,
     required this.timestamp,
+    this.lastCommand,
+    this.direction,
+    this.targetLevel,
   });
 
   Map<String, dynamic> toMap() {
     return {
+      // Core gate state
       'level': level,
       'isMoving': isMoving,
       'status': status.value,
-      'status_description': status.description,
-      'status_icon': status.icon,
-      'timestamp': timestamp.millisecondsSinceEpoch,
-      'created_at': timestamp,
+      // 🚨 timestamp removed - no longer needed since we don't write to Firebase
+      
+      // Command tracking for debugging (local state only)
+      'last_command': lastCommand,
+      'direction': direction,
+      'target_level': targetLevel,
     };
   }
 
@@ -56,6 +67,11 @@ class GateState {
       timestamp: map['timestamp'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(map['timestamp'])
           : DateTime.now(),
+      
+      // Simplified fields for command-based logic
+      lastCommand: map['last_command'],
+      direction: map['direction'],
+      targetLevel: map['target_level'],
     );
   }
 
@@ -94,6 +110,9 @@ class GateState {
     required bool isMoving,
     DateTime? timestamp,
     GateStatus? forcedStatus,
+    String? lastCommand,
+    String? direction,
+    int? targetLevel,
   }) {
     GateStatus status;
     
@@ -112,6 +131,38 @@ class GateState {
       isMoving: isMoving,
       status: status,
       timestamp: timestamp ?? DateTime.now(),
+      lastCommand: lastCommand,
+      direction: direction,
+      targetLevel: targetLevel,
+    );
+  }
+
+  // Simplified utility methods for command-based logic
+  
+  /// Check if gate has reached target level
+  bool get hasReachedTarget {
+    if (targetLevel == null) return true;
+    return level == targetLevel;
+  }
+  
+  /// Create a copy with updated fields
+  GateState copyWith({
+    int? level,
+    bool? isMoving,
+    GateStatus? status,
+    DateTime? timestamp,
+    String? lastCommand,
+    String? direction,
+    int? targetLevel,
+  }) {
+    return GateState(
+      level: level ?? this.level,
+      isMoving: isMoving ?? this.isMoving,
+      status: status ?? this.status,
+      timestamp: timestamp ?? this.timestamp,
+      lastCommand: lastCommand ?? this.lastCommand,
+      direction: direction ?? this.direction,
+      targetLevel: targetLevel ?? this.targetLevel,
     );
   }
 }
@@ -137,31 +188,24 @@ class GateStateService {
   static final GateStateService _instance = GateStateService._internal();
   factory GateStateService() => _instance;
   GateStateService._internal();
+  
+  // Cache mechanism - 🚨 OPTIMIZED: Minimal Firebase reads, rely on MQTT for real-time
+  GateState? _cachedState;
+  DateTime? _lastCacheTime;
+  static const Duration _cacheTimeout = Duration(hours: 1);  // 🚨 CRITICAL: 1 hour cache to minimize Firebase reads
 
-  /// Lưu trạng thái cổng (phiên bản mới - đơn giản hóa)
+  /// Lưu trạng thái cổng với cache - 🚨 FIREBASE WRITES DISABLED
   Future<bool> saveGateState(GateState gateState) async {
     try {
-      final data = gateState.toMap();
-      data.addAll({
-        'description': gateState.description,
-        'icon': gateState.icon,
-        'device_id': 'main_gate',
-        'location': 'entrance',
-        'zone': 'entrance', 
-        'type': 'gate',
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-
-      // Use document ID 'main_gate' to avoid index issues
-      await _firestore
-          .collection(_gateStateCollection)
-          .doc('main_gate')
-          .set(data, SetOptions(merge: true));
+      // Update cache immediately for responsive UI
+      _cachedState = gateState;
+      _lastCacheTime = DateTime.now();
       
-      print('✅ Gate state saved successfully: ${gateState.status.description} (${gateState.level}%)');
+      // 🚨 FIREBASE WRITES COMPLETELY DISABLED - Only use cache for real-time UI
+      print('📋 Gate state cached: ${gateState.status.description} (${gateState.level}%) - Firebase write DISABLED');
       return true;
     } catch (e) {
-      print('❌ Error saving gate state: $e');
+      print('❌ Error caching gate state: $e');
       return false;
     }
   }
@@ -178,43 +222,159 @@ class GateStateService {
     );
     return saveGateState(gateState);
   }
-  /// Lấy trạng thái cổng hiện tại (phiên bản đơn giản)
+
+  /// Send gate command with proper direction logic
+  Future<bool> sendGateCommand({
+    required String command,
+    required int targetLevel,
+    String? direction,
+  }) async {
+    try {
+      // Get current state to determine proper status
+      final currentState = await getCurrentGateState();
+      final currentLevel = currentState.level;
+      
+      // Determine status based on direction logic
+      GateStatus status;
+      if (direction == 'opening') {
+        status = GateStatus.opening;
+      } else if (direction == 'closing') {
+        status = GateStatus.closing;
+      } else {
+        // No direction = no movement needed or stop command
+        status = targetLevel > 0 ? GateStatus.open : GateStatus.closed;
+      }
+      
+      final gateState = GateState(
+        level: currentLevel, // Keep current level initially
+        isMoving: direction != null, // Moving if has direction
+        status: status,
+        timestamp: DateTime.now(),
+        lastCommand: command,
+        direction: direction,
+        targetLevel: targetLevel,
+      );
+      
+      print('🚪 Sending gate command: $command → Target: $targetLevel%, Direction: $direction');
+      return saveGateState(gateState);
+    } catch (e) {
+      print('❌ Error sending gate command: $e');
+      return false;
+    }
+  }
+
+  /// Update operation progress during movement
+  Future<bool> updateOperationProgress({
+    required int currentLevel,
+  }) async {
+    try {
+      final currentState = await getCurrentGateState();
+      
+      // Check if target reached
+      if (currentState.targetLevel != null && 
+          currentLevel == currentState.targetLevel) {
+        // Auto-complete operation when target is reached
+        print('🎯 Target reached: $currentLevel% - Auto completing operation');
+        return completeOperation(finalLevel: currentLevel, success: true);
+      }
+      
+      // Keep existing command tracking but update level
+      final gateState = currentState.copyWith(
+        level: currentLevel,
+        isMoving: true,
+        timestamp: DateTime.now(),
+      );
+      
+      return saveGateState(gateState);
+    } catch (e) {
+      print('❌ Error updating operation progress: $e');
+      return false;
+    }
+  }
+  
+  /// Complete operation and set final state
+  Future<bool> completeOperation({
+    required int finalLevel,
+    bool success = true,
+  }) async {
+    try {
+      final currentState = await getCurrentGateState();
+      
+      // Keep all command fields, only update movement and status
+      final gateState = currentState.copyWith(
+        level: finalLevel,
+        isMoving: false,  // Stop movement
+        status: success 
+            ? (finalLevel > 0 ? GateStatus.open : GateStatus.closed)
+            : GateStatus.error,
+        timestamp: DateTime.now(),
+        // Keep all command tracking: lastCommand, direction, targetLevel
+      );
+      
+      print('✅ Operation completed: Level=$finalLevel%, Status=${gateState.status.value}');
+      return saveGateState(gateState);
+    } catch (e) {
+      print('❌ Error completing operation: $e');
+      return false;
+    }
+  }
+
+  /// Lấy trạng thái cổng hiện tại với cache - 🚨 OPTIMIZED to minimize Firebase reads
   Future<GateState> getCurrentGateState() async {
     try {
-      // Simple document read - no index required
+      // 🚨 PRIORITY 1: Return cached state if available (even if "expired" - MQTT keeps it current)
+      if (_cachedState != null) {
+        final cacheAge = _lastCacheTime != null ? DateTime.now().difference(_lastCacheTime!) : Duration.zero;
+        print('📋 Using cached gate state (age: ${cacheAge.inMinutes}min ${cacheAge.inSeconds % 60}s)');
+        return _cachedState!;
+      }
+      
+      // 🚨 PRIORITY 2: Only read Firebase if absolutely no cache (app startup only)
+      print('🔄 RARE: Loading gate state from Firebase (no cache available)...');
       final doc = await _firestore
           .collection(_gateStateCollection)
           .doc('main_gate')
           .get();
       
+      GateState state;
       if (doc.exists) {
         final data = doc.data()!;
         // Try new format first
         if (data.containsKey('level') && data.containsKey('status')) {
-          return GateState.fromMap(data);
+          state = GateState.fromMap(data);
+        } else {
+          // Fallback to legacy format
+          final percentage = data['percentage'] ?? 0;
+          state = GateState.withAutoStatus(
+            level: percentage,
+            isMoving: false,
+            timestamp: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          );
         }
-        // Fallback to legacy format
-        final percentage = data['percentage'] ?? 0;
-        return GateState.withAutoStatus(
-          level: percentage,
+      } else {
+        // Return default state if no data found
+        state = GateState.withAutoStatus(
+          level: 0,
           isMoving: false,
-          timestamp: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
       }
-      // Return default state if no data found
-      return GateState.withAutoStatus(
-        level: 0,
-        isMoving: false,
-        timestamp: DateTime.now(),
-      );
+      
+      // Update cache
+      _cachedState = state;
+      _lastCacheTime = DateTime.now();
+      
+      print('📡 Firebase read completed - cache updated for 1 hour');
+      return state;
     } catch (e) {
       print('❌ Error getting current gate state: $e');
-      // Return default state on error
-      return GateState.withAutoStatus(
-        level: 0,
-        isMoving: false,
-        timestamp: DateTime.now(),
-      );
+      
+      // Fallback to cache even if expired, or return default
+      if (_cachedState != null) {
+        print('🔄 Using stale cache as fallback');
+        return _cachedState!;
+      }
+      
+      return GateState.withAutoStatus(level: 0, isMoving: false);
     }
   }
 
@@ -441,30 +601,20 @@ class GateStateService {
   }
 
   /// Cập nhật trạng thái cổng gặp lỗi
-  Future<bool> setGateError(int currentLevel, {String? errorMessage}) async {
+  Future<bool> setGateError(int currentLevel) async {
     final gateState = GateState.withAutoStatus(
       level: currentLevel,
       isMoving: false,
       forcedStatus: GateStatus.error,
     );
     
-    // Lưu thêm thông tin lỗi nếu có
-    final success = await saveGateState(gateState);
-    if (success && errorMessage != null) {
-      try {
-        await _firestore
-            .collection(_gateStateCollection)
-            .doc('main_gate')
-            .update({
-          'error_message': errorMessage,
-          'error_timestamp': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        print('❌ Error saving error message: $e');
-      }
-    }
-    
-    return success;
+    return saveGateState(gateState);
+  }
+  
+  /// Get current level from state
+  Future<int> getCurrentLevel() async {
+    final currentState = await getCurrentGateState();
+    return currentState.level;
   }
 }
 

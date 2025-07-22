@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
-import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
 import 'package:smart_home/service/gate_state_service.dart'; // Import gate service
 
@@ -13,8 +12,8 @@ class MqttService {
   static const String _password = 'U0ofxmA6rbhSp4_O'; // App Secret
   static const String _clientIdBase = 'Flutter_SmartHome';
   
-  // Firebase toggle - enable để lưu dữ liệu thực tế
-  static const bool _enableFirebase = true; // Bật để lưu dữ liệu lên Firebase
+  // Firebase toggle - 🚨 DISABLED to reduce requests - use Widget-level saves instead
+  static const bool _enableFirebase = false; // 🚨 Disabled để giảm requests
 
     // MQTT topics - outdoor ESP32 Dev
   static const String topicTemp = 'khoasmarthome/temperature';
@@ -58,7 +57,6 @@ class MqttService {
   final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
 
   // Firebase service instance
-  final FirebaseDataService _firebaseData = FirebaseDataService();
   final FirebaseBatchService _batchService = FirebaseBatchService();
 
   // Firebase write throttling - HEAVILY REDUCED to save costs
@@ -438,6 +436,56 @@ class MqttService {
     }
   }
 
+  // ENHANCED: Gate control with direction for accurate motor control
+  Future<void> publishGateControlWithDirection({
+    required int currentLevel,
+    required int targetLevel,
+    String? direction,
+    String? command,
+  }) async {
+    try {
+      if (!_isConnected) {
+        print('❌ Cannot publish gate control: MQTT not connected');
+        return;
+      }
+
+      // Create enhanced command message format: "LEVEL|DIRECTION|COMMAND"
+      String mqttMessage;
+      
+      if (command == 'STOP') {
+        mqttMessage = 'STOP';
+        print('🚪 Sending STOP command...');
+      } else {
+        // Format: "targetLevel|direction|command"
+        // Example: "25|closing|OPEN_TO_25" or "75|opening|OPEN_TO_75"
+        mqttMessage = '$targetLevel|${direction ?? 'none'}|${command ?? 'MOVE_TO_$targetLevel'}';
+        print('🚪 Sending enhanced gate command:');
+        print('   From: $currentLevel% → To: $targetLevel%');
+        print('   Direction: ${direction ?? 'none'}');
+        print('   Command: ${command ?? 'MOVE_TO_$targetLevel'}');
+        print('   MQTT Message: $mqttMessage');
+      }
+
+      publishDeviceCommand(topicGateLevel, mqttMessage);
+      
+      // Update local state for responsive UI
+      _currentGateLevel = targetLevel;
+      _gateStatusController.add({
+        'level': currentLevel, // Keep current until movement starts
+        'isMoving': direction != null,
+        'description': direction != null 
+            ? 'Đang ${direction == "opening" ? "mở" : "đóng"} đến $targetLevel%...'
+            : 'Đã đến $targetLevel%',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      
+      print('🚪 Enhanced gate command sent: $mqttMessage');
+      
+    } catch (e) {
+      print('❌ Error in publishGateControlWithDirection: $e');
+    }
+  }
+
   // CẢI TIẾN: Điều khiển cổng với percentage (0-100%)
   Future<void> publishGateControl(int level, {bool shouldRequestStatus = false}) async {
     try {
@@ -543,29 +591,39 @@ class MqttService {
         
         print('🚪 Gate status updated: Level $level%, Moving: $isMoving ($description)');
         
-        // Save to Firebase
+        // Save to Firebase - 🚨 ONLY if isMoving changed to avoid excessive writes
         if (_enableFirebase) {
           _saveGateStateToFirebase(level, isMoving: isMoving);
         }
         
       } else if (parts.length >= 2) {
         // Format cũ - tương thích ngược
-        final level = int.tryParse(parts[0]) ?? 0;
-        _currentGateLevel = level;
-        _gateStateController.add(level);
+        final firstPart = int.tryParse(parts[0]) ?? 0;
         
-        // Convert old level to percentage for new stream
-        int percentage = (level * 33.33).round();
-        if (level == 3) percentage = 100;
+        // 🚨 FIX: Determine if first part is percentage or level
+        int percentage;
+        bool isMoving = false; // 🚨 CRITICAL: Default isMoving = false for legacy format
+        
+        if (firstPart <= 4) {
+          // Old format: level (0-4) -> convert to percentage
+          percentage = (firstPart * 25); // 0->0%, 1->25%, 2->50%, 3->75%, 4->100%
+          _currentGateLevel = firstPart;
+          print('🚪 Gate status updated (legacy level): Level $firstPart -> $percentage% (${parts[1]}) - isMoving: $isMoving');
+        } else {
+          // New format: already percentage -> use directly
+          percentage = firstPart;
+          _currentGateLevel = (percentage / 25).round(); // Convert back to level for compatibility
+          print('🚪 Gate status updated (percentage): $percentage% (level ${_currentGateLevel}) (${parts[1]}) - isMoving: $isMoving');
+        }
+        
+        _gateStateController.add(_currentGateLevel);
         
         _gateStatusController.add({
           'level': percentage,
-          'isMoving': false,
+          'isMoving': isMoving, // 🚨 CRITICAL: Always false for legacy format
           'description': parts[1],
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
-        
-        print('🚪 Gate status updated (legacy): Level $level -> $percentage% (${parts[1]})');
       }
     } catch (e) {
       print('❌ Error parsing gate status: $e');

@@ -131,15 +131,25 @@ bool ledGateState = false;    // true = ON, false = OFF
 bool ledAroundState = false;
 // Add more device states as needed for other devices
 
-// Điều khiển motor cổng - CẢI TIẾN ĐA MỨC ĐỘ
-unsigned long motorRunTime = 7000;  // Thời gian mở hoàn toàn 
+// Điều khiển motor cổng - CẢI TIẾN 25% INTERVALS
+unsigned long motorRunTime = 7000;  // Thời gian mở hoàn toàn (0→100%)
 bool motorRunning = false;
 unsigned long motorStartTime = 0;
 int motorState = 0; // 0 = dừng, 1 = tiến, 2 = lùi
-int gateLevel = 0;  // 0 = đóng, 1 = mở 1/3, 2 = mở 2/3, 3 = mở hoàn toàn
+int gateLevel = 0;  // 0 = đóng (0%), 1 = 25%, 2 = 50%, 3 = 75%, 4 = 100%
+int targetGateLevel = 0; // Target level để track trong motor operation
 
-// Thời gian cho từng mức độ mở cổng
-unsigned long gateLevelTimes[4] = {0, 2300, 4600, 7000}; // 0%, 33%, 66%, 100%
+// Failsafe - Maximum motor runtime to prevent damage
+const unsigned long MAX_MOTOR_RUNTIME = 7000;  // 7 seconds absolute maximum
+
+// Thời gian tích lũy cho từng mức độ mở cổng (0-100% trong 7 giây)
+unsigned long gateLevelTimes[5] = {
+  0,     // 0% = 0ms
+  1750,  // 25% = 1.75s 
+  3500,  // 50% = 3.5s
+  5250,  // 75% = 5.25s  
+  7000   // 100% = 7s
+};
 
 void setup_wifi() {
   WiFi.begin(ssid, password);
@@ -163,17 +173,25 @@ void syncTime() {
 }
 
 void checkPing() {
+  // 🚨 TEMPORARILY DISABLED - Ping function causing hangs
+  Serial.println("⚠️ Ping check disabled to prevent ESP32 hang");
+  Serial.println("🔧 MQTT connection will be tested directly");
+  /*
   if (Ping.ping(mqtt_server)) {
     Serial.println("✅ Ping MQTT Broker OK");
   } else {
     Serial.println("❌ Ping failed");
   }
+  */
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
   String message;
   for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
-  Serial.printf("📩 Message [%s]: %s\n", topic, message.c_str());
+  
+  // 🚨 ENHANCED DEBUG - Always print received messages
+  Serial.printf("� MQTT RECEIVED [%s]: %s (length: %d)\n", topic, message.c_str(), length);
+  Serial.printf("🔥 Current time: %lu ms\n", millis());
 
   // Điều khiển cổng và đèn cổng - BỔ SUNG MQTT CHO ĐA MỨC ĐỘ
   if (String(topic) == TOPIC_LED_GATE) {
@@ -202,46 +220,100 @@ void callback(char* topic, byte* payload, unsigned int length) {
     // Report status back to MQTT
     publishDeviceStatus("led_around", newState);
   }
-  // Điều khiển motor cổng - CẢI TIẾN ĐA MỨC ĐỘ
+  // Điều khiển motor cổng - CẢI TIẾN ĐA MỨC ĐỘ với DIRECTION
   else if (String(topic) == TOPIC_GATE_LEVEL && !motorRunning) {
     // Handle STOP command
     if (message == "STOP") {
-      Serial.printf("🛑 STOP command received - ignoring\n");
+      Serial.printf("🛑 STOP command received - motor already stopped\n");
       return;
     }
     
-    int inputValue = message.toInt();
+    // Parse enhanced message format: "targetLevel|direction|command"
+    // Example: "25|closing|OPEN_TO_25" or simple: "50"
     int targetLevel;
+    String direction = "";
+    String command = "";
     
-    // Convert percentage to level (0-100% -> 0-3 levels)
-    if (inputValue >= 0 && inputValue <= 100) {
-      if (inputValue == 0) targetLevel = 0;      // 0% = CLOSED
-      else if (inputValue <= 33) targetLevel = 1;  // 1-33% = PARTIAL_33
-      else if (inputValue <= 66) targetLevel = 2;  // 34-66% = PARTIAL_66
-      else targetLevel = 3;                         // 67-100% = OPEN
+    if (message.indexOf('|') > 0) {
+      // Enhanced format: "targetLevel|direction|command"
+      int firstPipe = message.indexOf('|');
+      int secondPipe = message.indexOf('|', firstPipe + 1);
       
-      Serial.printf("📨 MQTT Received gate command: percentage=%d%% -> level=%d (current=%d)\n", 
-                    inputValue, targetLevel, gateLevel);
-    }
-    // Direct level input (0-3)
-    else if (inputValue >= 0 && inputValue <= 3) {
-      targetLevel = inputValue;
-      Serial.printf("📨 MQTT Received gate command: level=%d (current=%d)\n", 
-                    targetLevel, gateLevel);
-    }
-    else {
-      Serial.printf("❌ Invalid input value: %d - must be 0-100%% or 0-3 level\n", inputValue);
-      return;
+      String levelStr = message.substring(0, firstPipe);
+      direction = message.substring(firstPipe + 1, secondPipe);
+      command = message.substring(secondPipe + 1);
+      
+      int inputValue = levelStr.toInt();
+      
+      // Convert percentage to ESP32 level (0-100% -> 0-4 levels)
+      if (inputValue >= 0 && inputValue <= 100) {
+        if (inputValue == 0) targetLevel = 0;        // 0% = CLOSED
+        else if (inputValue <= 25) targetLevel = 1;  // 1-25% = LEVEL_25
+        else if (inputValue <= 50) targetLevel = 2;  // 26-50% = LEVEL_50  
+        else if (inputValue <= 75) targetLevel = 3;  // 51-75% = LEVEL_75
+        else targetLevel = 4;                        // 76-100% = LEVEL_100
+        
+        Serial.printf("📨 Enhanced MQTT: %d%% -> level=%d, direction=%s, cmd=%s\n", 
+                      inputValue, targetLevel, direction.c_str(), command.c_str());
+      } else {
+        Serial.printf("❌ Invalid enhanced input: %s\n", message.c_str());
+        return;
+      }
+    } else {
+      // Legacy format: simple number
+      int inputValue = message.toInt();
+      
+      // Convert percentage to level (0-100% -> 0-4 levels)
+      if (inputValue >= 0 && inputValue <= 100) {
+        if (inputValue == 0) targetLevel = 0;        // 0% = CLOSED
+        else if (inputValue <= 25) targetLevel = 1;  // 1-25% = LEVEL_25
+        else if (inputValue <= 50) targetLevel = 2;  // 26-50% = LEVEL_50
+        else if (inputValue <= 75) targetLevel = 3;  // 51-75% = LEVEL_75
+        else targetLevel = 4;                        // 76-100% = LEVEL_100
+        
+        Serial.printf("📨 Legacy MQTT: percentage=%d%% -> level=%d (current=%d)\n", 
+                      inputValue, targetLevel, gateLevel);
+      }
+      // Direct level input (0-4)
+      else if (inputValue >= 0 && inputValue <= 4) {
+        targetLevel = inputValue;
+        Serial.printf("📨 Legacy MQTT: level=%d (current=%d)\n", 
+                      targetLevel, gateLevel);
+      }
+      else {
+        Serial.printf("❌ Invalid input value: %d - must be 0-100%% or 0-4 level\n", inputValue);
+        return;
+      }
     }
     
     if (targetLevel != gateLevel) {
-      Serial.printf("🚀 Motor starting: level %d -> %d\n", gateLevel, targetLevel);
+      Serial.printf("🚀 Motor starting: level %d -> %d (direction: %s)\n", 
+                    gateLevel, targetLevel, direction.c_str());
       controlGateToLevel(targetLevel);
     } else {
       Serial.printf("ℹ️ Gate already at level %d - no action needed\n", targetLevel);
     }
   } else if (String(topic) == TOPIC_GATE_LEVEL && motorRunning) {
-    Serial.printf("⚠️ Gate control ignored - motor already running\n");
+    // Allow STOP command even when motor is running
+    if (message == "STOP" || message.indexOf("STOP") >= 0) {
+      Serial.printf("🛑 EMERGENCY STOP received - stopping motor immediately\n");
+      // Stop motor immediately
+      digitalWrite(MOTOR_FORWARD_PIN, LOW);
+      digitalWrite(MOTOR_REVERSE_PIN, LOW);
+      motorRunning = false;
+      motorState = 0;
+      
+      // ✅ Emergency stop - keep current gateLevel (don't update to target)
+      // gateLevel stays as-is
+      
+      // Publish current status
+      publishGateStatus();
+      Serial.printf("⏹️ Motor emergency stopped at level %d\n", gateLevel);
+    } else {
+      Serial.printf("⚠️ Gate control ignored - motor already running (use STOP to halt)\n");
+      Serial.printf("🔧 Current motor state: level %d->%d, elapsed %lu ms\n", 
+                    gateLevel, targetGateLevel, millis() - motorStartTime);
+    }
   }
   // Handle status request
   else if (String(topic) == "khoasmarthome/status_request") {
@@ -263,19 +335,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
     /*
     if (message == "CLOSE" || message == "0") {
       Serial.printf("🔒 Motor command: CLOSE\n");
-      controlGateToLevel(0); // Đóng hoàn toàn
+      controlGateToLevel(0); // Đóng hoàn toàn (0%)
     }
     else if (message == "PEDESTRIAN" || message == "1") {
-      Serial.printf("🚶 Motor command: PEDESTRIAN (33%)\n");
-      controlGateToLevel(1); // Mở cho người đi bộ
+      Serial.printf("🚶 Motor command: PEDESTRIAN (25%)\n");
+      controlGateToLevel(1); // Mở cho người đi bộ (25%)
     }
     else if (message == "MOTORBIKE" || message == "2") {
-      Serial.printf("🏍️ Motor command: MOTORBIKE (66%)\n");
-      controlGateToLevel(2); // Mở cho xe máy
+      Serial.printf("🏍️ Motor command: MOTORBIKE (50%)\n");
+      controlGateToLevel(2); // Mở cho xe máy (50%)
     }
-    else if (message == "OPEN" || message == "3") {
-      Serial.printf("🚗 Motor command: OPEN FULL (100%)\n");
-      controlGateToLevel(3); // Mở hoàn toàn
+    else if (message == "CAR" || message == "3") {
+      Serial.printf("🚗 Motor command: CAR (75%)\n");
+      controlGateToLevel(3); // Mở cho xe hơi (75%)
+    }
+    else if (message == "TRUCK" || message == "4") {
+      Serial.printf("🚛 Motor command: TRUCK FULL (100%)\n");
+      controlGateToLevel(4); // Mở hoàn toàn (100%)
     }
     else {
       Serial.printf("❌ Unknown motor command: %s\n", message.c_str());
@@ -326,6 +402,8 @@ void reconnect() {
     Serial.print("🔁 Attempting MQTT connection...");
     if (client.connect(mqtt_client_id, mqtt_user, mqtt_pass)) {
       Serial.println("✅ connected");
+      Serial.printf("🔥 MQTT CLIENT ID: %s\n", mqtt_client_id);
+      Serial.printf("🔥 MQTT BROKER: %s:%d\n", mqtt_server, mqtt_port);
       
       // Subscribe to existing topics (giữ nguyên)
       client.subscribe(TOPIC_LED_GATE);
@@ -333,6 +411,10 @@ void reconnect() {
       client.subscribe(TOPIC_MOTOR);
       client.subscribe(TOPIC_GATE_LEVEL);   // Subscribe topic mới
       client.subscribe("khoasmarthome/status_request"); // Subscribe status request
+      
+      // 🚨 ENHANCED DEBUG - Confirm subscriptions
+      Serial.printf("🔥 SUBSCRIBED TO GATE_LEVEL: %s\n", TOPIC_GATE_LEVEL);
+      Serial.printf("🔥 SUBSCRIBED TO GATE_STATUS: %s\n", TOPIC_GATE_STATUS);
       
       // Subscribe to new topics
       client.subscribe(TOPIC_AWNING);
@@ -344,6 +426,15 @@ void reconnect() {
       client.subscribe(TOPIC_BEDROOM);
       client.subscribe(TOPIC_STAIRS);
       client.subscribe(TOPIC_BATHROOM);
+      
+      // 🚨 IMMEDIATE STATUS PUBLISH for debugging
+      Serial.println("🔥 Publishing initial device status...");
+      publishAllDeviceStatus();
+      
+      // 🚨 EXPLICIT GATE STATUS - Send gate closed state immediately
+      delay(200);
+      publishGateStatus();
+      Serial.println("✅ MQTT connected - Initial gate status sent");
       
     } else {
       Serial.printf("❌ failed, rc=%d, retrying in 5s\n", client.state());
@@ -417,9 +508,21 @@ void setup() {
   Serial.println("   🌿 Yard & Fish Pond Lights");
   Serial.println("   🏘️ Indoor Lights (5 rooms)");
   
+  // 🚨 INITIAL GATE STATUS - Send default gate closed state to Flutter
+  Serial.println("📡 Sending initial gate status: CLOSED (0%)");
+  gateLevel = 0;  // Ensure gate starts at closed position
+  targetGateLevel = 0;
+  motorRunning = false;
+  motorState = 0;
+  
   // Publish initial device status after 3 seconds
   delay(3000);
   publishAllDeviceStatus();
+  
+  // 🚨 ADDITIONAL - Explicitly send gate closed status
+  delay(500);
+  publishGateStatus();
+  Serial.println("✅ Initial gate status sent: 0% CLOSED");
 }
 
 void loop() {
@@ -428,25 +531,64 @@ void loop() {
 
   unsigned long now = millis();
 
+  // Debug motor timing mọi lúc khi motor đang chạy
+  if (motorRunning) {
+    unsigned long elapsed = now - motorStartTime;
+    Serial.printf("⏰ MOTOR TIMING: elapsed=%lu ms, target=%lu ms, max=%lu ms\n",
+                  elapsed, motorRunTime, MAX_MOTOR_RUNTIME);
+  }
+
   // Kiểm tra và tắt motor khi đạt mức độ mong muốn
-  if (motorRunning && now - motorStartTime > motorRunTime) {
+  if (motorRunning && now - motorStartTime >= motorRunTime) {
     digitalWrite(MOTOR_FORWARD_PIN, LOW);
     digitalWrite(MOTOR_REVERSE_PIN, LOW);
     motorRunning = false;
     motorState = 0;
     
+    // ✅ CHỈ BÂY GIỜ MỚI UPDATE gateLevel
+    gateLevel = targetGateLevel;
+    
     // Báo trạng thái cổng qua MQTT
     publishGateStatus();
     
-    Serial.printf("⏹️ Motor stopped at level %d (runtime: %lu ms)\n", gateLevel, motorRunTime);
+    Serial.printf("⏹️ Motor stopped at level %d (runtime: %lu ms)\n", gateLevel, now - motorStartTime);
   }
   
-  // Debug motor state mỗi 10 giây
+  // FAILSAFE: Ngắt motor nếu chạy quá 7 giây (bảo vệ phần cứng)
+  if (motorRunning && now - motorStartTime >= MAX_MOTOR_RUNTIME) {
+    digitalWrite(MOTOR_FORWARD_PIN, LOW);
+    digitalWrite(MOTOR_REVERSE_PIN, LOW);
+    motorRunning = false;
+    motorState = 0;
+    
+    // ⚠️ FAILSAFE: Update gateLevel to target (assume reached)
+    gateLevel = targetGateLevel;
+    
+    // Báo lỗi failsafe
+    publishGateStatus();
+    
+    Serial.printf("🚨 FAILSAFE: Motor force stopped after %lu ms (max: %lu ms)\n", 
+                  now - motorStartTime, MAX_MOTOR_RUNTIME);
+    Serial.printf("⚠️ Motor runtime exceeded maximum safe limit - check hardware!\n");
+  }
+  
+  // Debug motor state mỗi 5 giây thay vì 10 giây
   static unsigned long lastDebug = 0;
-  if (now - lastDebug > 10000) {
+  if (now - lastDebug > 5000) {
     lastDebug = now;
-    Serial.printf("🔍 Debug - gateLevel=%d, motorRunning=%s, motorState=%d\n", 
-                  gateLevel, motorRunning ? "true" : "false", motorState);
+    Serial.printf("🔍 Debug - gateLevel=%d, targetLevel=%d, motorRunning=%s, motorState=%d\n", 
+                  gateLevel, targetGateLevel, motorRunning ? "true" : "false", motorState);
+    if (motorRunning) {
+      Serial.printf("🔍 Motor timing - elapsed=%lu ms, target=%lu ms\n", 
+                    now - motorStartTime, motorRunTime);
+    }
+    
+    // 🚨 ENHANCED DEBUG - MQTT connection status
+    Serial.printf("🔥 MQTT Status: connected=%s, state=%d\n", 
+                  client.connected() ? "true" : "false", client.state());
+    Serial.printf("🔥 WiFi Status: %s, IP: %s\n", 
+                  WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", 
+                  WiFi.localIP().toString().c_str());
   }
 
   // Gửi dữ liệu cảm biến định kỳ (giữ nguyên)
@@ -468,13 +610,19 @@ void loop() {
     client.publish(TOPIC_CURRENT, String(current, 2).c_str());
     client.publish(TOPIC_POWER, String(power, 2).c_str());
     Serial.printf("🔋 V: %.2fV, I: %.2fmA, P: %.2fmW\n", busV, current, power);
+    
+    // 🚨 PERIODIC GATE STATUS - Send gate status every 5 seconds to ensure Flutter stays updated
+    publishGateStatus();
+    Serial.printf("📡 Periodic gate status sent: %d%% (level %d)\n", 
+                  (gateLevel == 0) ? 0 : (gateLevel == 1) ? 25 : (gateLevel == 2) ? 50 : (gateLevel == 3) ? 75 : 100, 
+                  gateLevel);
   }
 }
 
 // THÊM CÁC HÀM MỚI CHO ĐIỀU KHIỂN ĐA MỨC ĐỘ CỔNG
 
 void controlGateToLevel(int targetLevel) {
-  if (targetLevel < 0 || targetLevel > 3 || targetLevel == gateLevel) return;
+  if (targetLevel < 0 || targetLevel > 4 || targetLevel == gateLevel) return;
   
   int currentLevel = gateLevel; // Lưu level hiện tại
   bool needForward = targetLevel > currentLevel;
@@ -496,92 +644,173 @@ void controlGateToLevel(int targetLevel) {
     Serial.printf("🔽 Motor REVERSE for %lu ms\n", motorRunTime);
   }
   
-  // CHỈ set gateLevel sau khi đã tính toán xong
-  gateLevel = targetLevel;
+  // ✅ FIX: Lưu target, KHÔNG update gateLevel ngay
+  targetGateLevel = targetLevel;
   motorStartTime = millis();
   motorRunning = true;
   
-  // Publish status with MOVING state - gửi percentage thay vì level
-  int percentage;
+  // Debug thông tin timing
+  Serial.printf("🔧 DEBUG: currentLevel=%d, targetLevel=%d, motorRunTime=%lu ms\n", 
+                currentLevel, targetLevel, motorRunTime);
+  Serial.printf("🔧 DEBUG: gateLevelTimes[%d]=%lu, gateLevelTimes[%d]=%lu\n", 
+                currentLevel, gateLevelTimes[currentLevel], 
+                targetLevel, gateLevelTimes[targetLevel]);
+  
+  // Publish status with MOVING state - dùng current level, moving to target
+  int currentPercentage;
+  int targetPercentage;
+  switch(currentLevel) {
+    case 0: currentPercentage = 0; break;   // 0%
+    case 1: currentPercentage = 25; break;  // 25%
+    case 2: currentPercentage = 50; break;  // 50%
+    case 3: currentPercentage = 75; break;  // 75%
+    case 4: currentPercentage = 100; break; // 100%
+    default: currentPercentage = 0; break;
+  }
   switch(targetLevel) {
-    case 0: percentage = 0; break;
-    case 1: percentage = 33; break;
-    case 2: percentage = 66; break;
-    case 3: percentage = 100; break;
-    default: percentage = 0; break;
+    case 0: targetPercentage = 0; break;   // 0%
+    case 1: targetPercentage = 25; break;  // 25%
+    case 2: targetPercentage = 50; break;  // 50%
+    case 3: targetPercentage = 75; break;  // 75%
+    case 4: targetPercentage = 100; break; // 100%
+    default: targetPercentage = 0; break;
   }
   
-  String status = String(percentage);
-  String description = "MOVING_TO_" + String(percentage);
-  String message = status + ":" + description;
-  client.publish(TOPIC_GATE_STATUS, message.c_str());
-  Serial.printf("📡 Gate status published: %s%% (moving to level %d)\n", percentage, targetLevel);
+  // 🚨 SAFETY CHECK - Use char arrays instead of String objects
+  char statusStr[8];
+  char descriptionStr[32];
+  char messageStr[64];
+  
+  snprintf(statusStr, sizeof(statusStr), "%d", currentPercentage);
+  snprintf(descriptionStr, sizeof(descriptionStr), "MOVING_TO_%d", targetPercentage);
+  // 🚨 NEW FORMAT: "percentage:isMoving:description"
+  snprintf(messageStr, sizeof(messageStr), "%s:%s:%s", statusStr, "true", descriptionStr);
+  
+  if (client.connected() && strlen(messageStr) > 0) {
+    client.publish(TOPIC_GATE_STATUS, messageStr);
+    Serial.printf("📡 Gate status published: %d%% MOVING_TO_%d%% (level %d->%d)\n", 
+                  currentPercentage, targetPercentage, currentLevel, targetLevel);
+  } else {
+    Serial.println("⚠️ MQTT not connected or invalid message - skipping status publish");
+  }
   
   Serial.printf("⚙️ Motor started: %s direction, target level %d, runtime %lu ms\n", 
                 needForward ? "FORWARD" : "REVERSE", targetLevel, motorRunTime);
 }
 
 void publishGateStatus() {
-  if (!client.connected()) return;
+  if (!client.connected()) {
+    Serial.println("⚠️ MQTT not connected - skipping gate status publish");
+    return;
+  }
   
-  // Convert level to percentage để gửi về Flutter
+  // 🚨 SAFETY CHECK - Validate gateLevel bounds
+  if (gateLevel < 0 || gateLevel > 4) {
+    Serial.printf("⚠️ Invalid gateLevel: %d - resetting to 0\n", gateLevel);
+    gateLevel = 0;
+  }
+  
+  // Convert level to percentage với 25% intervals để gửi về Flutter
   int percentage;
   switch(gateLevel) {
     case 0: percentage = 0; break;     // 0% = CLOSED
-    case 1: percentage = 33; break;    // 33% = PARTIAL_33
-    case 2: percentage = 66; break;    // 66% = PARTIAL_66
-    case 3: percentage = 100; break;   // 100% = OPEN
+    case 1: percentage = 25; break;    // 25% = LEVEL_25
+    case 2: percentage = 50; break;    // 50% = LEVEL_50  
+    case 3: percentage = 75; break;    // 75% = LEVEL_75
+    case 4: percentage = 100; break;   // 100% = LEVEL_100
     default: percentage = 0; break;
   }
   
-  String status = String(percentage);
-  String description;
+  // 🚨 SAFETY CHECK - Use char arrays instead of String objects
+  char statusStr[8];
+  char descriptionStr[32];
+  char messageStr[64];
+  
+  snprintf(statusStr, sizeof(statusStr), "%d", percentage);
   
   if (motorRunning) {
-    description = "MOVING_TO_" + String(percentage);
+    snprintf(descriptionStr, sizeof(descriptionStr), "MOVING_TO_%d", percentage);
+    // 🚨 NEW FORMAT: "percentage:isMoving:description" 
+    snprintf(messageStr, sizeof(messageStr), "%s:%s:%s", statusStr, "true", descriptionStr);
   } else {
     switch(gateLevel) {
-      case 0: description = "CLOSED"; break;
-      case 1: description = "PARTIAL_33"; break;
-      case 2: description = "PARTIAL_66"; break;
-      case 3: description = "OPEN"; break;
-      default: description = "UNKNOWN"; break;
+      case 0: strcpy(descriptionStr, "CLOSED"); break;
+      case 1: strcpy(descriptionStr, "LEVEL_25"); break;
+      case 2: strcpy(descriptionStr, "LEVEL_50"); break;
+      case 3: strcpy(descriptionStr, "LEVEL_75"); break;
+      case 4: strcpy(descriptionStr, "LEVEL_100"); break;
+      default: strcpy(descriptionStr, "UNKNOWN"); break;
     }
+    // 🚨 NEW FORMAT: "percentage:isMoving:description"
+    snprintf(messageStr, sizeof(messageStr), "%s:%s:%s", statusStr, "false", descriptionStr);
   }
   
-  String message = status + ":" + description;
-  client.publish(TOPIC_GATE_STATUS, message.c_str());
-  Serial.printf("📡 Gate status published: %s%% (level %d) - %s\n", 
-                percentage, gateLevel, description.c_str());
+  // 🚨 SAFETY CHECK - Validate message before publishing
+  if (strlen(messageStr) > 0) {
+    client.publish(TOPIC_GATE_STATUS, messageStr);
+    Serial.printf("📡 Gate status published: %s%% (level %d) - %s\n", 
+                  statusStr, gateLevel, descriptionStr);
+  } else {
+    Serial.println("⚠️ Empty message - skipping gate status publish");
+  }
 }
 
 // NEW: Publish individual device status
 void publishDeviceStatus(const char* deviceName, bool isOn) {
-  if (!client.connected()) return;
+  if (!client.connected()) {
+    Serial.println("⚠️ MQTT not connected - skipping device status publish");
+    return;
+  }
   
-  String topic = "khoasmarthome/" + String(deviceName) + "/status";
-  String message = isOn ? "ON" : "OFF";
+  // 🚨 SAFETY CHECK - Validate deviceName
+  if (deviceName == nullptr || strlen(deviceName) == 0) {
+    Serial.println("⚠️ Invalid device name - skipping device status publish");
+    return;
+  }
   
-  client.publish(topic.c_str(), message.c_str());
-  Serial.printf("📡 Device status published: %s = %s\n", deviceName, message.c_str());
+  // 🚨 SAFETY CHECK - Use char arrays instead of String objects
+  char topicStr[64];
+  char messageStr[8];
+  char jsonStr[128];
   
-  // Also publish to general device status topic with JSON format
-  String jsonStatus = "{\"device\":\"" + String(deviceName) + "\",\"state\":\"" + message + "\",\"timestamp\":" + String(millis()) + "}";
-  client.publish(TOPIC_DEVICE_STATUS, jsonStatus.c_str());
+  snprintf(topicStr, sizeof(topicStr), "khoasmarthome/%s/status", deviceName);
+  strcpy(messageStr, isOn ? "ON" : "OFF");
+  
+  // Validate before publishing
+  if (strlen(topicStr) > 0 && strlen(messageStr) > 0) {
+    client.publish(topicStr, messageStr);
+    Serial.printf("📡 Device status published: %s = %s\n", deviceName, messageStr);
+    
+    // Also publish to general device status topic with JSON format
+    snprintf(jsonStr, sizeof(jsonStr), 
+             "{\"device\":\"%s\",\"state\":\"%s\",\"timestamp\":%lu}", 
+             deviceName, messageStr, millis());
+    
+    client.publish(TOPIC_DEVICE_STATUS, jsonStr);
+  } else {
+    Serial.printf("⚠️ Invalid topic or message for device: %s\n", deviceName);
+  }
 }
 
 // NEW: Publish all device status at once
 void publishAllDeviceStatus() {
-  if (!client.connected()) return;
+  if (!client.connected()) {
+    Serial.println("⚠️ MQTT not connected - skipping all device status publish");
+    return;
+  }
   
   Serial.println("📡 Publishing all device status...");
   
-  // Publish individual device status
+  // 🚨 SAFETY CHECK - Add delays between publishes to prevent overload
   publishDeviceStatus("led_gate", ledGateState);
+  delay(100);
+  
   publishDeviceStatus("led_around", ledAroundState);
+  delay(100);
   
   // Publish gate status
   publishGateStatus();
+  delay(100);
   
   Serial.println("✅ All device status published");
 }

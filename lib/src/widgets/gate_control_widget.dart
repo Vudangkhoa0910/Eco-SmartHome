@@ -47,12 +47,10 @@ class _GateControlWidgetState extends State<GateControlWidget> {
     try {
       // Load state từ Firebase
       final currentState = await _gateService.getCurrentGateState();
-      if (currentState != null) {
-        setState(() {
-          _currentLevel = currentState.level;
-          _isMoving = currentState.isMoving;
-        });
-      }
+      setState(() {
+        _currentLevel = currentState.level;
+        _isMoving = currentState.isMoving;
+      });
       
       // Publish current state request để get real-time từ ESP32
       await _mqttService.publishGateControl(0, shouldRequestStatus: true);
@@ -98,6 +96,7 @@ class _GateControlWidgetState extends State<GateControlWidget> {
     _gateService.saveGateState(GateState(
       level: targetLevel,
       isMoving: true,
+      status: GateStatus.opening,
       timestamp: DateTime.now(),
     ));
     
