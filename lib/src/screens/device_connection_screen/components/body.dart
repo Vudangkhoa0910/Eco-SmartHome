@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/src/screens/home_screen/home_screen.dart';
 import 'package:smart_home/src/screens/mock_qr_scanner_screen/mock_qr_scanner_screen.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -301,14 +302,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF464646),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    context.showInfoNotification(message);
   }
 
   void _logout() async {

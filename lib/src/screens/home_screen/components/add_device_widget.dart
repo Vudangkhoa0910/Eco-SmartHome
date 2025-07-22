@@ -1,6 +1,7 @@
 import 'package:smart_home/config/size_config.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'device_selection_dialog.dart';
 
 class AddNewDevice extends StatelessWidget {
@@ -99,20 +100,7 @@ class AddNewDevice extends StatelessWidget {
             }
 
             // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text('Đã thêm thiết bị "${device.name}" vào $roomName'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-                behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  bottom: 100,
-                  left: 16,
-                  right: 16,
-                ),
-              ),
-            );
+            context.showSuccessNotification('Đã thêm thiết bị "${device.name}" vào $roomName');
           },
         );
       },

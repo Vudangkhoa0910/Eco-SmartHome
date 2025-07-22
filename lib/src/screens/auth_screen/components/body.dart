@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/service/auth_service.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'package:flutter/material.dart';
 
 class Body extends StatefulWidget {
@@ -153,14 +154,7 @@ class _BodyState extends State<Body> with SingleTickerProviderStateMixin {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF464646),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    context.showInfoNotification(message);
   }
 
   @override

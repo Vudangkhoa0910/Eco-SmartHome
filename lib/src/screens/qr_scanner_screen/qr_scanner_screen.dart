@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_home/service/theme_service.dart';
+import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 
 class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({Key? key}) : super(key: key);
@@ -14,26 +17,609 @@ class _QRScannerScreenState extends State<QRScannerScreen> with TickerProviderSt
   MobileScannerController controller = MobileScannerController();
   String? result;
   bool isScanning = true;
+  bool flashOn = false;
   final ImagePicker _imagePicker = ImagePicker();
   
   late AnimationController _animationController;
-  late Animation<double> _animation;
+  late AnimationController _pulseController;
+  late Animation<double> _scanAnimation;
+  late Animation<double> _pulseAnimation;
   
   @override
   void initState() {
     super.initState();
+    
+    // Scan line animation
     _animationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _scanAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.repeat(reverse: true);
+
+    // Pulse animation for corners
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _pulseController.dispose();
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _onQRViewCreated(BarcodeCapture capture) {
+    if (!isScanning) return;
+    
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isNotEmpty) {
+      final barcode = barcodes.first;
+      if (barcode.rawValue != null) {
+        setState(() {
+          result = barcode.rawValue;
+          isScanning = false;
+        });
+        _animationController.stop();
+        _showResultDialog(barcode.rawValue!);
+      }
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100,
+      );
+      
+      if (image != null) {
+        setState(() {
+          isScanning = false;
+        });
+        
+        // Process image for QR code
+        await _processImageForQR(image.path);
+      }
+    } catch (e) {
+      _showErrorDialog('Không thể chọn ảnh: $e');
+    }
+  }
+
+  Future<void> _processImageForQR(String imagePath) async {
+    try {
+      // Show loading dialog
+      _showLoadingDialog();
+      
+      // Analyze image with mobile_scanner
+      final result = await controller.analyzeImage(imagePath);
+      Navigator.of(context).pop(); // Close loading dialog
+      
+      if (result != null && result.barcodes.isNotEmpty) {
+        final barcode = result.barcodes.first;
+        if (barcode.rawValue != null) {
+          _showResultDialog(barcode.rawValue!);
+        } else {
+          _showErrorDialog('Không tìm thấy mã QR trong ảnh');
+        }
+      } else {
+        _showErrorDialog('Không tìm thấy mã QR trong ảnh');
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Close loading dialog
+      _showErrorDialog('Lỗi khi xử lý ảnh: $e');
+    }
+  }
+
+  void _toggleFlash() {
+    setState(() {
+      flashOn = !flashOn;
+    });
+    controller.toggleTorch();
+  }
+
+  void _showResultDialog(String qrData) {
+    final theme = ThemeService.instance.currentPalette;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.qr_code_scanner,
+                  color: theme.primaryColor,
+                  size: 24,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Quét thành công!',
+                style: TextStyle(
+                  color: theme.primaryColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Mã QR đã được quét:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  qrData,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  result = null;
+                  isScanning = true;
+                });
+                _animationController.repeat(reverse: true);
+              },
+              child: Text(
+                'Quét lại',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop(qrData);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  ThemeService.instance.currentPalette.primaryColor,
+                ),
+              ),
+              SizedBox(width: 16),
+              Text(
+                'Đang phân tích ảnh...',
+                style: TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeService.instance.currentPalette;
+    final textColor = ThemeService.instance.getAdaptiveTextColor(theme.gradientColors.first);
+    
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: theme.gradientColors,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Main scanner view
+            MobileScanner(
+              controller: controller,
+              onDetect: _onQRViewCreated,
+            ),
+            
+            // Top overlay with gradient
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.7),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              backdropFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            ),
+                            child: Icon(
+                              Icons.arrow_back_ios,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'Quét mã QR',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _toggleFlash,
+                          child: Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: flashOn 
+                                ? theme.primaryColor.withOpacity(0.3)
+                                : Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              backdropFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            ),
+                            child: Icon(
+                              flashOn ? Icons.flash_on : Icons.flash_off,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+            // Center scanning frame with animation
+            Center(
+              child: Container(
+                width: 280,
+                height: 280,
+                child: Stack(
+                  children: [
+                    // Outer glow effect
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.primaryColor.withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Main scanning frame
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: theme.primaryColor,
+                          width: 3,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(17),
+                        child: Stack(
+                          children: [
+                            // Corner decorations
+                            ...List.generate(4, (index) {
+                              return Positioned(
+                                top: index < 2 ? 8 : null,
+                                bottom: index >= 2 ? 8 : null,
+                                left: index % 2 == 0 ? 8 : null,
+                                right: index % 2 == 1 ? 8 : null,
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: theme.primaryColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                ),
+                              );
+                            }),
+                            
+                            // Animated scanning line
+                            if (isScanning)
+                              AnimatedBuilder(
+                                animation: _animation,
+                                builder: (context, child) {
+                                  return Positioned(
+                                    top: _animation.value * 240,
+                                    left: 20,
+                                    right: 20,
+                                    child: Container(
+                                      height: 3,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.transparent,
+                                            theme.primaryColor,
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Pulse effect
+                    AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: theme.primaryColor.withOpacity(
+                                0.5 * (1 - _pulseAnimation.value),
+                              ),
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          transform: Matrix4.identity()
+                            ..scale(1 + _pulseAnimation.value * 0.1),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Bottom overlay with controls
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Đưa mã QR vào khung để quét',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 20),
+                      
+                      // Gallery button
+                      GestureDetector(
+                        onTap: _pickImageFromGallery,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(
+                              color: theme.primaryColor,
+                              width: 2,
+                            ),
+                            backdropFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.photo_library,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Chọn từ thư viện',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            // Result overlay
+            if (result != null && !isScanning)
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Center(
+                  child: Container(
+                    margin: EdgeInsets.all(32),
+                    padding: EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 64,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Quét thành công!',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          result!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black54,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    result = null;
+                                    isScanning = true;
+                                  });
+                                  _animationController.repeat(reverse: true);
+                                },
+                                child: Text('Quét lại'),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(result);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.primaryColor,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: Text('Xác nhận'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -252,22 +838,13 @@ class _QRScannerScreenState extends State<QRScannerScreen> with TickerProviderSt
         Navigator.of(context).pop(); // Close loading dialog
         
         // Show info message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chức năng phân tích QR từ hình ảnh đang được phát triển'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        context.showInfoNotification('Chức năng phân tích QR từ hình ảnh đang được phát triển');
       }
     } catch (e) {
       print('Error picking image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lỗi khi chọn hình ảnh'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      context.showErrorNotification('Lỗi khi chọn hình ảnh');
     }
+  }
   }
 
   void _onQRViewCreated(BarcodeCapture capture) {
@@ -292,12 +869,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> with TickerProviderSt
       if (validKeys.contains(code)) {
         Navigator.of(context).pop(code); // Return the scanned key
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Mã QR không hợp lệ: $code'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorNotification('Mã QR không hợp lệ: $code');
         setState(() {
           result = null;
           isScanning = true;

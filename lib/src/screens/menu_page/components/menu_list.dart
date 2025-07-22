@@ -3,6 +3,7 @@ import 'package:smart_home/src/screens/stats_screen/stats_screen.dart';
 import 'package:smart_home/src/screens/savings_screen/savings_screen.dart';
 import 'package:smart_home/src/screens/ai_voice_screen/ai_voice_screen.dart';
 import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -88,12 +89,7 @@ class MenuList extends StatelessWidget {
           iconPath: 'assets/icons/menu_icons/settings.svg',
           itemName: 'Cài đặt',
           function: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tính năng cài đặt đang được phát triển'),
-                backgroundColor: Color(0xFF464646),
-              ),
-            );
+            context.showInfoNotification('Tính năng cài đặt đang được phát triển');
           },
         ),
         SizedBox(height: getProportionateScreenHeight(8)),
@@ -102,12 +98,7 @@ class MenuList extends StatelessWidget {
           iconPath: 'assets/icons/menu_icons/faq.svg',
           itemName: 'Câu hỏi thường gặp',
           function: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tính năng FAQ đang được phát triển'),
-                backgroundColor: Color(0xFF464646),
-              ),
-            );
+            context.showInfoNotification('Tính năng FAQ đang được phát triển');
           },
         ),
         SizedBox(height: getProportionateScreenHeight(24)),

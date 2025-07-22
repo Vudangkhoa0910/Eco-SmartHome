@@ -5,6 +5,7 @@ import 'package:smart_home/src/screens/home_screen/components/energy_overview_wi
 import 'package:smart_home/src/screens/set_event_screen/set_event_screen.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/service/device_manager_service.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -247,20 +248,8 @@ class _BodyState extends State<Body> {
 
                   if (success) {
                     await _loadUserDevices(); // Refresh the device list
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Đã thêm thiết bị "${device.name}" vào phần điều khiển nhanh'),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 3),
-                        behavior: SnackBarBehavior.floating,
-                        margin: EdgeInsets.only(
-                          bottom: getProportionateScreenHeight(100),
-                          left: getProportionateScreenWidth(16),
-                          right: getProportionateScreenWidth(16),
-                        ),
-                      ),
-                    );
+                    context.showSuccessNotification(
+                        'Đã thêm thiết bị "${device.name}" vào phần điều khiển nhanh');
                   }
                 },
               ),
@@ -583,19 +572,7 @@ class _BodyState extends State<Body> {
       final success = await _deviceManager.removeDevice(userDevice.device.name);
       if (success) {
         await _loadUserDevices();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã xóa thiết bị "${userDevice.device.name}"'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(
-              bottom: getProportionateScreenHeight(100),
-              left: getProportionateScreenWidth(16),
-              right: getProportionateScreenWidth(16),
-            ),
-          ),
-        );
+        context.showWarningNotification('Đã xóa thiết bị "${userDevice.device.name}"');
       }
     }
   }
@@ -709,18 +686,7 @@ class _BodyState extends State<Body> {
                   await _deviceManager.clearAllDevices();
                   await _loadUserDevices();
                   Navigator.of(context).pop(); // Close edit dialog
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Đã xóa tất cả thiết bị'),
-                      backgroundColor: Colors.orange,
-                      behavior: SnackBarBehavior.floating,
-                      margin: EdgeInsets.only(
-                        bottom: getProportionateScreenHeight(100),
-                        left: getProportionateScreenWidth(16),
-                        right: getProportionateScreenWidth(16),
-                      ),
-                    ),
-                  );
+                  context.showWarningNotification('Đã xóa tất cả thiết bị');
                 }
               },
               child: Text('Xóa tất cả', style: TextStyle(color: Colors.red)),

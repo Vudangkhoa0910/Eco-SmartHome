@@ -1,4 +1,5 @@
 import 'package:smart_home/config/size_config.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -398,20 +399,10 @@ class _BodyState extends State<Body> {
             await user.updatePassword(newPasswordController.text);
             _showSuccessDialog();
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Vui lòng điền đầy đủ thông tin để đổi mật khẩu'),
-                backgroundColor: Colors.orange,
-              ),
-            );
+            context.showWarningNotification('Vui lòng điền đầy đủ thông tin để đổi mật khẩu');
           }
         } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          context.showErrorNotification('Lỗi: ${e.toString()}');
         }
       }
     }

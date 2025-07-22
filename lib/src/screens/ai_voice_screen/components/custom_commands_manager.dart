@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/view/ai_voice_view_model.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 
 class CustomCommandsManager extends StatefulWidget {
   final AIVoiceViewModel model;
@@ -595,9 +596,7 @@ class _CustomCommandsManagerState extends State<CustomCommandsManager> {
 
   void _addCommand() async {
     if (_commandController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập lệnh giọng nói')),
-      );
+      context.showWarningNotification('Vui lòng nhập lệnh giọng nói');
       return;
     }
 
@@ -621,9 +620,7 @@ class _CustomCommandsManagerState extends State<CustomCommandsManager> {
     _descriptionController.clear();
     _aliasesController.clear();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã thêm lệnh tùy chỉnh thành công!')),
-    );
+    context.showSuccessNotification('Đã thêm lệnh tùy chỉnh thành công!');
   }
 
   void _showEditCommandDialog(Map<String, dynamic> command) {
@@ -658,9 +655,7 @@ class _CustomCommandsManagerState extends State<CustomCommandsManager> {
             onPressed: () {
               Navigator.pop(context);
               widget.model.deleteCustomCommand(command['id']);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã xóa lệnh thành công!')),
-              );
+              context.showSuccessNotification('Đã xóa lệnh thành công!');
             },
             child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
