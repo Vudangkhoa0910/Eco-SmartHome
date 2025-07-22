@@ -282,7 +282,8 @@ class HomeScreenViewModel extends BaseModel {
 
   void fanSwitch() {
     isFanON = !isFanON;
-    _mqttService.controlMotor(isFanON ? 'ON' : 'OFF');
+    // 🔧 FIX: Sử dụng method riêng cho đèn sân chính thay vì controlMotor
+    _mqttService.controlYardMainLight(isFanON);
     notifyListeners();
   }
 
@@ -447,9 +448,10 @@ class HomeScreenViewModel extends BaseModel {
         notifyListeners();
       });
       
-      // Request current status từ ESP32
-      _mqttService.publishGateControl(0, shouldRequestStatus: true);
-    } catch (e) {
+      
+      // Request current status từ ESP32 without sending control command
+      _mqttService.publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
+      } catch (e) {
       print('❌ Error initializing gate state: $e');
       _gateStatusText = 'Lỗi kết nối cổng';
       notifyListeners();
@@ -534,7 +536,7 @@ class HomeScreenViewModel extends BaseModel {
       _gateStatusText = 'Đang cập nhật...';
       notifyListeners();
       
-      await _mqttService.publishGateControl(0, shouldRequestStatus: true);
+      _mqttService.publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
       await _loadCurrentGateState();
     } catch (e) {
       print('❌ Error refreshing gate status: $e');

@@ -171,7 +171,7 @@ class MqttServiceSimple {
 
       // Request fresh status from ESP32
       await Future.delayed(const Duration(milliseconds: 500));
-      await publishGateControl(0, shouldRequestStatus: true);
+      publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
     } catch (e) {
       print('❌ Error initializing gate state: $e');
 
