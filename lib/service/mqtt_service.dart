@@ -4,6 +4,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
 import 'package:smart_home/service/gate_state_service.dart'; // Import gate service
+import 'package:smart_home/service/device_state_service.dart'; // Import device state service
 
 class MqttService {
   static const String _broker = 'i0bf1b65.ala.asia-southeast1.emqxsl.com';
@@ -58,6 +59,9 @@ class MqttService {
 
   // Firebase service instance
   final FirebaseBatchService _batchService = FirebaseBatchService();
+
+  // Device state service instance for synchronization
+  final DeviceStateService _deviceStateService = DeviceStateService();
 
   // Firebase write throttling - HEAVILY REDUCED to save costs
   DateTime? _lastFirebaseWrite;
@@ -191,6 +195,26 @@ class MqttService {
     
     // Initialize gate state when connected
     initializeGateState();
+    
+    // Request current device status from ESP32
+    _requestDeviceStatus();
+  }
+
+  void _requestDeviceStatus() {
+    // Send status request to ESP32 to get current device states
+    try {
+      // Request all device status
+      publishDeviceCommand('khoasmarthome/status_request', 'ALL_DEVICES');
+      
+      // Request specific device status
+      publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
+      publishDeviceCommand('khoasmarthome/status_request', 'LED_GATE');
+      publishDeviceCommand('khoasmarthome/status_request', 'LED_AROUND');
+      
+      print('📡 Requested device status from ESP32');
+    } catch (e) {
+      print('❌ Error requesting device status: $e');
+    }
   }
 
   void _onDisconnected() {
@@ -245,14 +269,45 @@ class MqttService {
       topicPower,
       // Gate status topic
       topicGateStatus,
+      
+      // Subscribe to device status topics for synchronization
+      '$topicLedGate/status',        // Trạng thái đèn cổng
+      '$topicLedAround/status',      // Trạng thái đèn xung quanh
+      'khoasmarthome/device_status', // Trạng thái thiết bị chung
+      'khoasmarthome/gate_percentage', // Gate percentage for compatibility
+      
+      // Other outdoor device status topics
+      'khoasmarthome/device/yard_main_light/status',
+      'khoasmarthome/device/fish_pond_light/status',
+      'khoasmarthome/device/awning_light/status',
+      'khoasmarthome/device/awning/status',
+      
+      // Indoor device status topics
+      'khoasmarthome/device/living_room_light/status',
+      'khoasmarthome/device/kitchen_light/status',
+      'khoasmarthome/device/bedroom_light/status',
+      'khoasmarthome/device/stairs_light/status',
+      'khoasmarthome/device/bathroom_light/status',
+      
       // Indoor ESP32-S3 topics
       topicCurrentInside,
       topicVoltageInside,
       topicPowerInside,
+      
+      // Subscribe to ESP32-S3 device status topics
+      '$topicKitchenLight/status',
+      '$topicLivingRoomLight/status',
+      '$topicBedroomLight/status',
+      '$topicCornerBedroomLight/status',
+      '$topicYardBedroomLight/status',
+      '$topicWorshipRoomLight/status',
+      '$topicHallwayLight/status',
+      '$topicBalconyLight/status',
     ];
 
     for (String topic in topics) {
       _client!.subscribe(topic, MqttQos.atLeastOnce);
+      print('📡 Subscribed to: $topic');
     }
 
     _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
@@ -266,6 +321,12 @@ class MqttService {
 
   void _handleMessage(String topic, String message) {
     print('📩 Received [$topic]: $message');
+    
+    // Handle device status messages first (before parsing as numbers)
+    if (topic.endsWith('/status') || topic.contains('device_status') || topic.contains('gate_percentage')) {
+      _handleDeviceStatus(topic, message);
+      return;
+    }
     
     try {
       final value = double.tryParse(message) ?? 0.0;
@@ -561,6 +622,89 @@ class MqttService {
     }
   }
 
+  // ========== DEVICE STATUS SYNCHRONIZATION ==========
+  
+  void _handleDeviceStatus(String topic, String message) {
+    print('🔄 Processing device status: [$topic] = $message');
+    
+    try {
+      // Extract device name from topic
+      String deviceName = _extractDeviceNameFromTopic(topic);
+      bool deviceState = (message.toUpperCase() == 'ON' || message.toUpperCase() == 'TRUE');
+      
+      // 🔧 FIX: Đảo logic cho yard_main_light để khớp với hardware thực tế
+      // Note: led_around không cần đảo ở đây vì sẽ xử lý trong UI
+      if (deviceName == 'yard_main_light') {
+        deviceState = !deviceState;  // Đảo ngược logic từ ESP32
+        print('🔧 Device $deviceName Status Inverted: ESP32=${message} -> UI=${deviceState ? 'ON' : 'OFF'}');
+      }
+      
+      // Update device state service for synchronization
+      if (deviceName.isNotEmpty) {
+        _deviceStateService.updateDeviceState(deviceName, deviceState, source: 'ESP32');
+        
+        print('🔄 Device synchronized: $deviceName = ${deviceState ? 'ON' : 'OFF'} (from ESP32)');
+        
+        // Broadcast device state change for UI updates
+        _broadcastDeviceStateChange(deviceName, deviceState);
+      }
+      
+      // Handle special cases
+      if (topic.contains('gate_percentage')) {
+        // Gate percentage for compatibility
+        final percentage = int.tryParse(message) ?? 0;
+        final level = (percentage / 25).round(); // Convert percentage to level (0-4)
+        _currentGateLevel = level;
+        _gateStateController.add(level);
+        print('🚪 Gate percentage updated: $percentage% (level $level)');
+      }
+      
+    } catch (e) {
+      print('❌ Error handling device status [$topic]: $e');
+    }
+  }
+  
+  String _extractDeviceNameFromTopic(String topic) {
+    // Extract device name from various topic formats
+    if (topic.contains('/status')) {
+      // Format: "khoasmarthome/led_gate/status" -> "led_gate"
+      // Format: "khoasmarthome/device/yard_main_light/status" -> "yard_main_light"
+      final parts = topic.split('/');
+      if (parts.length >= 3) {
+        if (parts.contains('device') && parts.length >= 4) {
+          // khoasmarthome/device/yard_main_light/status
+          return parts[parts.length - 2]; // Take device name before /status
+        } else {
+          // khoasmarthome/led_gate/status or inside/kitchen_light/status
+          return parts[parts.length - 2]; // Take device name before /status
+        }
+      }
+    }
+    
+    if (topic.contains('device_status')) {
+      // Parse JSON format for general device status
+      try {
+        // Expected format: {"device":"led_gate","state":"ON","timestamp":123456}
+        // For now, return empty - JSON parsing can be added if needed
+        return '';
+      } catch (e) {
+        return '';
+      }
+    }
+    
+    return '';
+  }
+  
+  void _broadcastDeviceStateChange(String deviceName, bool state) {
+    // Create a stream controller for device state changes if needed
+    // This can be listened to by widgets that need real-time device updates
+    // For now, just log the change
+    print('📡 Broadcasting device state change: $deviceName = ${state ? 'ON' : 'OFF'}');
+    
+    // TODO: Add StreamController for device state broadcasts if needed
+    // _deviceStateController.add({'device': deviceName, 'state': state});
+  }
+
   // ========== GATE STATE MANAGEMENT ==========
   
   void _handleGateStatus(String statusMessage) {
@@ -691,9 +835,9 @@ class MqttService {
         'timestamp': currentState.timestamp.millisecondsSinceEpoch,
       });
       print('🚪 Gate state initialized from Firebase: ${currentState.level}%');
-      // Request fresh status from ESP32
+      // Request fresh status from ESP32 without changing level
       await Future.delayed(const Duration(milliseconds: 500));
-      await publishGateControl(0, shouldRequestStatus: true);
+      publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
     } catch (e) {
       print('❌ Error initializing gate state: $e');
       
@@ -759,6 +903,25 @@ class MqttService {
     final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicBalconyLight, command);
     _logIndoorDeviceState('balcony_light', command, 'floor_2', 'balcony', 20.0);
+  }
+
+  // 🔧 FIX: Method điều khiển đèn sân chính với logic đảo ngược
+  void controlYardMainLight(bool isOn) {
+    // 🚨 INVERTED LOGIC: Hardware thực tế ngược với software expectation
+    final command = isOn ? 'OFF' : 'ON';  // Đảo logic để khớp với hardware
+    publishDeviceCommand('khoasmarthome/yard_main_light', command);
+    print('🔧 Yard Main Light: UI=${isOn ? 'ON' : 'OFF'} -> Hardware=${command}');
+    
+    // Log device state with original UI state (not inverted command)
+    if (_enableFirebase && _shouldWriteDeviceState()) {
+      _batchService.writeDeviceStateOptimized('yard_main_light', isOn ? 'ON' : 'OFF', 
+          metadata: {'room': 'yard', 'type': 'light', 'zone': 'main_yard', 'inverted': true})
+          .catchError((error) {
+            print('⚠️ Firebase Yard Main Light error: $error');
+            return false;
+          });
+      _lastDeviceWrite = DateTime.now();
+    }
   }
 
   // Helper method to log indoor device states (with optimized batching)

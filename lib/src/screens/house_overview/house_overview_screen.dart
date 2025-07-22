@@ -1,11 +1,41 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
 import 'package:smart_home/src/widgets/gate_device_control_widget.dart'; // 🚨 CONSOLIDATED: Using unified gate widget
+import 'package:smart_home/service/device_state_service.dart'; // Import for device synchronization
 
-class HouseOverviewScreen extends StatelessWidget {
+class HouseOverviewScreen extends StatefulWidget {
   const HouseOverviewScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HouseOverviewScreen> createState() => _HouseOverviewScreenState();
+}
+
+class _HouseOverviewScreenState extends State<HouseOverviewScreen> {
+  final DeviceStateService _deviceStateService = DeviceStateService();
+  late StreamSubscription _deviceStateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Listen to device state changes for UI synchronization
+    _deviceStateSubscription = _deviceStateService.stateStream.listen((states) {
+      if (mounted) {
+        setState(() {
+          // Trigger rebuild when device states change
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _deviceStateSubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

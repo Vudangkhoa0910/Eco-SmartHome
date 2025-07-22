@@ -60,8 +60,9 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         _statusText = _getGateDescription(_currentLevel);
       });
 
-      // Request current status từ ESP32
-      await _mqttService.publishGateControl(0, shouldRequestStatus: true);
+      // Request current status từ ESP32 WITHOUT sending control command
+      await Future.delayed(const Duration(milliseconds: 300));
+      _mqttService.publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
     } catch (e) {
       print('Error initializing gate widget: $e');
       setState(() {
@@ -726,7 +727,7 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
     });
 
     try {
-      await _mqttService.publishGateControl(0, shouldRequestStatus: true);
+      _mqttService.publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
       await _loadCurrentGateState();
     } catch (e) {
       print('❌ Error refreshing gate status: $e');

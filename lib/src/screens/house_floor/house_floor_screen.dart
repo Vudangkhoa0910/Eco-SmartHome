@@ -505,11 +505,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'khoasmarthome/led2',
       'khoasmarthome/motor',
       'khoasmarthome/led_gate', // Thêm đèn cổng từ ESP32
-      'khoasmarthome/led_around', // Thêm đèn xung quanh từ ESP32 (cho tương lai)
-      'khoasmarthome/awning', // Mái che
-      'khoasmarthome/yard_main_light', // Đèn sân chính
-      'khoasmarthome/fish_pond_light', // Đèn khu bể cá
-      'khoasmarthome/awning_light', // Đèn mái hiên
+      'khoasmarthome/led_around', // Đèn sân
 
       // ESP32-S3 (indoor) topics - Floor 1
       'inside/kitchen_light', // Đèn bếp lớn
@@ -543,6 +539,23 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     // Extract device id from MQTT topic for device state service
     String deviceId = _extractDeviceId(device.mqttTopic);
 
+    // 🔄 PRIORITY: Check DeviceStateService first for synchronized state from ESP32
+    if (_deviceStateService.currentStates.containsKey(deviceId)) {
+      bool syncedState = _deviceStateService.getDeviceState(deviceId);
+      
+      // 🔧 FIX: Đảo logic cho led_around vì ESP32 dùng logic âm (LOW=ON, HIGH=OFF)
+      if (deviceId == 'led_around') {
+        syncedState = !syncedState;  // Đảo ngược từ ESP32 logic
+        print('🔧 LED Around UI State: ESP32=${!syncedState} -> UI=$syncedState');
+      }
+      
+      print('🔄 Using synced state for $deviceId: $syncedState (from ESP32)');
+      return syncedState;
+    }
+
+    // 🔄 FALLBACK: Use local ViewModel state if no synced state available
+    print('📱 Using local state for $deviceId (fallback)');
+
     // For specific ESP32 devices, use device state service
     switch (device.mqttTopic) {
       case 'khoasmarthome/led_gate':
@@ -559,21 +572,13 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       return _deviceStateService.getDeviceState(deviceId);
     }
 
-    // For legacy devices, keep existing logic
+    // For legacy devices, keep existing logic as fallback
     switch (device.mqttTopic) {
       // ESP32 Dev (outdoor) devices
       case 'khoasmarthome/led1':
         return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
       case 'khoasmarthome/led2':
         return !_model.isACON; // Đảo trạng thái vì ESP32 dùng cực âm
-      case 'khoasmarthome/awning':
-        return _model.isSpeakerON; // Sử dụng state speaker cho mái che
-      case 'khoasmarthome/yard_main_light':
-        return _model.isFanON; // Sử dụng state fan cho đèn sân chính
-      case 'khoasmarthome/fish_pond_light':
-        return _model.isLightFav; // Sử dụng state favourite cho đèn bể cá
-      case 'khoasmarthome/awning_light':
-        return _model.isACFav; // Sử dụng AC favourite cho đèn mái hiên
 
       // ESP32-S3 (indoor) devices - Floor 1
       case 'inside/kitchen_light':
@@ -766,22 +771,6 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         break;
       case 'khoasmarthome/motor':
         _model.toggleMotor();
-        break;
-      case 'khoasmarthome/awning':
-        // Điều khiển mái che
-        _model.speakerSwitch(); // Sử dụng speaker switch cho mái che
-        break;
-      case 'khoasmarthome/yard_main_light':
-        // Điều khiển đèn sân chính
-        _model.fanSwitch(); // Sử dụng fan switch cho đèn sân chính
-        break;
-      case 'khoasmarthome/fish_pond_light':
-        // Điều khiển đèn khu bể cá
-        _model.lightFav(); // Sử dụng light favourite toggle cho đèn bể cá
-        break;
-      case 'khoasmarthome/awning_light':
-        // Điều khiển đèn mái hiên
-        _model.acFav(); // Sử dụng AC favourite toggle cho đèn mái hiên
         break;
 
       // Legacy topics for backward compatibility
