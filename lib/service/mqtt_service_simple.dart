@@ -248,7 +248,10 @@ class MqttServiceSimple {
     }
     
     if (topic == topicLedAroundStatus) {
-      _deviceStateService.updateDeviceState('led_around', message.toUpperCase() == 'ON', source: 'ESP32');
+      // 🔧 FIX: Đảo ngược logic cho LED Around status vì hardware kết nối ngược
+      // ESP32 gửi ON nghĩa là đèn tắt, gửi OFF nghĩa là đèn sáng
+      bool actualState = message.toUpperCase() == 'OFF';
+      _deviceStateService.updateDeviceState('led_around', actualState, source: 'ESP32');
       return;
     }
 
@@ -403,7 +406,9 @@ class MqttServiceSimple {
   }
 
   void controlLedAround(bool isOn) {
-    final command = isOn ? 'ON' : 'OFF';
+    // 🔧 FIX: Đảo ngược logic cho LED Around vì hardware kết nối ngược
+    // Gửi OFF để đèn sáng, gửi ON để đèn tắt
+    final command = isOn ? 'OFF' : 'ON';
     publishDeviceCommand(topicLedAround, command);
   }
 
