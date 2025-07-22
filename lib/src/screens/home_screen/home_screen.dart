@@ -188,60 +188,7 @@ class HomeScreen extends StatelessWidget {
             child: const Menu(),
           ),
 
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
-          floatingActionButton: Container(
-            margin: const EdgeInsets.only(top: 70), // Đẩy xuống gần navbar hơn
-            child: SizedBox(
-              width: 56, // Kích thước lớn hơn một chút
-              height: 56, // Kích thước lớn hơn một chút
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF6B73FF),
-                      Color(0xFF9C88FF)
-                    ], // Giữ màu như code cũ
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6B73FF).withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: FloatingActionButton(
-                  onPressed: () {
-                    // Navigate to AI Voice Screen hoặc show dialog/popup
-                    model.onItemTapped(2);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const AIVoiceScreenContent()),
-                    );
-                  },
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  child: AnimatedScale(
-                    duration: const Duration(milliseconds: 200),
-                    scale: model.selectedIndex == 2 ? 1.1 : 1.0,
-                    child: const Icon(
-                      Icons.mic,
-                      color: Colors.white,
-                      size: 32, // Icon mic lớn hơn một chút
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // BODY sử dụng PageView để đồng bộ với BottomNavigationBar
+          // BODY sử dụng PageView
           body: Container(
             decoration: BoxDecoration(
               gradient: AppColors.primaryGradient,
