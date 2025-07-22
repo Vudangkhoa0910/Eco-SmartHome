@@ -69,6 +69,12 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 #define LED_HALLWAY_PIN 7         // Đèn hành lang
 #define LED_BALCONY_PIN 18        // Đèn ban công lớn
 
+// Quạt và điều hòa (mô phỏng bằng LED)
+#define FAN_LIVING_ROOM_PIN 9     // Quạt tầng 1 phòng khách
+#define AC_LIVING_ROOM_PIN 12     // Điều hòa tầng 1 phòng khách
+#define AC_BEDROOM1_PIN 11        // Điều hòa tầng 2 phòng ngủ 1
+#define AC_BEDROOM2_PIN 10        // Điều hòa tầng 2 phòng ngủ 2
+
 // I2C pins for INA219 and OLED
 #define I2C_SDA 20
 #define I2C_SCL 21
@@ -89,6 +95,12 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 #define TOPIC_WORSHIP_ROOM "inside/worship_room_light"
 #define TOPIC_HALLWAY "inside/hallway_light"
 #define TOPIC_BALCONY "inside/balcony_light"
+
+// Quạt và điều hòa topics
+#define TOPIC_FAN_LIVING_ROOM "inside/fan_living_room"
+#define TOPIC_AC_LIVING_ROOM "inside/ac_living_room"
+#define TOPIC_AC_BEDROOM1 "inside/ac_bedroom1"
+#define TOPIC_AC_BEDROOM2 "inside/ac_bedroom2"
 
 // Device status sync topics
 #define TOPIC_STATUS_REQUEST "inside/device_status/request"
@@ -118,6 +130,10 @@ void publishDeviceStatus() {
   statusJson += "\"worship_room_light\":" + String(digitalRead(LED_WORSHIP_ROOM_PIN) == LOW ? "true" : "false") + ",";
   statusJson += "\"hallway_light\":" + String(digitalRead(LED_HALLWAY_PIN) == LOW ? "true" : "false") + ",";
   statusJson += "\"balcony_light\":" + String(digitalRead(LED_BALCONY_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"fan_living_room\":" + String(digitalRead(FAN_LIVING_ROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"ac_living_room\":" + String(digitalRead(AC_LIVING_ROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"ac_bedroom1\":" + String(digitalRead(AC_BEDROOM1_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"ac_bedroom2\":" + String(digitalRead(AC_BEDROOM2_PIN) == LOW ? "true" : "false") + ",";
   statusJson += "\"timestamp\":" + String(millis());
   statusJson += "}";
   
@@ -191,7 +207,10 @@ void syncTime() {
 void callback(char* topic, byte* payload, unsigned int length) {
   String message;
   for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
-  Serial.printf("📩 Tin nhắn [%s]: %s\n", topic, message.c_str());
+  
+  // 🚨 ENHANCED DEBUG - Always print received messages
+  Serial.printf("  MQTT RECEIVED [%s]: %s (length: %d)\n", topic, message.c_str(), length);
+  Serial.printf("🔥 Current time: %lu ms\n", millis());
 
   // Handle device status request
   if (String(topic) == TOPIC_STATUS_REQUEST) {
@@ -242,6 +261,43 @@ void callback(char* topic, byte* payload, unsigned int length) {
     delay(100);
     publishDeviceStatus();
   }
+  // 🔧 New device controls
+  else if (String(topic) == TOPIC_FAN_LIVING_ROOM) {
+    Serial.printf("🌀 [FAN] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
+    Serial.printf("🌀 [FAN] Pin %d current state: %s\n", FAN_LIVING_ROOM_PIN, digitalRead(FAN_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
+    digitalWrite(FAN_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("🌀 [FAN] Pin %d new state: %s\n", FAN_LIVING_ROOM_PIN, digitalRead(FAN_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
+    delay(100);
+    publishDeviceStatus();
+    Serial.printf("🌀 [FAN] Status published successfully\n");
+  }
+  else if (String(topic) == TOPIC_AC_LIVING_ROOM) {
+    Serial.printf("❄️ [AC-LIVING] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
+    Serial.printf("❄️ [AC-LIVING] Pin %d current state: %s\n", AC_LIVING_ROOM_PIN, digitalRead(AC_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
+    digitalWrite(AC_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("❄️ [AC-LIVING] Pin %d new state: %s\n", AC_LIVING_ROOM_PIN, digitalRead(AC_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
+    delay(100);
+    publishDeviceStatus();
+    Serial.printf("❄️ [AC-LIVING] Status published successfully\n");
+  }
+  else if (String(topic) == TOPIC_AC_BEDROOM1) {
+    Serial.printf("❄️ [AC-BEDROOM1] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
+    Serial.printf("❄️ [AC-BEDROOM1] Pin %d current state: %s\n", AC_BEDROOM1_PIN, digitalRead(AC_BEDROOM1_PIN) == HIGH ? "HIGH" : "LOW");
+    digitalWrite(AC_BEDROOM1_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("❄️ [AC-BEDROOM1] Pin %d new state: %s\n", AC_BEDROOM1_PIN, digitalRead(AC_BEDROOM1_PIN) == HIGH ? "HIGH" : "LOW");
+    delay(100);
+    publishDeviceStatus();
+    Serial.printf("❄️ [AC-BEDROOM1] Status published successfully\n");
+  }
+  else if (String(topic) == TOPIC_AC_BEDROOM2) {
+    Serial.printf("❄️ [AC-BEDROOM2] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
+    Serial.printf("❄️ [AC-BEDROOM2] Pin %d current state: %s\n", AC_BEDROOM2_PIN, digitalRead(AC_BEDROOM2_PIN) == HIGH ? "HIGH" : "LOW");
+    digitalWrite(AC_BEDROOM2_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("❄️ [AC-BEDROOM2] Pin %d new state: %s\n", AC_BEDROOM2_PIN, digitalRead(AC_BEDROOM2_PIN) == HIGH ? "HIGH" : "LOW");
+    delay(100);
+    publishDeviceStatus();
+    Serial.printf("❄️ [AC-BEDROOM2] Status published successfully\n");
+  }
 }
 
 void reconnect() {
@@ -265,6 +321,17 @@ void reconnect() {
         client.subscribe(TOPIC_HALLWAY);
         client.subscribe(TOPIC_BALCONY);
         client.subscribe(TOPIC_STATUS_REQUEST);  // Subscribe to status request topic
+        
+        // Subscribe to fan and AC topics
+        Serial.println("🔌 Subscribing to new device topics...");
+        client.subscribe(TOPIC_FAN_LIVING_ROOM);
+        Serial.printf("✅ Subscribed to: %s\n", TOPIC_FAN_LIVING_ROOM);
+        client.subscribe(TOPIC_AC_LIVING_ROOM);
+        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_LIVING_ROOM);
+        client.subscribe(TOPIC_AC_BEDROOM1);
+        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_BEDROOM1);
+        client.subscribe(TOPIC_AC_BEDROOM2);
+        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_BEDROOM2);
         
         // Send initial device status after connection
         delay(1000); // Wait for subscription to be established
@@ -293,6 +360,12 @@ void setup() {
   pinMode(LED_WORSHIP_ROOM_PIN, OUTPUT);
   pinMode(LED_HALLWAY_PIN, OUTPUT);
   pinMode(LED_BALCONY_PIN, OUTPUT);
+  
+  // Cấu hình chân cho quạt và điều hòa
+  pinMode(FAN_LIVING_ROOM_PIN, OUTPUT);
+  pinMode(AC_LIVING_ROOM_PIN, OUTPUT);
+  pinMode(AC_BEDROOM1_PIN, OUTPUT);
+  pinMode(AC_BEDROOM2_PIN, OUTPUT);
 
   // Tắt tất cả đèn ban đầu (rơ le active LOW)
   digitalWrite(LED_KITCHEN_PIN, HIGH);
@@ -303,6 +376,12 @@ void setup() {
   digitalWrite(LED_WORSHIP_ROOM_PIN, HIGH);
   digitalWrite(LED_HALLWAY_PIN, HIGH);
   digitalWrite(LED_BALCONY_PIN, HIGH);
+  
+  // Tắt tất cả quạt và điều hòa ban đầu (rơ le active LOW)
+  digitalWrite(FAN_LIVING_ROOM_PIN, HIGH);
+  digitalWrite(AC_LIVING_ROOM_PIN, HIGH);
+  digitalWrite(AC_BEDROOM1_PIN, HIGH);
+  digitalWrite(AC_BEDROOM2_PIN, HIGH);
 
   // Khởi tạo I2C cho INA219 và OLED
   Wire.begin(I2C_SDA, I2C_SCL);

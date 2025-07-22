@@ -307,6 +307,51 @@ class DeviceManagerService {
       print('❌ Error sending MQTT command: $e');
     }
   }
+
+  // New control methods for fan and AC devices
+  Future<bool> controlFanLivingRoom(bool isOn) async {
+    try {
+      await _mqttService.publishFanLivingRoomCommand(isOn ? 'ON' : 'OFF');
+      print('🌪️ Fan Living Room controlled: ${isOn ? 'ON' : 'OFF'}');
+      return true;
+    } catch (e) {
+      print('❌ Error controlling Fan Living Room: $e');
+      return false;
+    }
+  }
+
+  Future<bool> controlACLivingRoom(bool isOn) async {
+    try {
+      await _mqttService.publishACLivingRoomCommand(isOn ? 'ON' : 'OFF');
+      print('❄️ AC Living Room controlled: ${isOn ? 'ON' : 'OFF'}');
+      return true;
+    } catch (e) {
+      print('❌ Error controlling AC Living Room: $e');
+      return false;
+    }
+  }
+
+  Future<bool> controlACBedroom1(bool isOn) async {
+    try {
+      await _mqttService.publishACBedroom1Command(isOn ? 'ON' : 'OFF');
+      print('❄️ AC Bedroom1 controlled: ${isOn ? 'ON' : 'OFF'}');
+      return true;
+    } catch (e) {
+      print('❌ Error controlling AC Bedroom1: $e');
+      return false;
+    }
+  }
+
+  Future<bool> controlACBedroom2(bool isOn) async {
+    try {
+      await _mqttService.publishACBedroom2Command(isOn ? 'ON' : 'OFF');
+      print('❄️ AC Bedroom2 controlled: ${isOn ? 'ON' : 'OFF'}');
+      return true;
+    } catch (e) {
+      print('❌ Error controlling AC Bedroom2: $e');
+      return false;
+    }
+  }
 }
 
 /// Model for user-added devices
