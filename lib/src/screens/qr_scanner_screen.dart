@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:smart_home/core/permission_helper.dart';
+import 'package:smart_home/src/widgets/custom_notification.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -130,14 +131,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF464646),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+    context.showInfoNotification(message);
   }
 
   @override
