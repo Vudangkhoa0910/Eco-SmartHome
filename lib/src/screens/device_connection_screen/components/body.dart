@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/src/screens/home_screen/home_screen.dart';
 import 'package:smart_home/src/screens/mock_qr_scanner_screen/mock_qr_scanner_screen.dart';
@@ -20,11 +19,13 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   bool isConnecting = false;
   String _userName = 'Người dùng';
+  List<Map<String, dynamic>> _savedDevices = []; // List of saved devices for this user
+  bool _isLoadingDevices = true;
 
   // Valid device codes with their configurations
   final Map<String, Map<String, dynamic>> validDeviceCodes = {
     'smarthome99': {
-      'name': 'Smart Home Premium',
+      'name': 'Smart Home',
       'hasFullDevices': true,
       'description': 'Gói đầy đủ với tất cả thiết bị'
     },
@@ -55,6 +56,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
 
     _fadeAnimationController.forward();
     _loadUserData();
+    _loadSavedDevices();
   }
 
   /// Load user data from Firebase
@@ -85,8 +87,108 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
         }
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      // Handle error silently in production
       // Keep default if error occurs
+    }
+  }
+
+  /// Load saved devices from Firebase
+  Future<void> _loadSavedDevices() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final devicesSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('scanned_devices')
+            .orderBy('scannedAt', descending: true)
+            .get();
+
+        setState(() {
+          _savedDevices = devicesSnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'deviceCode': data['deviceCode'],
+              'deviceName': data['deviceName'],
+              'scannedAt': data['scannedAt'],
+              'lastUsed': data['lastUsed'],
+            };
+          }).toList();
+          _isLoadingDevices = false;
+        });
+      }
+    } catch (e) {
+      // Handle error silently in production
+      setState(() {
+        _isLoadingDevices = false;
+      });
+    }
+  }
+
+  /// Save scanned device to Firebase
+  Future<void> _saveDeviceToFirebase(String deviceCode) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final deviceInfo = validDeviceCodes[deviceCode.toLowerCase()] ?? {
+          'name': 'Smart Home Device',
+          'hasFullDevices': false,
+          'description': 'Thiết bị nhà thông minh'
+        };
+
+        // Check if device already exists
+        final existingDevice = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('scanned_devices')
+            .where('deviceCode', isEqualTo: deviceCode)
+            .get();
+
+        if (existingDevice.docs.isNotEmpty) {
+          // Update last used time
+          await existingDevice.docs.first.reference.update({
+            'lastUsed': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Add new device
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('scanned_devices')
+              .add({
+            'deviceCode': deviceCode,
+            'deviceName': deviceInfo['name'],
+            'scannedAt': FieldValue.serverTimestamp(),
+            'lastUsed': FieldValue.serverTimestamp(),
+          });
+        }
+
+        // Reload saved devices
+        await _loadSavedDevices();
+      }
+    } catch (e) {
+      // Handle error silently in production
+    }
+  }
+
+  /// Delete saved device from Firebase
+  Future<void> _deleteDeviceFromFirebase(String deviceId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('scanned_devices')
+            .doc(deviceId)
+            .delete();
+
+        // Reload saved devices
+        await _loadSavedDevices();
+      }
+    } catch (e) {
+      // Handle error silently in production
     }
   }
 
@@ -98,6 +200,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   }
 
   void _startScanning() async {
+    if (!mounted) return;
+    
     try {
       final result = await Navigator.of(context).push(
         MaterialPageRoute(
@@ -105,60 +209,236 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
         ),
       );
 
-      if (result != null) {
-        setState(() => isConnecting = true);
-        // Simulate connection process
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) {
-          setState(() => isConnecting = false);
+      if (result != null && mounted) {
+        // Automatically fill the device code input field
+        setState(() {
+          deviceCodeController.text = result.toString();
+        });
 
-          // Check if scanned code is valid
-          final code = result.toString().toLowerCase();
-          if (validDeviceCodes.containsKey(code)) {
-            final deviceInfo = validDeviceCodes[code]!;
-            _showSuccessDialog(deviceInfo);
-          } else {
-            // Default to smarthome99 for demo purposes
-            final deviceInfo = validDeviceCodes['smarthome99']!;
-            _showSuccessDialog(deviceInfo);
-          }
+        // Save device to Firebase
+        await _saveDeviceToFirebase(result.toString());
+
+        // Show success message
+        if (mounted) {
+          context.showSuccessNotification('Đã quét thành công mã thiết bị: $result');
+        }
+        
+        // Optionally auto-connect after a short delay
+        if (mounted) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              _connectToDevice();
+            }
+          });
         }
       }
     } catch (e) {
-      _showMessage('Lỗi khi quét QR: $e');
+      if (mounted) {
+        _showMessage('Lỗi khi quét QR: $e');
+      }
     }
   }
 
-  void _showScanResult() {
+  /// Select an existing saved device
+  void _selectSavedDevice(Map<String, dynamic> device) async {
+    if (!mounted) return;
+    
+    // Show immediate feedback
+    if (mounted) {
+      context.showInfoNotification('Đã chọn thiết bị: ${device['deviceName']}');
+    }
+    
+    if (mounted) {
+      setState(() {
+        deviceCodeController.text = device['deviceCode'];
+      });
+    }
+
+    // Update last used time in background (non-blocking)
+    _saveDeviceToFirebase(device['deviceCode']).catchError((e) {
+      // Handle error silently in production
+    });
+    
+    // Auto-connect immediately without delay
+    if (mounted) {
+      _connectToDevice();
+    }
+  }
+
+  /// Show delete device confirmation dialog
+  void _showDeleteDeviceDialog(Map<String, dynamic> device) {
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Quét QR thành công!'),
-          content: const Text(
-              'Đã phát hiện thiết bị Smart Home.\nBạn có muốn kết nối không?'),
+          title: Text('Xóa thiết bị'),
+          content: Text('Bạn có chắc muốn xóa thiết bị "${device['deviceName']}" khỏi danh sách đã lưu?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Hủy'),
+              child: Text('Hủy'),
             ),
-            ElevatedButton(
-              onPressed: () {
+            TextButton(
+              onPressed: () async {
                 Navigator.of(context).pop();
-                _connectToDevice();
+                await _deleteDeviceFromFirebase(device['id']);
+                
+                // Check if widget is still mounted before showing notification
+                if (mounted) {
+                  context.showWarningNotification('Đã xóa thiết bị "${device['deviceName']}"');
+                }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF464646),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Kết nối'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: Text('Xóa'),
             ),
           ],
         );
       },
     );
+  }
+
+  /// Show all saved devices dialog
+  void _showAllDevicesDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Tất cả thiết bị đã lưu'),
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(maxHeight: 400),
+            child: ListView.builder(
+              itemCount: _savedDevices.length,
+              itemBuilder: (context, index) {
+                final device = _savedDevices[index];
+                return Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _selectSavedDevice(device);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      splashColor: Colors.blue.withOpacity(0.1),
+                      highlightColor: Colors.blue.withOpacity(0.05),
+                      child: Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.devices, color: Colors.blue[600], size: 20),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  device['deviceName'] ?? 'Smart Home Device',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  'Mã: ${device['deviceCode']}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (device['lastUsed'] != null) ...[
+                                  Text(
+                                    'Sử dụng lần cuối: ${_formatDate(device['lastUsed'])}',
+                                    style: TextStyle(
+                                      color: Colors.grey[500],
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(); // Close dialog first
+                                  _showDeleteDeviceDialog(device);
+                                },
+                                icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
+                                constraints: BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                                padding: EdgeInsets.all(4),
+                              ),
+                              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+                            ],
+                          ),
+                        ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Format date for display
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Không xác định';
+    
+    try {
+      DateTime date;
+      if (timestamp is Timestamp) {
+        date = timestamp.toDate();
+      } else {
+        return 'Không xác định';
+      }
+      
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      if (difference.inDays == 0) {
+        return 'Hôm nay';
+      } else if (difference.inDays == 1) {
+        return 'Hôm qua';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} ngày trước';
+      } else {
+        return '${date.day}/${date.month}/${date.year}';
+      }
+    } catch (e) {
+      return 'Không xác định';
+    }
   }
 
   void _connectToDevice() async {
@@ -302,7 +582,9 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   }
 
   void _showMessage(String message) {
-    context.showInfoNotification(message);
+    if (mounted) {
+      context.showInfoNotification(message);
+    }
   }
 
   void _logout() async {
@@ -382,7 +664,7 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        SizedBox(height: getProportionateScreenHeight(30)),
+                        SizedBox(height: getProportionateScreenHeight(15)), // Reduced from 30
 
                         // Title
                         Text(
@@ -395,34 +677,164 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                                 color: const Color(0xFF2E3440),
                               ),
                         ),
-                        SizedBox(height: getProportionateScreenHeight(8)),
+                        SizedBox(height: getProportionateScreenHeight(5)), // Reduced from 8
                         Text(
-                          'Kết nối thiết bị Smart Home để bắt đầu sử dụng',
+                          'Chọn thiết bị đã lưu hoặc quét thiết bị mới',
                           style:
                               Theme.of(context).textTheme.bodyMedium!.copyWith(
                                     color: Colors.grey[600],
                                   ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: getProportionateScreenHeight(40)),
+                        SizedBox(height: getProportionateScreenHeight(20)), // Reduced from 40
 
-                        // QR Scanner section
-                        Container(
-                          width: 200,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            border:
-                                Border.all(color: Colors.grey[300]!, width: 2),
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.grey[50]!,
-                                Colors.grey[100]!,
+                        // Saved Devices Section
+                        if (!_isLoadingDevices && _savedDevices.isNotEmpty) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(16),
+                            margin: EdgeInsets.only(bottom: getProportionateScreenHeight(20)),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.history, color: Colors.blue[600], size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Thiết bị đã lưu (${_savedDevices.length})',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blue[700],
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 12),
+                                Container(
+                                  constraints: BoxConstraints(maxHeight: 120),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: _savedDevices.length > 3 ? 3 : _savedDevices.length,
+                                    itemBuilder: (context, index) {
+                                      final device = _savedDevices[index];
+                                      return Container(
+                                        margin: EdgeInsets.only(bottom: 8),
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => _selectSavedDevice(device),
+                                            borderRadius: BorderRadius.circular(8),
+                                            splashColor: Colors.blue.withOpacity(0.1),
+                                            highlightColor: Colors.blue.withOpacity(0.05),
+                                            child: Container(
+                                              padding: EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: Colors.blue[100]!),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 40,
+                                                    height: 40,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.blue[100],
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Icon(Icons.devices, color: Colors.blue[600], size: 20),
+                                                  ),
+                                                  SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          device['deviceName'] ?? 'Smart Home Device',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w600,
+                                                            fontSize: 14,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          'Mã: ${device['deviceCode']}',
+                                                          style: TextStyle(
+                                                            color: Colors.grey[600],
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      IconButton(
+                                                        onPressed: () => _showDeleteDeviceDialog(device),
+                                                        icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
+                                                        constraints: BoxConstraints(
+                                                          minWidth: 32,
+                                                          minHeight: 32,
+                                                        ),
+                                                        padding: EdgeInsets.all(4),
+                                                      ),
+                                                      Icon(Icons.arrow_forward_ios, color: Colors.blue[400], size: 16),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                if (_savedDevices.length > 3) ...[
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        // Show all devices dialog
+                                        _showAllDevicesDialog();
+                                      },
+                                      child: Text(
+                                        'Xem tất cả ${_savedDevices.length} thiết bị',
+                                        style: TextStyle(color: Colors.blue[600]),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
+                        ],
+
+                        // QR Scanner section
+                        GestureDetector(
+                          onTap: _startScanning,
+                          child: Container(
+                            width: 200,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              border:
+                                  Border.all(color: Colors.grey[300]!, width: 2),
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.grey[50]!,
+                                  Colors.grey[100]!,
+                                ],
+                              ),
+                            ),
                           child: Stack(
                             children: [
                               Center(
@@ -521,7 +933,8 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
                               ),
                             ],
                           ),
-                        ),
+                        ), // End of Container
+                      ), // End of GestureDetector
                         SizedBox(height: getProportionateScreenHeight(20)),
 
                         // Scan button

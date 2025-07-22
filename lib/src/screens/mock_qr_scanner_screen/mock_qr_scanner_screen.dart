@@ -48,6 +48,83 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
                   controller: controller,
                   onDetect: _onQRViewCreated,
                 ),
+                // QR Scanning Frame Overlay
+                Center(
+                  child: Container(
+                    width: 250,
+                    height: 250,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Corner indicators
+                        _buildCornerIndicator(Alignment.topLeft, [
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                        ], [true, false, false, true]), // top and left
+                        _buildCornerIndicator(Alignment.topRight, [
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                        ], [true, true, false, false]), // top and right
+                        _buildCornerIndicator(Alignment.bottomLeft, [
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                        ], [false, false, true, true]), // bottom and left
+                        _buildCornerIndicator(Alignment.bottomRight, [
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                          BorderSide(color: const Color(0xFF4CAF50), width: 4),
+                        ], [false, true, true, false]), // bottom and right
+                        
+                        // Scanning line animation
+                        Center(
+                          child: Container(
+                            width: 220,
+                            height: 2,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.transparent,
+                                  const Color(0xFF4CAF50),
+                                  Colors.transparent,
+                                ],
+                                stops: [0.0, 0.5, 1.0],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Instructions
+                Positioned(
+                  bottom: 120,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Đặt mã QR vào trong khung để quét',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Flash button
                 Positioned(
                   bottom: 40,
                   left: 0,
@@ -103,22 +180,28 @@ class _MockQRScannerScreenState extends State<MockQRScannerScreen> {
 
   void _handleScanResult(String? code) {
     if (code != null) {
-      final validKeys = ['smarthome99', 'smarthome88', 'smarthome66'];
-      if (validKeys.contains(code)) {
-        Navigator.of(context).pop(code);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Mã QR không hợp lệ: $code'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() {
-          result = null;
-          isScanning = true;
-        });
-      }
+      // Always return the scanned text, don't validate here
+      // Let the device connection screen handle validation
+      Navigator.of(context).pop(code);
     }
+  }
+
+  Widget _buildCornerIndicator(Alignment alignment, List<BorderSide> sides, List<bool> activeSides) {
+    return Align(
+      alignment: alignment,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          border: Border(
+            top: activeSides[0] ? sides[0] : BorderSide.none,
+            right: activeSides[1] ? (sides.length > 1 ? sides[1] : sides[0]) : BorderSide.none,
+            bottom: activeSides[2] ? (sides.length > 1 ? sides[1] : sides[0]) : BorderSide.none,
+            left: activeSides[3] ? sides[0] : BorderSide.none,
+          ),
+        ),
+      ),
+    );
   }
 
   @override

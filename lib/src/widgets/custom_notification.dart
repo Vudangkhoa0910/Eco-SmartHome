@@ -17,27 +17,40 @@ class CustomNotification {
     Duration duration = const Duration(seconds: 3),
     bool fromTop = true,
   }) {
-    // Remove any existing notification
-    hide();
-
-    _overlayEntry = _createOverlayEntry(
-      context,
-      message: message,
-      type: type,
-      duration: duration,
-      fromTop: fromTop,
-    );
-
-    Overlay.of(context).insert(_overlayEntry!);
-
-    // Auto hide after duration
-    Future.delayed(duration, () {
+    // Check if context is valid and mounted
+    try {
+      final overlay = Overlay.maybeOf(context);
+      if (overlay == null) return;
+      
+      // Remove any existing notification
       hide();
-    });
+
+      _overlayEntry = _createOverlayEntry(
+        context,
+        message: message,
+        type: type,
+        duration: duration,
+        fromTop: fromTop,
+      );
+
+      overlay.insert(_overlayEntry!);
+
+      // Auto hide after duration
+      Future.delayed(duration, () {
+        hide();
+      });
+    } catch (e) {
+      // Silently handle overlay errors
+      _overlayEntry = null;
+    }
   }
 
   static void hide() {
-    _overlayEntry?.remove();
+    try {
+      _overlayEntry?.remove();
+    } catch (e) {
+      // Silently handle removal errors
+    }
     _overlayEntry = null;
   }
 
