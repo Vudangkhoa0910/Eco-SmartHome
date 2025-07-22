@@ -13,6 +13,7 @@ class Body extends StatefulWidget {
 
 class _BodyState extends State<Body> {
   TextEditingController usernameController = TextEditingController();
+  TextEditingController displayNameController = TextEditingController();
   TextEditingController oldPasswordController = TextEditingController();
   TextEditingController newPasswordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
@@ -22,12 +23,11 @@ class _BodyState extends State<Body> {
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
-  String displayName = 'Đang tải...'; // Thêm biến để lưu tên hiển thị
+  String displayName = 'Đang tải...';
 
   @override
   void initState() {
     super.initState();
-    // Load current user data
     _loadUserData();
   }
 
@@ -41,17 +41,17 @@ class _BodyState extends State<Body> {
       if (userDoc.exists) {
         setState(() {
           usernameController.text = userDoc['email'] ?? user.email ?? '';
-          // Lấy tên hiển thị từ Firestore hoặc Firebase Auth
           displayName = userDoc['displayName'] ??
               user.displayName ??
               userDoc['name'] ??
               'Người dùng';
+          displayNameController.text = displayName;
         });
       } else {
         setState(() {
           usernameController.text = user.email ?? '';
-          // Nếu không có document trong Firestore, lấy từ Firebase Auth
           displayName = user.displayName ?? 'Người dùng';
+          displayNameController.text = displayName;
         });
       }
     }
@@ -95,7 +95,7 @@ class _BodyState extends State<Body> {
                           fontWeight: FontWeight.bold,
                         ),
                   ),
-                  const SizedBox(width: 48), // Balance the row
+                  const SizedBox(width: 48),
                 ],
               ),
               SizedBox(height: getProportionateScreenHeight(30)),
@@ -106,7 +106,7 @@ class _BodyState extends State<Body> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        // Profile Avatar (read-only display)
+                        // Profile Avatar
                         Container(
                           width: 100,
                           height: 100,
@@ -137,17 +137,30 @@ class _BodyState extends State<Body> {
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
+
                         SizedBox(height: getProportionateScreenHeight(30)),
 
                         // Account Section
                         _buildSectionTitle('Thông tin tài khoản'),
+                        SizedBox(height: getProportionateScreenHeight(15)),
+                        _buildTextField(
+                          controller: displayNameController,
+                          label: 'Tên người dùng',
+                          icon: Icons.person_outline,
+                          validator: (value) {
+                            if (value!.isEmpty) {
+                              return 'Tên người dùng không được để trống';
+                            }
+                            return null;
+                          },
+                        ),
                         SizedBox(height: getProportionateScreenHeight(15)),
 
                         _buildTextField(
                           controller: usernameController,
                           label: 'Tên đăng nhập / Email',
                           icon: Icons.account_circle_outlined,
-                          enabled: false, // Không cho phép chỉnh sửa email
+                          enabled: false,
                           validator: (value) {
                             if (value!.isEmpty) {
                               return 'Tên đăng nhập không được để trống';
@@ -173,7 +186,10 @@ class _BodyState extends State<Body> {
                             });
                           },
                           validator: (value) {
-                            if (value!.isEmpty) {
+                            if (value!.isEmpty &&
+                                (newPasswordController.text.isNotEmpty ||
+                                    confirmPasswordController
+                                        .text.isNotEmpty)) {
                               return 'Vui lòng nhập mật khẩu hiện tại';
                             }
                             return null;
@@ -193,10 +209,11 @@ class _BodyState extends State<Body> {
                             });
                           },
                           validator: (value) {
-                            if (value!.isEmpty) {
+                            if (value!.isEmpty &&
+                                confirmPasswordController.text.isNotEmpty) {
                               return 'Vui lòng nhập mật khẩu mới';
                             }
-                            if (value.length < 6) {
+                            if (value.isNotEmpty && value.length < 6) {
                               return 'Mật khẩu phải có ít nhất 6 ký tự';
                             }
                             return null;
@@ -217,10 +234,12 @@ class _BodyState extends State<Body> {
                             });
                           },
                           validator: (value) {
-                            if (value!.isEmpty) {
+                            if (value!.isEmpty &&
+                                newPasswordController.text.isNotEmpty) {
                               return 'Vui lòng xác nhận mật khẩu mới';
                             }
-                            if (value != newPasswordController.text) {
+                            if (value.isNotEmpty &&
+                                value != newPasswordController.text) {
                               return 'Mật khẩu xác nhận không khớp';
                             }
                             return null;
@@ -302,10 +321,13 @@ class _BodyState extends State<Body> {
         controller: controller,
         enabled: enabled,
         validator: validator,
+        style: TextStyle(
+          color: Theme.of(context).primaryColor, // ✅ Màu chữ ở đây
+        ),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            color: enabled ? Theme.of(context).primaryColor : Colors.grey,
+            color: Theme.of(context).primaryColor,
             fontSize: 14,
           ),
           prefixIcon: Icon(
@@ -392,17 +414,51 @@ class _BodyState extends State<Body> {
     if (_formKey.currentState!.validate()) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        try {
-          if (oldPasswordController.text.isNotEmpty &&
-              newPasswordController.text.isNotEmpty) {
-            // Update password
-            await user.updatePassword(newPasswordController.text);
-            _showSuccessDialog();
-          } else {
-            context.showWarningNotification('Vui lòng điền đầy đủ thông tin để đổi mật khẩu');
+        bool hasChanges = false;
+        String? errorMessage;
+
+        // Check for display name update
+        if (displayNameController.text != displayName) {
+          try {
+            await user.updateDisplayName(displayNameController.text);
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
+              'displayName': displayNameController.text,
+              'email': user.email,
+            }, SetOptions(merge: true));
+            hasChanges = true;
+          } catch (e) {
+            errorMessage = 'Lỗi khi cập nhật tên người dùng: ${e.toString()}';
           }
-        } catch (e) {
-          context.showErrorNotification('Lỗi: ${e.toString()}');
+        }
+
+        // Check for password update
+        if (oldPasswordController.text.isNotEmpty &&
+            newPasswordController.text.isNotEmpty &&
+            confirmPasswordController.text.isNotEmpty) {
+          try {
+            // Re-authenticate user before updating password
+            AuthCredential credential = EmailAuthProvider.credential(
+              email: user.email!,
+              password: oldPasswordController.text,
+            );
+            await user.reauthenticateWithCredential(credential);
+            await user.updatePassword(newPasswordController.text);
+            hasChanges = true;
+          } catch (e) {
+            errorMessage = 'Lỗi khi cập nhật mật khẩu: ${e.toString()}';
+          }
+        }
+
+        if (hasChanges) {
+          _showSuccessDialog();
+        } else if (errorMessage != null) {
+          context.showErrorNotification(errorMessage);
+        } else {
+          context.showWarningNotification(
+              'Vui lòng nhập thông tin để thay đổi tên người dùng hoặc mật khẩu');
         }
       }
     }
@@ -413,7 +469,7 @@ class _BodyState extends State<Body> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Thành công'),
-        content: const Text('Mật khẩu đã được cập nhật thành công!'),
+        content: const Text('Thông tin đã được cập nhật thành công!'),
         actions: [
           TextButton(
             onPressed: () {
