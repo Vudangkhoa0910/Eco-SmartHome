@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
@@ -32,6 +33,10 @@ class MqttServiceSimple {
   static const String topicLedAroundStatus = 'khoasmarthome/led_around/status';
   static const String topicStatusRequest = 'khoasmarthome/status_request';
 
+  // Indoor device status sync topics (ESP32-S3 Indoor)
+  static const String topicIndoorStatusRequest = 'inside/device_status/request';
+  static const String topicIndoorStatusResponse = 'inside/device_status/response';
+
   MqttServerClient? _client;
   bool _isConnected = false;
   bool _enableFirebase = true;
@@ -45,6 +50,8 @@ class MqttServiceSimple {
       StreamController<int>.broadcast();
   final StreamController<Map<String, dynamic>> _gateStatusController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, bool>> _indoorDeviceStatusController =
+      StreamController<Map<String, bool>>.broadcast();
 
   // Firebase services
   final FirebaseBatchService _batchService = FirebaseBatchService();
@@ -68,6 +75,8 @@ class MqttServiceSimple {
   Stream<int> get gateStateStream => _gateStateController.stream;
   Stream<Map<String, dynamic>> get gateStatusStream =>
       _gateStatusController.stream;
+  Stream<Map<String, bool>> get indoorDeviceStatusStream =>
+      _indoorDeviceStatusController.stream;
   bool get isConnected => _isConnected;
   int get currentGateLevel => _currentGateLevel;
   
@@ -121,6 +130,11 @@ class MqttServiceSimple {
     
     // Request all device status from ESP32
     _requestAllDeviceStatus();
+    
+    // Request indoor device status from ESP32-S3 Indoor
+    Future.delayed(const Duration(seconds: 2), () {
+      requestIndoorDeviceStatus();
+    });
   }
 
   // Initialize gate state from Firebase and sync with ESP32
@@ -191,6 +205,8 @@ class MqttServiceSimple {
       topicDeviceStatus,
       topicLedGateStatus,
       topicLedAroundStatus,
+      // Indoor device status topics
+      topicIndoorStatusResponse,
     ];
 
     for (String topic in topics) {
@@ -208,8 +224,6 @@ class MqttServiceSimple {
   }
 
   void _handleMessage(String topic, String message) {
-    print('📩 MQTT: $topic = $message');
-
     if (topic == topicGateStatus) {
       _handleGateStatus(message);
       return;
@@ -218,6 +232,12 @@ class MqttServiceSimple {
     // Handle device status messages
     if (topic == topicDeviceStatus) {
       _deviceStateService.parseDeviceStatusJson(message);
+      return;
+    }
+    
+    // Handle indoor device status response
+    if (topic == topicIndoorStatusResponse) {
+      _handleIndoorDeviceStatus(message);
       return;
     }
     
@@ -326,6 +346,33 @@ class MqttServiceSimple {
         return 'Mở hoàn toàn - Xe tải';
       default:
         return 'Mở $percentage%';
+    }
+  }
+
+  void _handleIndoorDeviceStatus(String statusMessage) {
+    try {
+      final Map<String, dynamic> statusData = 
+          Map<String, dynamic>.from(json.decode(statusMessage) as Map);
+      
+      final Map<String, bool> deviceStates = {};
+      
+      // Parse each device status
+      statusData.forEach((key, value) {
+        if (key != 'timestamp' && value is bool) {
+          deviceStates[key] = value;
+          // Update device state service for individual devices
+          _deviceStateService.updateDeviceState(key, value, source: 'ESP32-Indoor');
+        }
+      });
+      
+      // Emit combined status
+      _indoorDeviceStatusController.add(deviceStates);
+      
+      print('🏠 Indoor device status updated: ${deviceStates.length} devices');
+      print('📊 Status: $deviceStates');
+      
+    } catch (e) {
+      print('❌ Error parsing indoor device status: $e');
     }
   }
 
@@ -578,6 +625,45 @@ class MqttServiceSimple {
     }
   }
 
+  // Request indoor device status
+  Future<void> requestIndoorDeviceStatus() async {
+    if (!_isConnected || _client == null) return;
+    
+    try {
+      print('🏠 Requesting indoor device status...');
+      
+      await _client!.publishMessage(
+        topicIndoorStatusRequest,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString('get_all_status').payload!,
+      );
+      
+      print('✅ Indoor device status request sent');
+    } catch (e) {
+      print('❌ Error requesting indoor device status: $e');
+    }
+  }
+
+  // Publish command to indoor device
+  Future<void> publishIndoorDeviceCommand(String deviceTopic, String command) async {
+    if (!_isConnected || _client == null) return;
+    
+    try {
+      print('🏠 Publishing indoor device command: $deviceTopic = $command');
+      
+      await _client!.publishMessage(
+        deviceTopic,
+        MqttQos.atLeastOnce,
+        MqttClientPayloadBuilder().addString(command).payload!,
+      );
+      
+      print('✅ Indoor device command sent: $deviceTopic = $command');
+      // Note: ESP32 will automatically send status after command execution
+    } catch (e) {
+      print('❌ Error publishing indoor device command: $e');
+    }
+  }
+
   void disconnect() {
     _client?.disconnect();
     _isConnected = false;
@@ -591,6 +677,7 @@ class MqttServiceSimple {
     _connectionController.close();
     _gateStateController.close();
     _gateStatusController.close();
+    _indoorDeviceStatusController.close();
     _deviceStateService.dispose(); // Dispose device state service
   }
 }

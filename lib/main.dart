@@ -1,15 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_home/firebase_options.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/routes/routes.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/theme_service.dart';
+import 'package:smart_home/service/mqtt_service_simple.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
-import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
-import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
-import 'package:smart_home/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -48,6 +45,16 @@ void main() async {
   }
 
   setupLocator();
+  
+  // Initialize MQTT service
+  try {
+    final mqttService = getIt<MqttServiceSimple>();
+    await mqttService.initialize();
+    print('MQTT service initialized and connected');
+  } catch (e) {
+    print('Failed to initialize MQTT service: $e');
+  }
+  
   runApp(const MyApp());
 }
 

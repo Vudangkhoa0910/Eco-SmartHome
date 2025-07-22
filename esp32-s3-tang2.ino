@@ -90,6 +90,10 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 #define TOPIC_HALLWAY "inside/hallway_light"
 #define TOPIC_BALCONY "inside/balcony_light"
 
+// Device status sync topics
+#define TOPIC_STATUS_REQUEST "inside/device_status/request"
+#define TOPIC_STATUS_RESPONSE "inside/device_status/response"
+
 Adafruit_INA219 ina219(INA219_ADDRESS);
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, I2C_SCL, I2C_SDA, U8X8_PIN_NONE);
 WiFiClientSecure espClient;
@@ -97,6 +101,29 @@ PubSubClient client(espClient);
 
 unsigned long lastMsg = 0;
 #define MSG_INTERVAL 5000
+// Remove STATUS_INTERVAL - no longer needed for periodic status sending
+
+// Function to read actual pin states and publish device status
+void publishDeviceStatus() {
+  if (!client.connected()) return;
+  
+  // Create JSON string with actual device states
+  // Note: Relays are active LOW, so we need to invert the reading
+  String statusJson = "{";
+  statusJson += "\"kitchen_light\":" + String(digitalRead(LED_KITCHEN_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"living_room_light\":" + String(digitalRead(LED_LIVING_ROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"bedroom_light\":" + String(digitalRead(LED_BEDROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"corner_bedroom_light\":" + String(digitalRead(LED_CORNER_BEDROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"yard_bedroom_light\":" + String(digitalRead(LED_YARD_BEDROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"worship_room_light\":" + String(digitalRead(LED_WORSHIP_ROOM_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"hallway_light\":" + String(digitalRead(LED_HALLWAY_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"balcony_light\":" + String(digitalRead(LED_BALCONY_PIN) == LOW ? "true" : "false") + ",";
+  statusJson += "\"timestamp\":" + String(millis());
+  statusJson += "}";
+  
+  client.publish(TOPIC_STATUS_RESPONSE, statusJson.c_str());
+  Serial.println("📊 Published device status: " + statusJson);
+}
 
 void setup_wifi() {
   WiFi.begin(ssid, password);
@@ -166,23 +193,55 @@ void callback(char* topic, byte* payload, unsigned int length) {
   for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
   Serial.printf("📩 Tin nhắn [%s]: %s\n", topic, message.c_str());
 
+  // Handle device status request
+  if (String(topic) == TOPIC_STATUS_REQUEST) {
+    Serial.println("🔄 Received status request, publishing current device states...");
+    publishDeviceStatus();
+    return;
+  }
+
   // Điều khiển đèn trong nhà (rơ le active LOW)
-  if (String(topic) == TOPIC_KITCHEN)
+  if (String(topic) == TOPIC_KITCHEN) {
     digitalWrite(LED_KITCHEN_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_LIVING_ROOM)
+    // Send status update after device control
+    delay(100); // Small delay to ensure relay has switched
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_LIVING_ROOM) {
     digitalWrite(LED_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_BEDROOM)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_BEDROOM) {
     digitalWrite(LED_BEDROOM_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_CORNER_BEDROOM)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_CORNER_BEDROOM) {
     digitalWrite(LED_CORNER_BEDROOM_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_YARD_BEDROOM)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_YARD_BEDROOM) {
     digitalWrite(LED_YARD_BEDROOM_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_WORSHIP_ROOM)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_WORSHIP_ROOM) {
     digitalWrite(LED_WORSHIP_ROOM_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_HALLWAY)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_HALLWAY) {
     digitalWrite(LED_HALLWAY_PIN, message == "ON" ? LOW : HIGH);
-  else if (String(topic) == TOPIC_BALCONY)
+    delay(100);
+    publishDeviceStatus();
+  }
+  else if (String(topic) == TOPIC_BALCONY) {
     digitalWrite(LED_BALCONY_PIN, message == "ON" ? LOW : HIGH);
+    delay(100);
+    publishDeviceStatus();
+  }
 }
 
 void reconnect() {
@@ -205,6 +264,12 @@ void reconnect() {
         client.subscribe(TOPIC_WORSHIP_ROOM);
         client.subscribe(TOPIC_HALLWAY);
         client.subscribe(TOPIC_BALCONY);
+        client.subscribe(TOPIC_STATUS_REQUEST);  // Subscribe to status request topic
+        
+        // Send initial device status after connection
+        delay(1000); // Wait for subscription to be established
+        publishDeviceStatus();
+        Serial.println("📋 Subscribed to all topics and published initial status");
       } else {
         Serial.printf("❌ Thất bại, rc=%d, thử lại sau 5s\n", client.state());
         delay(5000);

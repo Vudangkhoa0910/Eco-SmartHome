@@ -5,6 +5,7 @@ import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_service_simple.dart';
 import 'package:smart_home/service/device_state_service.dart';
 import 'package:smart_home/src/widgets/gate_device_control_widget.dart';
 
@@ -46,6 +47,22 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         });
       }
     });
+
+    // Request indoor device status sync when entering floor screen
+    _requestIndoorDeviceStatusSync();
+  }
+
+  void _requestIndoorDeviceStatusSync() {
+    // Get MQTT service and request indoor device status for real-time sync
+    try {
+      final MqttServiceSimple mqttService = getIt<MqttServiceSimple>();
+      if (mqttService.isConnected) {
+        mqttService.requestIndoorDeviceStatus();
+        print('🏠 Requested indoor device status sync for ${widget.floor.name}');
+      }
+    } catch (e) {
+      print('❌ Error requesting indoor device status sync: $e');
+    }
   }
 
   @override
@@ -531,6 +548,11 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return _model.currentGateLevel > 0; // Mở nếu level > 0
     }
 
+    // For indoor devices (ESP32-S3), use device state service with extracted ID
+    if (device.mqttTopic.startsWith('inside/')) {
+      return _deviceStateService.getDeviceState(deviceId);
+    }
+
     // For legacy devices, keep existing logic
     switch (device.mqttTopic) {
       // ESP32 Dev (outdoor) devices
@@ -625,6 +647,40 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     // Update device state service first
     _deviceStateService.updateDeviceState(deviceId, newState, source: 'UI');
 
+    // Handle indoor devices (ESP32-S3)
+    if (device.mqttTopic.startsWith('inside/')) {
+      try {
+        final mqttServiceSimple = getIt<MqttServiceSimple>();
+        if (mqttServiceSimple.isConnected) {
+          final command = newState ? 'ON' : 'OFF';
+          mqttServiceSimple.publishIndoorDeviceCommand(device.mqttTopic, command);
+          print('🏠 UI: ${device.name} = $newState via Indoor MQTT');
+        } else {
+          print('⚠️ MqttServiceSimple not connected, initializing...');
+          mqttServiceSimple.initialize().then((_) {
+            if (mqttServiceSimple.isConnected) {
+              final command = newState ? 'ON' : 'OFF';
+              mqttServiceSimple.publishIndoorDeviceCommand(device.mqttTopic, command);
+              print('🏠 UI: ${device.name} = $newState via Indoor MQTT (after init)');
+            } else {
+              print('❌ Failed to connect MqttServiceSimple');
+            }
+          });
+        }
+      } catch (e) {
+        print('❌ Error controlling indoor device: $e');
+        // Fallback: Try using the regular MQTT service if available
+        try {
+          _mqttService.publishDeviceCommand(device.mqttTopic, newState ? 'ON' : 'OFF');
+          print('🔄 Fallback: Using regular MQTT service for ${device.name}');
+        } catch (fallbackError) {
+          print('❌ Fallback also failed: $fallbackError');
+        }
+      }
+      return;
+    }
+
+    // Handle outdoor devices and legacy devices
     switch (device.mqttTopic) {
       // ESP32 devices - use direct MQTT control
       case 'khoasmarthome/led_gate':
@@ -661,50 +717,6 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       case 'khoasmarthome/awning_light':
         // Điều khiển đèn mái hiên
         _model.acFav(); // Sử dụng AC favourite toggle cho đèn mái hiên
-        break;
-
-      // ESP32-S3 (indoor) devices - Floor 1
-      case 'inside/kitchen_light':
-        // Điều khiển đèn bếp trong nhà
-        _model.toggleKitchenLight();
-        _mqttService.controlKitchenLight(_model.isKitchenLightOn);
-        break;
-      case 'inside/living_room_light':
-        // Điều khiển đèn phòng khách trong nhà
-        _model.toggleLivingRoomLight();
-        _mqttService.controlLivingRoomLight(_model.isLivingRoomLightOn);
-        break;
-      case 'inside/bedroom_light':
-        // Điều khiển đèn phòng ngủ trong nhà
-        _model.toggleBedroomLight();
-        _mqttService.controlBedroomLight(_model.isBedroomLightOn);
-        break;
-
-      // ESP32-S3 (indoor) devices - Floor 2
-      case 'inside/corner_bedroom_light':
-        // Điều khiển đèn phòng ngủ góc
-        _model.toggleCornerBedroomLight();
-        _mqttService.controlCornerBedroomLight(_model.isCornerBedroomLightOn);
-        break;
-      case 'inside/yard_bedroom_light':
-        // Điều khiển đèn phòng ngủ sân
-        _model.toggleYardBedroomLight();
-        _mqttService.controlYardBedroomLight(_model.isYardBedroomLightOn);
-        break;
-      case 'inside/worship_room_light':
-        // Điều khiển đèn phòng thờ
-        _model.toggleWorshipRoomLight();
-        _mqttService.controlWorshipRoomLight(_model.isWorshipRoomLightOn);
-        break;
-      case 'inside/hallway_light':
-        // Điều khiển đèn hành lang
-        _model.toggleHallwayLight();
-        _mqttService.controlHallwayLight(_model.isHallwayLightOn);
-        break;
-      case 'inside/balcony_light':
-        // Điều khiển đèn ban công lớn
-        _model.toggleBalconyLight();
-        _mqttService.controlBalconyLight(_model.isBalconyLightOn);
         break;
 
       // Legacy topics for backward compatibility

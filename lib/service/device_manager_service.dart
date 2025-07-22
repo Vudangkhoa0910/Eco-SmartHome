@@ -228,6 +228,9 @@ class DeviceManagerService {
     if (mqttTopic.isEmpty) return;
 
     try {
+      // Determine if this is an indoor device (ESP32-S3) or outdoor device (ESP32)
+      bool isIndoorDevice = mqttTopic.startsWith('inside/');
+      
       // Handle different device types
       switch (device.type.toLowerCase()) {
         case 'gate':
@@ -258,31 +261,48 @@ class DeviceManagerService {
         case 'led':
           // LED/Light devices use ON/OFF commands
           final command = isOn ? 'ON' : 'OFF';
-          _mqttService.publishDeviceCommand(mqttTopic, command);
+          if (isIndoorDevice) {
+            // Use indoor device command for ESP32-S3
+            _mqttService.publishIndoorDeviceCommand(mqttTopic, command);
+          } else {
+            // Use regular command for ESP32
+            _mqttService.publishDeviceCommand(mqttTopic, command);
+          }
           break;
 
         case 'fan':
         case 'motor':
           // Motor/Fan devices might use different commands
           final command = isOn ? 'ON' : 'OFF';
-          _mqttService.publishDeviceCommand(mqttTopic, command);
+          if (isIndoorDevice) {
+            _mqttService.publishIndoorDeviceCommand(mqttTopic, command);
+          } else {
+            _mqttService.publishDeviceCommand(mqttTopic, command);
+          }
           break;
 
         case 'awning':
         case 'curtain':
           // Awning/Curtain devices might use position commands
           final command = isOn ? 'OPEN' : 'CLOSE';
-          _mqttService.publishDeviceCommand(mqttTopic, command);
+          if (isIndoorDevice) {
+            _mqttService.publishIndoorDeviceCommand(mqttTopic, command);
+          } else {
+            _mqttService.publishDeviceCommand(mqttTopic, command);
+          }
           break;
 
         default:
           // Default: Simple ON/OFF command
           final command = isOn ? 'ON' : 'OFF';
-          _mqttService.publishDeviceCommand(mqttTopic, command);
+          if (isIndoorDevice) {
+            _mqttService.publishIndoorDeviceCommand(mqttTopic, command);
+          } else {
+            _mqttService.publishDeviceCommand(mqttTopic, command);
+          }
           break;
       }
 
-      print('✅ MQTT command sent: $mqttTopic for ${device.type} device');
     } catch (e) {
       print('❌ Error sending MQTT command: $e');
     }
