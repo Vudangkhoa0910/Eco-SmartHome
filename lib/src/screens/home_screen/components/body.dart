@@ -36,27 +36,293 @@ class _BodyState extends State<Body> {
     });
   }
 
-  /// Get SVG asset path for device type - consistent with default devices
+  /// Get SVG asset path for device type - comprehensive device mapping
   String _getDeviceSvgAsset(String deviceType) {
     switch (deviceType.toLowerCase()) {
+      // Lighting devices
       case 'light':
+      case 'bulb':
+      case 'lamp':
+      case 'lighting':
         return 'assets/icons/svg/light.svg';
+      
+      // Climate control
       case 'fan':
+      case 'ceiling_fan':
+      case 'ventilation':
         return 'assets/icons/svg/fan.svg';
       case 'ac':
+      case 'air_conditioner':
+      case 'hvac':
+      case 'climate':
         return 'assets/icons/svg/ac.svg';
+      
+      // Audio/Video devices
       case 'speaker':
+      case 'audio':
+      case 'sound_system':
         return 'assets/icons/svg/speaker.svg';
       case 'tv':
+      case 'television':
+      case 'smart_tv':
+      case 'entertainment':
         return 'assets/icons/svg/music.svg'; // Use music icon for TV/entertainment
+      
+      // Security & Monitoring
       case 'camera':
+      case 'security':
+      case 'cctv':
+      case 'surveillance':
         return 'assets/icons/svg/profile.svg'; // Use profile icon for camera/security
+      
+      // Sensors & IoT
       case 'sensor':
+      case 'temperature':
+      case 'humidity':
+      case 'motion':
+      case 'door':
+      case 'window':
         return 'assets/icons/svg/eco.svg'; // Use eco icon for sensors
+      
+      // Switches & Controls
       case 'switch':
+      case 'outlet':
+      case 'plug':
+      case 'smart_switch':
         return 'assets/icons/svg/star.svg'; // Use star icon for switches
+      
+      // Smart Home Appliances
+      case 'robot':
+      case 'vacuum':
+      case 'cleaner':
+        return 'assets/icons/svg/info.svg'; // Use info icon for robots/cleaners
+      
+      // Kitchen & Appliances
+      case 'refrigerator':
+      case 'fridge':
+      case 'microwave':
+      case 'oven':
+        return 'assets/icons/svg/eco.svg'; // Use eco for appliances
+      
+      // Health & Wellness
+      case 'health':
+      case 'heart_rate':
+      case 'wellness':
+        return 'assets/icons/svg/heart.svg';
+      
+      // Solar & Energy
+      case 'solar':
+      case 'sun':
+      case 'solar_panel':
+        return 'assets/icons/svg/sun.svg';
+      case 'savings':
+      case 'energy':
+        return 'assets/icons/svg/savings_filled.svg';
+      
+      // Communication
+      case 'chat':
+      case 'communication':
+      case 'intercom':
+        return 'assets/icons/svg/chat.svg';
+      
+      // Air & Climate Extended
+      case 'air':
+      case 'air_purifier':
+        return 'assets/icons/svg/air.svg';
+      case 'cooling':
+      case 'cooler':
+        return 'assets/icons/svg/cool.svg';
+      
+      // Team/Group devices
+      case 'team':
+      case 'group':
+      case 'multi_user':
+        return 'assets/icons/svg/team.svg';
+      
+      // Help & Support
+      case 'help':
+      case 'support':
+        return 'assets/icons/svg/help.svg';
+      
+      // Default fallback
       default:
-        return 'assets/icons/svg/info.svg'; // Default fallback
+        return 'assets/icons/svg/info.svg';
+    }
+  }
+
+  /// Build device icon widget - tries SVG first, falls back to Material icon
+  Widget _buildDeviceIcon(String deviceType, bool isOn) {
+    final svgPath = _getDeviceSvgAsset(deviceType);
+    final iconColor = isOn
+        ? const Color.fromARGB(255, 29, 93, 202)
+        : Theme.of(context).brightness == Brightness.dark 
+            ? Colors.white.withOpacity(0.8)
+            : const Color.fromARGB(255, 0, 0, 0);
+    
+    final iconSize = getProportionateScreenWidth(32);
+    
+    try {
+      return SvgPicture.asset(
+        svgPath,
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+        width: iconSize,
+        height: iconSize,
+        fit: BoxFit.contain,
+      );
+    } catch (e) {
+      // Fallback to Material icon if SVG is not found or fails to load
+      return Icon(
+        _getDeviceIcon(deviceType),
+        color: iconColor,
+        size: iconSize,
+      );
+    }
+  }
+
+  /// Build device icon widget specifically for UserAddedDevice - uses the device's actual icon
+  Widget _buildUserDeviceIcon(UserAddedDevice userDevice) {
+    // Make icon colors darker and more vibrant
+    final baseColor = userDevice.device.color;
+    final iconColor = userDevice.device.isOn
+        ? Color.fromARGB(
+            255,
+            (baseColor.red * 0.8).clamp(0, 255).toInt(),
+            (baseColor.green * 0.8).clamp(0, 255).toInt(),
+            (baseColor.blue * 0.8).clamp(0, 255).toInt(),
+          )
+        : Color.fromARGB(
+            255,
+            (baseColor.red * 0.6).clamp(0, 255).toInt(),
+            (baseColor.green * 0.6).clamp(0, 255).toInt(),
+            (baseColor.blue * 0.6).clamp(0, 255).toInt(),
+          );
+    
+    final iconSize = getProportionateScreenWidth(28); // Slightly smaller for better appearance
+    
+    // Use the device's actual icon from house_structure.dart
+    return Icon(
+      userDevice.device.icon,
+      color: iconColor,
+      size: iconSize,
+    );
+  }
+
+  /// Get Material icon for device type when SVG is not available
+  IconData _getDeviceIcon(String deviceType) {
+    switch (deviceType.toLowerCase()) {
+      // Lighting devices
+      case 'light':
+      case 'bulb':
+      case 'lamp':
+      case 'lighting':
+        return Icons.lightbulb_outline;
+      
+      // Climate control
+      case 'fan':
+      case 'ceiling_fan':
+      case 'ventilation':
+        return Icons.air;
+      case 'ac':
+      case 'air_conditioner':
+      case 'hvac':
+      case 'climate':
+        return Icons.ac_unit;
+      
+      // Audio/Video devices
+      case 'speaker':
+      case 'audio':
+      case 'sound_system':
+        return Icons.speaker;
+      case 'tv':
+      case 'television':
+      case 'smart_tv':
+      case 'entertainment':
+        return Icons.tv;
+      
+      // Security & Monitoring
+      case 'camera':
+      case 'security':
+      case 'cctv':
+      case 'surveillance':
+        return Icons.videocam_outlined;
+      
+      // Sensors & IoT
+      case 'sensor':
+      case 'temperature':
+      case 'humidity':
+        return Icons.sensors;
+      case 'motion':
+        return Icons.motion_photos_on;
+      case 'door':
+        return Icons.door_front_door_outlined;
+      case 'window':
+        return Icons.window_outlined;
+      
+      // Switches & Controls
+      case 'switch':
+      case 'outlet':
+      case 'plug':
+      case 'smart_switch':
+        return Icons.power_settings_new;
+      
+      // Smart Home Appliances
+      case 'robot':
+      case 'vacuum':
+      case 'cleaner':
+        return Icons.smart_toy_outlined;
+      
+      // Kitchen & Appliances
+      case 'refrigerator':
+      case 'fridge':
+        return Icons.kitchen_outlined;
+      case 'microwave':
+        return Icons.microwave_outlined;
+      case 'oven':
+        return Icons.kitchen_outlined;
+      
+      // Health & Wellness
+      case 'health':
+      case 'heart_rate':
+      case 'wellness':
+        return Icons.favorite_outline;
+      
+      // Solar & Energy
+      case 'solar':
+      case 'sun':
+      case 'solar_panel':
+        return Icons.wb_sunny_outlined;
+      case 'savings':
+      case 'energy':
+        return Icons.energy_savings_leaf;
+      
+      // Communication
+      case 'chat':
+      case 'communication':
+      case 'intercom':
+        return Icons.chat_outlined;
+      
+      // Air & Climate Extended
+      case 'air':
+      case 'air_purifier':
+        return Icons.air_outlined;
+      case 'cooling':
+      case 'cooler':
+        return Icons.ac_unit_outlined;
+      
+      // Team/Group devices
+      case 'team':
+      case 'group':
+      case 'multi_user':
+        return Icons.group_outlined;
+      
+      // Help & Support
+      case 'help':
+      case 'support':
+        return Icons.help_outline;
+      
+      // Default fallback
+      default:
+        return Icons.device_unknown;
     }
   }
 
@@ -409,8 +675,8 @@ class _BodyState extends State<Body> {
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: getProportionateScreenWidth(10),
-            vertical: getProportionateScreenHeight(6),
+            horizontal: getProportionateScreenWidth(12), // Slightly more horizontal padding
+            vertical: getProportionateScreenHeight(8), // Slightly more vertical padding
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,25 +686,17 @@ class _BodyState extends State<Body> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 45, // Slightly smaller
+                    height: 45,
                     decoration: BoxDecoration(
                       color: userDevice.device.isOn
-                          ? (Theme.of(context).brightness == Brightness.dark
-                              ? const Color.fromARGB(255, 254, 254, 254)
-                              : const Color.fromARGB(255, 182, 174, 255))
+                          ? userDevice.device.color.withOpacity(0.15) // Use device color with transparency
                           : (Theme.of(context).brightness == Brightness.dark
                               ? const Color(0xFF1A202C)
-                              : const Color.fromARGB(255, 255, 255, 255)),
-                      borderRadius:
-                          const BorderRadius.all(Radius.elliptical(45, 45)),
+                              : Colors.grey.withOpacity(0.1)),
+                      borderRadius: BorderRadius.circular(22.5), // More standard circular border
                     ),
-                    child: SvgPicture.asset(
-                      _getDeviceSvgAsset(userDevice.device.type),
-                      color: userDevice.device.isOn
-                          ? const Color.fromARGB(255, 29, 93, 202)
-                          : const Color.fromARGB(255, 0, 0, 0),
-                    ),
+                    child: _buildUserDeviceIcon(userDevice),
                   ),
                   // Delete button (instead of star)
                   GestureDetector(
@@ -459,17 +717,19 @@ class _BodyState extends State<Body> {
                     textAlign: TextAlign.left,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                          color: userDevice.device.isOn
-                              ? (Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.white
-                                  : Colors.white)
-                              : Theme.of(context)
-                                  .textTheme
-                                  .displayMedium!
-                                  .color,
-                        ),
+                    style: TextStyle(
+                      color: userDevice.device.isOn
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.white)
+                          : Theme.of(context).textTheme.bodyLarge!.color,
+                      fontSize: 13, // Smaller font size for compactness
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                      height: 1.2,
+                    ),
                   ),
+                  SizedBox(height: 2), // Reduce spacing
                   Text(
                     '${userDevice.roomName}',
                     textAlign: TextAlign.left,
@@ -477,12 +737,12 @@ class _BodyState extends State<Body> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         color: userDevice.device.isOn
-                            ? const Color.fromARGB(255, 255, 254, 254)
-                            : Theme.of(context).textTheme.bodyMedium!.color,
-                        fontSize: 13,
-                        letterSpacing: 0,
-                        fontWeight: FontWeight.normal,
-                        height: 1.6),
+                            ? Colors.white.withOpacity(0.8)
+                            : Theme.of(context).textTheme.bodySmall!.color,
+                        fontSize: 10, // Smaller room name
+                        letterSpacing: -0.1,
+                        fontWeight: FontWeight.w400,
+                        height: 1.2),
                   ),
                 ],
               ),
@@ -490,13 +750,16 @@ class _BodyState extends State<Body> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    userDevice.device.isOn ? 'On' : 'Off',
+                    userDevice.device.isOn ? 'Bật' : 'Tắt',
                     textAlign: TextAlign.left,
-                    style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                          color: userDevice.device.isOn
-                              ? Colors.white
-                              : Colors.black,
-                        ),
+                    style: TextStyle(
+                      color: userDevice.device.isOn
+                          ? Colors.white
+                          : Theme.of(context).textTheme.bodyMedium!.color,
+                      fontSize: 11, // Smaller status text
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.1,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () async {
