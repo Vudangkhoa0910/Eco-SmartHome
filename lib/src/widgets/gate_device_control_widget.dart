@@ -32,6 +32,13 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
   
   // 🚨 TIMEOUT MECHANISM for loading spinner
   Timer? _loadingTimeout;
+  
+  // 🚨 DIALOG STATE SYNC: Callback to update dialog when MQTT updates received
+  StateSetter? _dialogStateSetter;
+  
+  // 🚨 REALISTIC LOADING: Track actual gate operation timing
+  DateTime? _operationStartTime;
+  int? _operationTargetLevel;
 
   @override
   void initState() {
@@ -89,35 +96,61 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         final newIsMoving = status['isMoving'] ?? false;
         
         // 🚨 DEBUG: Log state changes
-        print('🔄 Widget state update: level=$newLevel, isMoving=$newIsMoving, description=${status['description']}');
-        print('🔄 Current widget state before update: level=$_currentLevel, isMoving=$_isMoving');
+        print('🔄 MQTT update: level=$newLevel, isMoving=$newIsMoving, description=${status['description']}');
+        print('🔄 Current state: level=$_currentLevel, isMoving=$_isMoving');
         
-        // Update UI
+        // 🚨 REALISTIC LOADING LOGIC: Don't stop loading immediately if operation is in progress
+        bool shouldShowLoading = _isMoving;
+        
+        if (_operationStartTime != null && _operationTargetLevel != null) {
+          final elapsed = DateTime.now().difference(_operationStartTime!);
+          final distance = (_operationTargetLevel! - _currentLevel).abs();
+          final expectedDuration = Duration(milliseconds: (distance * 70)); // ~70ms per 1% = 7s for 100%
+          
+          print('🔄 Operation timing: elapsed=${elapsed.inMilliseconds}ms, expected=${expectedDuration.inMilliseconds}ms');
+          
+          // Keep loading if we haven't reached expected completion time AND target level
+          if (elapsed < expectedDuration && newLevel != _operationTargetLevel) {
+            shouldShowLoading = true;
+            print('🔄 Keeping loading state: operation still in progress');
+          } else if (newLevel == _operationTargetLevel || elapsed > Duration(seconds: 8)) {
+            shouldShowLoading = false;
+            _operationStartTime = null;
+            _operationTargetLevel = null;
+            print('🔄 Operation completed or timed out - stopping loading');
+          }
+        } else {
+          // No active operation - use MQTT isMoving directly
+          shouldShowLoading = newIsMoving;
+        }
+        
+        // Update main widget UI
         setState(() {
           _currentLevel = newLevel;
-          _isMoving = newIsMoving;
-          _statusText = _getGateDescription(newLevel);
+          _isMoving = shouldShowLoading;
+          _statusText = shouldShowLoading ? 'Đang di chuyển...' : _getGateDescription(newLevel);
         });
         
-        // 🚨 CANCEL TIMEOUT when state is updated
-        if (!newIsMoving) {
+        // 🚨 SYNC DIALOG STATE: Update dialog if it's open
+        if (_dialogStateSetter != null) {
+          _dialogStateSetter!(() {
+            print('🔄 Dialog state synced: level=$newLevel, isMoving=$shouldShowLoading');
+          });
+        } else {
+          print('🔄 No dialog open - skipping dialog sync');
+        }
+        
+        // 🚨 CANCEL TIMEOUT when operation truly completes
+        if (!shouldShowLoading) {
           _loadingTimeout?.cancel();
         }
         
-        // 🚨 DEBUG: Log state after update
-        print('🔄 Widget state after update: level=$_currentLevel, isMoving=$_isMoving, status=$_statusText');
-        
         // Update Firebase with progress using corrected logic
         try {
-          if (newIsMoving) {
-            // Still moving - update progress (auto-complete when target reached)
+          if (shouldShowLoading) {
             await _gateService.updateOperationProgress(currentLevel: newLevel);
           } else {
-            // Movement stopped - ensure completion
-            await _gateService.completeOperation(
-              finalLevel: newLevel,
-              success: true,
-            );
+            await _gateService.completeOperation(finalLevel: newLevel, success: true);
           }
         } catch (e) {
           print('❌ Error updating gate progress: $e');
@@ -169,6 +202,9 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            // 🚨 REGISTER DIALOG STATE SETTER for MQTT sync
+            _dialogStateSetter = setDialogState;
+            
             return AlertDialog(
               title: Row(
                 children: [
@@ -355,7 +391,11 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    // 🚨 CLEAR DIALOG STATE SETTER when closing
+                    _dialogStateSetter = null;
+                    Navigator.of(context).pop();
+                  },
                   child: Text('Đóng'),
                 ),
                 if (!_isMoving)
@@ -500,6 +540,8 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       return;
     }
     
+    print('🚪 STARTING gate control: $_currentLevel% → $targetLevel%');
+    
     // Prevent opening when already fully open (100%)
     if (_currentLevel >= 100 && targetLevel > _currentLevel) {
       print('❌ Gate already fully open (100%) - cannot open more');
@@ -524,6 +566,13 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       return;
     }
 
+    // 🚨 SET LOADING STATE in both dialog and widget + TRACK OPERATION TIMING
+    print('🔄 Setting isMoving = true in dialog and widget');
+    
+    // 🚨 START TRACKING REALISTIC OPERATION TIMING
+    _operationStartTime = DateTime.now();
+    _operationTargetLevel = targetLevel;
+    
     setDialogState(() {
       _isMoving = true;
       _statusText = 'Đang di chuyển đến $targetLevel%...';
@@ -543,6 +592,12 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
           _isMoving = false;
           _statusText = _getGateDescription(_currentLevel);
         });
+        // 🚨 Also update dialog state if open
+        if (_dialogStateSetter != null) {
+          _dialogStateSetter!(() {
+            print('⚠️ Dialog timeout - forcing isMoving = false in dialog');
+          });
+        }
       }
     });
 
@@ -566,6 +621,8 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         }
       }
       
+      print('🚪 Sending MQTT command: $command, direction: $direction');
+      
       // Send command using corrected logic
       await _gateService.sendGateCommand(
         command: command,
@@ -582,6 +639,7 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       );
       
       print('🚪 Gate command sent: $command → $targetLevel%');
+      print('🔄 Waiting for MQTT status update...');
     } catch (e) {
       print('❌ Error controlling gate: $e');
       setDialogState(() {
@@ -597,6 +655,7 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
     // Timeout sau 15 giây
     Future.delayed(const Duration(seconds: 15), () {
       if (mounted && _isMoving) {
+        print('⚠️ 15s timeout - stopping loading state');
         setDialogState(() {
           _isMoving = false;
           _statusText = 'Hết thời gian chờ - Kiểm tra kết nối';

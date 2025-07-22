@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
-import 'package:smart_home/src/widgets/gate_control_widget.dart';
+import 'package:smart_home/src/widgets/gate_device_control_widget.dart'; // 🚨 CONSOLIDATED: Using unified gate widget
 
 class HouseOverviewScreen extends StatelessWidget {
   const HouseOverviewScreen({Key? key}) : super(key: key);
@@ -44,14 +44,13 @@ class HouseOverviewScreen extends StatelessWidget {
             
             SizedBox(height: getProportionateScreenHeight(20)),
             
-            // Gate Control Widget - Prominent display
-            GateControlWidget(),
+            // Gate Control Widget - 🚨 CONSOLIDATED: Using GateDeviceControlWidget instead of duplicate GateControlWidget
+            GateDeviceControlWidget(
+              deviceName: 'Cổng chính',
+              deviceColor: Colors.blue,
+            ),
             
             SizedBox(height: getProportionateScreenHeight(24)),
-            
-            // Gate Control Section
-            const GateControlWidget(),
-            SizedBox(height: getProportionateScreenHeight(20)),
             
             // Floors List
             Expanded(

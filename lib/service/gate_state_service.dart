@@ -189,10 +189,13 @@ class GateStateService {
   factory GateStateService() => _instance;
   GateStateService._internal();
   
-  // Cache mechanism - 🚨 OPTIMIZED: Minimal Firebase reads, rely on MQTT for real-time
+  // Cache mechanism - 🚨 OPTIMIZED: Minimal Firebase reads with singleton lock
   GateState? _cachedState;
   DateTime? _lastCacheTime;
   static const Duration _cacheTimeout = Duration(hours: 1);  // 🚨 CRITICAL: 1 hour cache to minimize Firebase reads
+  
+  // 🚨 CRITICAL: Singleton lock to prevent multiple simultaneous Firebase reads during app startup
+  static Future<GateState>? _ongoingFetch;
 
   /// Lưu trạng thái cổng với cache - 🚨 FIREBASE WRITES DISABLED
   Future<bool> saveGateState(GateState gateState) async {
@@ -322,51 +325,32 @@ class GateStateService {
   /// Lấy trạng thái cổng hiện tại với cache - 🚨 OPTIMIZED to minimize Firebase reads
   Future<GateState> getCurrentGateState() async {
     try {
-      // 🚨 PRIORITY 1: Return cached state if available (even if "expired" - MQTT keeps it current)
+      // 🚨 PRIORITY 1: Return cached state if available 
       if (_cachedState != null) {
         final cacheAge = _lastCacheTime != null ? DateTime.now().difference(_lastCacheTime!) : Duration.zero;
         print('📋 Using cached gate state (age: ${cacheAge.inMinutes}min ${cacheAge.inSeconds % 60}s)');
         return _cachedState!;
       }
       
-      // 🚨 PRIORITY 2: Only read Firebase if absolutely no cache (app startup only)
-      print('🔄 RARE: Loading gate state from Firebase (no cache available)...');
-      final doc = await _firestore
-          .collection(_gateStateCollection)
-          .doc('main_gate')
-          .get();
-      
-      GateState state;
-      if (doc.exists) {
-        final data = doc.data()!;
-        // Try new format first
-        if (data.containsKey('level') && data.containsKey('status')) {
-          state = GateState.fromMap(data);
-        } else {
-          // Fallback to legacy format
-          final percentage = data['percentage'] ?? 0;
-          state = GateState.withAutoStatus(
-            level: percentage,
-            isMoving: false,
-            timestamp: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          );
-        }
-      } else {
-        // Return default state if no data found
-        state = GateState.withAutoStatus(
-          level: 0,
-          isMoving: false,
-        );
+      // 🚨 PRIORITY 2: Check if Firebase fetch is already in progress (prevent multiple reads)
+      if (_ongoingFetch != null) {
+        print('⏳ Firebase read already in progress, waiting...');
+        return await _ongoingFetch!;
       }
       
-      // Update cache
-      _cachedState = state;
-      _lastCacheTime = DateTime.now();
+      // 🚨 PRIORITY 3: Start single Firebase read (only if no cache and no ongoing fetch)
+      print('🔄 SINGLETON: Starting Firebase read (no cache available)...');
+      _ongoingFetch = _performFirebaseRead();
       
-      print('📡 Firebase read completed - cache updated for 1 hour');
-      return state;
+      try {
+        final result = await _ongoingFetch!;
+        return result;
+      } finally {
+        _ongoingFetch = null; // Clear the lock
+      }
     } catch (e) {
       print('❌ Error getting current gate state: $e');
+      _ongoingFetch = null; // Clear the lock on error
       
       // Fallback to cache even if expired, or return default
       if (_cachedState != null) {
@@ -376,6 +360,44 @@ class GateStateService {
       
       return GateState.withAutoStatus(level: 0, isMoving: false);
     }
+  }
+  
+  /// Perform actual Firebase read (separated for singleton control)
+  Future<GateState> _performFirebaseRead() async {
+    final doc = await _firestore
+        .collection(_gateStateCollection)
+        .doc('main_gate')
+        .get();
+    
+    GateState state;
+    if (doc.exists) {
+      final data = doc.data()!;
+      // Try new format first
+      if (data.containsKey('level') && data.containsKey('status')) {
+        state = GateState.fromMap(data);
+      } else {
+        // Fallback to legacy format
+        final percentage = data['percentage'] ?? 0;
+        state = GateState.withAutoStatus(
+          level: percentage,
+          isMoving: false,
+          timestamp: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+      }
+    } else {
+      // Return default state if no data found
+      state = GateState.withAutoStatus(
+        level: 0,
+        isMoving: false,
+      );
+    }
+    
+    // Update cache
+    _cachedState = state;
+    _lastCacheTime = DateTime.now();
+    
+    print('📡 SINGLETON Firebase read completed - cache updated for 1 hour');
+    return state;
   }
 
   /// Lấy trạng thái cổng hiện tại (deprecated - để tương thích)
