@@ -5,6 +5,7 @@ import 'package:smart_home/provider/base_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/service/weather_service.dart';
 import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_service_simple.dart';
 import 'package:smart_home/service/electricity_bill_service.dart';
 import 'package:smart_home/service/zone_management_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
@@ -18,6 +19,7 @@ class HomeScreenViewModel extends BaseModel {
   //-------------SERVICES-------------//
   final WeatherService _weatherService = getIt<WeatherService>();
   final MqttService _mqttService = getIt<MqttService>();
+  final MqttServiceSimple _mqttServiceSimple = getIt<MqttServiceSimple>();
   final ElectricityBillService _billService = getIt<ElectricityBillService>();
   final ZoneManagementService _zoneService = getIt<ZoneManagementService>();
   final GateStateService _gateService = GateStateService();
@@ -49,11 +51,18 @@ class HomeScreenViewModel extends BaseModel {
   bool isHallwayLightOn = false;
   bool isBalconyLightOn = false;
 
+  // Quạt và điều hòa states
+  bool isFanLivingRoomOn = false;        // Quạt tầng 1 phòng khách
+  bool isACLivingRoomOn = false;         // Điều hòa tầng 1 phòng khách
+  bool isACBedroom1On = false;           // Điều hòa tầng 2 phòng ngủ 1
+  bool isACBedroom2On = false;           // Điều hòa tầng 2 phòng ngủ 2
+
   // Gate state management
   int _currentGateLevel = 0;
   bool _isGateMoving = false;
   String _gateStatusText = 'Đang tải...';
   StreamSubscription? _gateStatusSubscription;
+  StreamSubscription? _indoorDeviceStatusSubscription;
 
   // Weather data
   WeatherData? _currentWeather;
@@ -120,6 +129,7 @@ class HomeScreenViewModel extends BaseModel {
     _sensorSubscription?.cancel();
     _connectionSubscription?.cancel();
     _gateStatusSubscription?.cancel();
+    _indoorDeviceStatusSubscription?.cancel();
     super.dispose();
   }
 
@@ -232,6 +242,12 @@ class HomeScreenViewModel extends BaseModel {
       notifyListeners();
     });
 
+    // Listen to indoor device status from ESP32-S3
+    _indoorDeviceStatusSubscription = 
+        _mqttServiceSimple.indoorDeviceStatusStream.listen((deviceStates) {
+      _updateIndoorDeviceStates(deviceStates);
+    });
+
     // Force update UI after setup
     notifyListeners();
   }
@@ -244,6 +260,58 @@ class HomeScreenViewModel extends BaseModel {
       _monthlyCost = _electricityEstimation['monthly_cost'] ?? 0.0;
     } catch (e) {
       print('Error calculating electricity: $e');
+    }
+  }
+
+  void _updateIndoorDeviceStates(Map<String, bool> deviceStates) {
+    try {
+      // Update states based on ESP32-S3 reported states
+      deviceStates.forEach((deviceKey, isOn) {
+        switch (deviceKey) {
+          case 'kitchen_light':
+            isKitchenLightOn = isOn;
+            break;
+          case 'living_room_light':
+            isLivingRoomLightOn = isOn;
+            break;
+          case 'bedroom_light':
+            isBedroomLightOn = isOn;
+            break;
+          case 'corner_bedroom_light':
+            isCornerBedroomLightOn = isOn;
+            break;
+          case 'yard_bedroom_light':
+            isYardBedroomLightOn = isOn;
+            break;
+          case 'worship_room_light':
+            isWorshipRoomLightOn = isOn;
+            break;
+          case 'hallway_light':
+            isHallwayLightOn = isOn;
+            break;
+          case 'balcony_light':
+            isBalconyLightOn = isOn;
+            break;
+          // Quạt và điều hòa
+          case 'fan_living_room':
+            isFanLivingRoomOn = isOn;
+            break;
+          case 'ac_living_room':
+            isACLivingRoomOn = isOn;
+            break;
+          case 'ac_bedroom1':
+            isACBedroom1On = isOn;
+            break;
+          case 'ac_bedroom2':
+            isACBedroom2On = isOn;
+            break;
+        }
+      });
+      
+      notifyListeners();
+      print('🏠 Updated indoor device states from ESP32-S3: ${deviceStates.length} devices');
+    } catch (e) {
+      print('❌ Error updating indoor device states: $e');
     }
   }
 
@@ -433,6 +501,56 @@ class HomeScreenViewModel extends BaseModel {
     notifyListeners();
   }
 
+  // ========== QUẠT VÀ ĐIỀU HÒA CONTROLS ==========
+  
+  // Quạt tầng 1 phòng khách
+  void toggleFanLivingRoom() {
+    isFanLivingRoomOn = !isFanLivingRoomOn;
+    _mqttServiceSimple.publishFanLivingRoomCommand(isFanLivingRoomOn ? 'ON' : 'OFF');
+    notifyListeners();
+  }
+
+  void setFanLivingRoom(bool isOn) {
+    isFanLivingRoomOn = isOn;
+    notifyListeners();
+  }
+
+  // Điều hòa tầng 1 phòng khách
+  void toggleACLivingRoom() {
+    isACLivingRoomOn = !isACLivingRoomOn;
+    _mqttServiceSimple.publishACLivingRoomCommand(isACLivingRoomOn ? 'ON' : 'OFF');
+    notifyListeners();
+  }
+
+  void setACLivingRoom(bool isOn) {
+    isACLivingRoomOn = isOn;
+    notifyListeners();
+  }
+
+  // Điều hòa tầng 2 phòng ngủ 1
+  void toggleACBedroom1() {
+    isACBedroom1On = !isACBedroom1On;
+    _mqttServiceSimple.publishACBedroom1Command(isACBedroom1On ? 'ON' : 'OFF');
+    notifyListeners();
+  }
+
+  void setACBedroom1(bool isOn) {
+    isACBedroom1On = isOn;
+    notifyListeners();
+  }
+
+  // Điều hòa tầng 2 phòng ngủ 2
+  void toggleACBedroom2() {
+    isACBedroom2On = !isACBedroom2On;
+    _mqttServiceSimple.publishACBedroom2Command(isACBedroom2On ? 'ON' : 'OFF');
+    notifyListeners();
+  }
+
+  void setACBedroom2(bool isOn) {
+    isACBedroom2On = isOn;
+    notifyListeners();
+  }
+
   // ========== GATE STATE MANAGEMENT ==========
   
   Future<void> _initializeGateState() async {
@@ -461,18 +579,10 @@ class HomeScreenViewModel extends BaseModel {
   Future<void> _loadCurrentGateState() async {
     try {
       final currentState = await _gateService.getCurrentGateState();
-      if (currentState != null) {
-        _currentGateLevel = currentState.level;
-        _isGateMoving = currentState.isMoving;
-        _gateStatusText = _getGateDescription(_currentGateLevel);
-        notifyListeners();
-      } else {
-        // No previous state, set defaults
-        _currentGateLevel = 0;
-        _isGateMoving = false;
-        _gateStatusText = 'Đóng hoàn toàn';
-        notifyListeners();
-      }
+      _currentGateLevel = currentState.level;
+      _isGateMoving = currentState.isMoving;
+      _gateStatusText = _getGateDescription(_currentGateLevel);
+      notifyListeners();
     } catch (e) {
       print('❌ Error loading gate state: $e');
       _gateStatusText = 'Lỗi tải trạng thái';

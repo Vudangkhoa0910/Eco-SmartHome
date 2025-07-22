@@ -651,10 +651,20 @@ class MqttServiceSimple {
 
   // Publish command to indoor device
   Future<void> publishIndoorDeviceCommand(String deviceTopic, String command) async {
-    if (!_isConnected || _client == null) return;
+    if (!_isConnected || _client == null) {
+      print('❌ MQTT not connected, cannot send: $deviceTopic = $command');
+      return;
+    }
     
     try {
       print('🏠 Publishing indoor device command: $deviceTopic = $command');
+      
+      // 🔍 Special debugging for AC topics
+      if (deviceTopic.contains('ac_')) {
+        print('❄️ [AC-DEBUG] Sending AC command: $deviceTopic = $command');
+        print('❄️ [AC-DEBUG] MQTT connected: $_isConnected');
+        print('❄️ [AC-DEBUG] Client: ${_client != null ? 'exists' : 'null'}');
+      }
       
       await _client!.publishMessage(
         deviceTopic,
@@ -663,10 +673,40 @@ class MqttServiceSimple {
       );
       
       print('✅ Indoor device command sent: $deviceTopic = $command');
+      
+      // 🔍 Additional AC debugging
+      if (deviceTopic.contains('ac_')) {
+        print('❄️ [AC-DEBUG] AC command sent successfully: $deviceTopic = $command');
+      }
       // Note: ESP32 will automatically send status after command execution
     } catch (e) {
       print('❌ Error publishing indoor device command: $e');
     }
+  }
+
+  // Specific methods for new devices
+  Future<void> publishFanLivingRoomCommand(String command) async {
+    print('🌀 [DEBUG] Publishing Fan Living Room command: $command to inside/fan_living_room');
+    await publishIndoorDeviceCommand('inside/fan_living_room', command);
+    print('🌀 [DEBUG] Fan Living Room command sent successfully');
+  }
+
+  Future<void> publishACLivingRoomCommand(String command) async {
+    print('❄️ [DEBUG] Publishing AC Living Room command: $command to inside/ac_living_room');
+    await publishIndoorDeviceCommand('inside/ac_living_room', command);
+    print('❄️ [DEBUG] AC Living Room command sent successfully');
+  }
+
+  Future<void> publishACBedroom1Command(String command) async {
+    print('❄️ [DEBUG] Publishing AC Bedroom1 command: $command to inside/ac_bedroom1');
+    await publishIndoorDeviceCommand('inside/ac_bedroom1', command);
+    print('❄️ [DEBUG] AC Bedroom1 command sent successfully');
+  }
+
+  Future<void> publishACBedroom2Command(String command) async {
+    print('❄️ [DEBUG] Publishing AC Bedroom2 command: $command to inside/ac_bedroom2');
+    await publishIndoorDeviceCommand('inside/ac_bedroom2', command);
+    print('❄️ [DEBUG] AC Bedroom2 command sent successfully');
   }
 
   void disconnect() {

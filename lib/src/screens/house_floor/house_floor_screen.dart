@@ -519,6 +519,12 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'inside/hallway_light', // Đèn hành lang
       'inside/balcony_light', // Đèn ban công lớn
 
+      // Quạt và điều hòa
+      'inside/fan_living_room', // Quạt tầng 1 phòng khách
+      'inside/ac_living_room', // Điều hòa tầng 1 phòng khách
+      'inside/ac_bedroom1', // Điều hòa tầng 2 phòng ngủ 1
+      'inside/ac_bedroom2', // Điều hòa tầng 2 phòng ngủ 2
+
       // Legacy topics for compatibility
       'khoasmarthome/living_room_light', // Đèn phòng khách (legacy)
       'khoasmarthome/kitchen_light', // Đèn phòng bếp (legacy)
@@ -595,6 +601,16 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       case 'inside/balcony_light':
         return _model.isBalconyLightOn; // State riêng cho đèn ban công
 
+      // Quạt và điều hòa
+      case 'inside/fan_living_room':
+        return _model.isFanLivingRoomOn; // State cho quạt phòng khách
+      case 'inside/ac_living_room':
+        return _model.isACLivingRoomOn; // State cho điều hòa phòng khách
+      case 'inside/ac_bedroom1':
+        return _model.isACBedroom1On; // State cho điều hòa phòng ngủ 1
+      case 'inside/ac_bedroom2':
+        return _model.isACBedroom2On; // State cho điều hòa phòng ngủ 2
+
       // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
         return _model
@@ -637,6 +653,15 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return 'hallway_light';
       case 'inside/balcony_light':
         return 'balcony_light';
+      // Quạt và điều hòa
+      case 'inside/fan_living_room':
+        return 'fan_living_room';
+      case 'inside/ac_living_room':
+        return 'ac_living_room';
+      case 'inside/ac_bedroom1':
+        return 'ac_bedroom1';
+      case 'inside/ac_bedroom2':
+        return 'ac_bedroom2';
       default:
         // Extract from topic format: prefix/device_name or prefix/device_name/status
         final parts = mqttTopic.split('/');
@@ -654,6 +679,46 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
 
     // Handle indoor devices (ESP32-S3)
     if (device.mqttTopic.startsWith('inside/')) {
+      // Update specific states in HomeScreenViewModel
+      switch (device.mqttTopic) {
+        case 'inside/kitchen_light':
+          _model.setKitchenLight(newState);
+          break;
+        case 'inside/living_room_light':
+          _model.setLivingRoomLight(newState);
+          break;
+        case 'inside/bedroom_light':
+          _model.setBedroomLight(newState);
+          break;
+        case 'inside/corner_bedroom_light':
+          _model.setCornerBedroomLight(newState);
+          break;
+        case 'inside/yard_bedroom_light':
+          _model.setYardBedroomLight(newState);
+          break;
+        case 'inside/worship_room_light':
+          _model.setWorshipRoomLight(newState);
+          break;
+        case 'inside/hallway_light':
+          _model.setHallwayLight(newState);
+          break;
+        case 'inside/balcony_light':
+          _model.setBalconyLight(newState);
+          break;
+        // Quạt và điều hòa
+        case 'inside/fan_living_room':
+          _model.setFanLivingRoom(newState);
+          break;
+        case 'inside/ac_living_room':
+          _model.setACLivingRoom(newState);
+          break;
+        case 'inside/ac_bedroom1':
+          _model.setACBedroom1(newState);
+          break;
+        case 'inside/ac_bedroom2':
+          _model.setACBedroom2(newState);
+          break;
+      }
       try {
         final mqttServiceSimple = getIt<MqttServiceSimple>();
         if (mqttServiceSimple.isConnected) {
