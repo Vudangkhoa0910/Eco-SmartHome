@@ -114,8 +114,8 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
         borderRadius: BorderRadius.circular(20),
         child: Container(
           width: getProportionateScreenWidth(380),
-          height: getProportionateScreenHeight(550),
-          padding: EdgeInsets.all(getProportionateScreenWidth(20)),
+          height: getProportionateScreenHeight(490),
+          padding: EdgeInsets.all(getProportionateScreenWidth(16)),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +129,7 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                       child: Text(
                         'Thêm thiết bị mới',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
@@ -141,11 +141,11 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                     ),
                   ],
                 ),
-                SizedBox(height: getProportionateScreenHeight(15)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 // Step 1: Location Selection
                 _buildStepHeader(1, 'Chọn vị trí', true),
-                SizedBox(height: getProportionateScreenHeight(10)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 // Floor Selection
                 _buildDropdown(
@@ -155,20 +155,28 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                   items: floors
                       .map((floor) => DropdownMenuItem<String>(
                             value: floor.name,
-                            child: Text(floor.name),
+                            child: Text(
+                              floor.name,
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ))
                       .toList(),
                   onChanged: (value) {
                     setState(() {
                       selectedFloor = value;
                       selectedRoom = null;
+                      selectedDevice = null; // Reset selected device when floor changes
                       selectedDeviceType = null;
                       deviceNameController.clear();
                     });
                   },
                 ),
 
-                SizedBox(height: getProportionateScreenHeight(8)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 // Room Selection
                 _buildDropdown(
@@ -181,7 +189,14 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                           .rooms
                           .map((room) => DropdownMenuItem<String>(
                                 value: room.name,
-                                child: Text(room.name),
+                                child: Text(
+                                  room.name,
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ))
                           .toList()
                       : [],
@@ -189,6 +204,7 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                       ? (value) {
                           setState(() {
                             selectedRoom = value;
+                            selectedDevice = null; // Reset selected device when room changes
                             selectedDeviceType = null;
                             deviceNameController.clear();
                           });
@@ -196,26 +212,15 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                       : null,
                 ),
 
-                SizedBox(height: getProportionateScreenHeight(15)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 // Step 2: Device Selection from Available Devices
                 _buildStepHeader(
                     2, 'Chọn thiết bị có sẵn', selectedRoom != null),
-                if (selectedRoom != null) ...[
-                  SizedBox(height: getProportionateScreenHeight(5)),
-                  Text(
-                    'Các thiết bị có sẵn trong ${selectedRoom}:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-                SizedBox(height: getProportionateScreenHeight(10)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 Container(
-                  height: getProportionateScreenHeight(180),
+                  height: getProportionateScreenHeight(60),
                   child: selectedRoom != null
                       ? () {
                           final availableDevices =
@@ -224,24 +229,18 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                             return _buildDisabledSection(
                                 'Không có thiết bị nào trong phòng này');
                           }
-                          return ListView.builder(
-                            itemCount: availableDevices.length,
-                            itemBuilder: (context, index) {
-                              final device = availableDevices[index];
-                              return _buildDeviceCard(device);
-                            },
-                          );
+                          return _buildDeviceDropdown(availableDevices);
                         }()
                       : _buildDisabledSection(
                           'Chọn vị trí trước để hiển thị thiết bị'),
                 ),
 
-                SizedBox(height: getProportionateScreenHeight(15)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 // Step 3: Device Name Confirmation
                 _buildStepHeader(
                     3, 'Xác nhận thông tin thiết bị', selectedDevice != null),
-                SizedBox(height: getProportionateScreenHeight(10)),
+                SizedBox(height: getProportionateScreenHeight(6)),
 
                 TextField(
                   controller: deviceNameController,
@@ -298,9 +297,9 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                 ),
 
                 if (selectedDevice != null) ...[
-                  SizedBox(height: getProportionateScreenHeight(10)),
+                  SizedBox(height: getProportionateScreenHeight(8)),
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.blue.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
@@ -309,66 +308,29 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
                         width: 1,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
                         Text(
-                          'Thông tin thiết bị:',
+                          'Loại: ',
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue[700],
+                            fontSize: 11,
+                            color: Colors.grey[600],
                           ),
                         ),
-                        SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(
-                              'Loại: ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            Text(
-                              _getDeviceTypeName(selectedDevice!.type),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              'MQTT Topic: ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                selectedDevice!.mqttTopic,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                  fontFamily: 'monospace',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          _getDeviceTypeName(selectedDevice!.type),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
 
-                SizedBox(height: getProportionateScreenHeight(20)),
+                SizedBox(height: getProportionateScreenHeight(10)),
 
                 // Action Buttons
                 Row(
@@ -451,88 +413,65 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
 
   SmartDevice? selectedDevice;
 
-  Widget _buildDeviceCard(SmartDevice device) {
-    final isSelected = selectedDevice?.name == device.name;
-
-    return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        onTap: () {
+  Widget _buildDeviceDropdown(List<SmartDevice> availableDevices) {
+    // Only use selectedDevice.name if the device exists in current room
+    final validSelectedDevice = selectedDevice != null && 
+        availableDevices.any((device) => device.name == selectedDevice!.name) 
+        ? selectedDevice!.name 
+        : null;
+        
+    return _buildDropdown(
+      label: 'Thiết bị',
+      value: validSelectedDevice,
+      hint: 'Chọn thiết bị có sẵn',
+      items: availableDevices
+          .map((device) => DropdownMenuItem<String>(
+                value: device.name,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: device.color.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Icon(
+                        device.icon,
+                        color: device.color,
+                        size: 9,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${device.name} (${_getDeviceTypeName(device.type)})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ))
+          .toList(),
+      onChanged: (deviceName) {
+        if (deviceName != null) {
+          final device = availableDevices.firstWhere(
+            (d) => d.name == deviceName,
+          );
           setState(() {
             selectedDevice = device;
             selectedDeviceType = device.type;
             deviceNameController.text = device.name;
           });
-        },
-        child: Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? device.color.withOpacity(0.1)
-                : Colors.grey.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? device.color : Colors.grey.withOpacity(0.3),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: device.color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  device.icon,
-                  color: device.color,
-                  size: 20,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      device.name,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? device.color : Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Loại: ${_getDeviceTypeName(device.type)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    Text(
-                      'Topic: ${device.mqttTopic}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[500],
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                Icon(
-                  Icons.check_circle,
-                  color: device.color,
-                  size: 20,
-                ),
-            ],
-          ),
-        ),
-      ),
+        }
+      },
     );
   }
 
@@ -620,7 +559,7 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
         SizedBox(height: 8),
         Container(
           width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 1),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(
@@ -661,19 +600,8 @@ class _DeviceSelectionDialogState extends State<DeviceSelectionDialog> {
               items: items.map((item) {
                 return DropdownMenuItem<String>(
                   value: item.value,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      item.child is Text
-                          ? (item.child as Text).data ?? ''
-                          : item.value ?? '',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
+                  child: item
+                      .child, // Use the widget directly without extra padding
                 );
               }).toList(),
               onChanged: onChanged,
