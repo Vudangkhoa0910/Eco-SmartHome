@@ -58,8 +58,8 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 
 // Pin configurations
 // Floor 1
-#define LED_KITCHEN_PIN 6        // Đèn bếp lớn
-#define LED_LIVING_ROOM_PIN 5    // Đèn phòng khách
+#define LED_KITCHEN_PIN 5        // Đèn bếp lớn
+#define LED_LIVING_ROOM_PIN 6    // Đèn phòng khách
 #define LED_BEDROOM_PIN 4        // Đèn phòng ngủ
 
 // Floor 2
