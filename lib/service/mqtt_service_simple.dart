@@ -411,7 +411,7 @@ class MqttServiceSimple {
   void controlLedAround(bool isOn) {
     // 🔧 FIX: Đảo ngược logic cho LED Around vì hardware kết nối ngược
     // Gửi OFF để đèn sáng, gửi ON để đèn tắt
-    final command = isOn ? 'OFF' : 'ON';
+    final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedAround, command);
   }
 
