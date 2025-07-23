@@ -6,6 +6,7 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:smart_home/service/firebase_batch_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
 import 'package:smart_home/service/device_state_service.dart';
+import 'package:smart_home/service/optimized_device_status_service.dart';
 
 /// Unified MQTT Service that consolidates mqtt_service.dart and mqtt_service_simple.dart
 /// Features:
@@ -82,6 +83,9 @@ class MqttUnifiedService {
   
   // Device state service
   final DeviceStateService _deviceStateService = DeviceStateService();
+  
+  // Optimized device status service - ADDED: Để giảm tải hệ thống
+  final OptimizedDeviceStatusService _optimizedStatusService = OptimizedDeviceStatusService();
 
   // Current data
   SensorData _currentData = SensorData.defaultData();
@@ -111,6 +115,9 @@ class MqttUnifiedService {
   // Device state getters
   DeviceStateService get deviceStateService => _deviceStateService;
   Stream<Map<String, bool>> get deviceStateStream => _deviceStateService.stateStream;
+  
+  // ADDED: Optimized device status service getter
+  OptimizedDeviceStatusService get optimizedStatusService => _optimizedStatusService;
 
   // Initialize MQTT
   Future<void> initialize() async {
@@ -246,20 +253,29 @@ class MqttUnifiedService {
     
     // Handle individual device status
     if (topic == topicLedGateStatus) {
-      _deviceStateService.updateDeviceState('led_gate', message.toUpperCase() == 'ON', source: 'ESP32');
+      final isOn = message.toUpperCase() == 'ON';
+      _deviceStateService.updateDeviceState('led_gate', isOn, source: 'ESP32');
+      // ADDED: Cập nhật cache tối ưu
+      _optimizedStatusService.updateDeviceState('led_gate', isOn);
       return;
     }
     
     if (topic == topicLedAroundStatus) {
       // FIXED: No more inverted logic - direct state mapping
-      _deviceStateService.updateDeviceState('led_around', message.toUpperCase() == 'ON', source: 'ESP32');
+      final isOn = message.toUpperCase() == 'ON';
+      _deviceStateService.updateDeviceState('led_around', isOn, source: 'ESP32');
+      // ADDED: Cập nhật cache tối ưu
+      _optimizedStatusService.updateDeviceState('led_around', isOn);
       return;
     }
 
     // Handle indoor device status
     if (topic.startsWith('inside/') && topic.endsWith('/status')) {
       final deviceId = topic.replaceAll('inside/', '').replaceAll('/status', '');
-      _deviceStateService.updateDeviceState(deviceId, message.toUpperCase() == 'ON', source: 'ESP32-Indoor');
+      final isOn = message.toUpperCase() == 'ON';
+      _deviceStateService.updateDeviceState(deviceId, isOn, source: 'ESP32-Indoor');
+      // ADDED: Cập nhật cache tối ưu cho indoor devices
+      _optimizedStatusService.updateDeviceState(deviceId, isOn);
       return;
     }
 
