@@ -146,10 +146,15 @@ class YardLedControlWidget extends StatelessWidget {
           vertical: getProportionateScreenHeight(12),
         ),
         decoration: BoxDecoration(
-          color: isOn ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+          // FIXED: LED Around logic ngược - isOn=true nghĩa là tắt đèn
+          color: name == 'LED 2' ? 
+            (isOn ? Colors.red.withOpacity(0.1) : color.withOpacity(0.1)) : // LED 2: ON=Tắt(đỏ), OFF=Mở
+            (isOn ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1)), // LED 1: bình thường
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isOn ? color : Colors.grey.withOpacity(0.3),
+            color: name == 'LED 2' ? 
+              (isOn ? Colors.red : color) : // LED 2: ON=Tắt(đỏ), OFF=Mở
+              (isOn ? color : Colors.grey.withOpacity(0.3)), // LED 1: bình thường
             width: 1.5,
           ),
         ),
@@ -157,7 +162,10 @@ class YardLedControlWidget extends StatelessWidget {
           children: [
             Icon(
               Icons.lightbulb,
-              color: isOn ? color : Colors.grey,
+              // FIXED: LED Around hiển thị màu đúng theo trạng thái thực tế
+              color: name == 'LED 2' ? 
+                (isOn ? Colors.red : color) : // LED 2: ON=Tắt(đỏ), OFF=Mở
+                (isOn ? color : Colors.grey), // LED 1: bình thường
               size: 24,
             ),
             SizedBox(height: getProportionateScreenHeight(8)),
@@ -166,15 +174,21 @@ class YardLedControlWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isOn ? color : Colors.grey,
+                // FIXED: LED Around hiển thị màu đúng
+                color: name == 'LED 2' ? 
+                  (isOn ? Colors.red : color) : // LED 2: ON=Tắt(đỏ), OFF=Mở
+                  (isOn ? color : Colors.grey), // LED 1: bình thường
               ),
             ),
             SizedBox(height: getProportionateScreenHeight(4)),
             Text(
-              isOn ? 'Bật' : 'Tắt',
+              // FIXED: Hiển thị trạng thái thực tế của đèn LED Around
+              name == 'LED 2' ? (isOn ? 'Tắt' : 'Mở') : (isOn ? 'Bật' : 'Tắt'),
               style: TextStyle(
                 fontSize: 10,
-                color: isOn ? color : Colors.grey,
+                color: name == 'LED 2' ? 
+                  (isOn ? Colors.red : color) : // LED 2: ON=Tắt (đỏ), OFF=Mở (màu bình thường)
+                  (isOn ? color : Colors.grey), // LED 1: giữ nguyên logic
               ),
             ),
           ],

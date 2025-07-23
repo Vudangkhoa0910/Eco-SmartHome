@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'add_device_widget.dart';
+import 'active_devices_widget.dart';
+import 'active_devices_widget_optimized.dart';
 
 class Body extends StatefulWidget {
   final HomeScreenViewModel model;
@@ -27,6 +29,22 @@ class _BodyState extends State<Body> {
   void initState() {
     super.initState();
     _loadUserDevices();
+    
+    // Listen to ViewModel changes for real-time synchronization
+    widget.model.addListener(_onViewModelChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.model.removeListener(_onViewModelChanged);
+    super.dispose();
+  }
+
+  void _onViewModelChanged() {
+    // Rebuild UI when ViewModel state changes (for real-time sync)
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadUserDevices() async {
@@ -180,10 +198,10 @@ class _BodyState extends State<Body> {
   }
 
   /// Build device icon widget specifically for UserAddedDevice - uses the device's actual icon
-  Widget _buildUserDeviceIcon(UserAddedDevice userDevice) {
+  Widget _buildUserDeviceIcon(UserAddedDevice userDevice, bool realTimeState) {
     // Make icon colors darker and more vibrant
     final baseColor = userDevice.device.color;
-    final iconColor = userDevice.device.isOn
+    final iconColor = realTimeState
         ? Color.fromARGB(
             255,
             (baseColor.red * 0.8).clamp(0, 255).toInt(),
@@ -326,6 +344,132 @@ class _BodyState extends State<Body> {
     }
   }
 
+  /// Get real-time state for user devices using the same logic as room controls
+  bool _getUserDeviceRealTimeState(UserAddedDevice userDevice) {
+    final topic = userDevice.device.mqttTopic;
+    
+    if (topic.isEmpty) return userDevice.device.isOn;
+
+    // Check if this is an indoor device (ESP32-S3)
+    if (topic.startsWith('inside/')) {
+      // Use ViewModel state for indoor devices (same as room controls)
+      switch (topic) {
+        case 'inside/kitchen_light':
+          return widget.model.isKitchenLightOn;
+        case 'inside/living_room_light':
+          return widget.model.isLivingRoomLightOn;
+        case 'inside/bedroom_light':
+          return widget.model.isBedroomLightOn;
+        case 'inside/corner_bedroom_light':
+          return widget.model.isCornerBedroomLightOn;
+        case 'inside/yard_bedroom_light':
+          return widget.model.isYardBedroomLightOn;
+        case 'inside/worship_room_light':
+          return widget.model.isWorshipRoomLightOn;
+        case 'inside/hallway_light':
+          return widget.model.isHallwayLightOn;
+        case 'inside/balcony_light':
+          return widget.model.isBalconyLightOn;
+        case 'inside/fan_living_room':
+          return widget.model.isFanLivingRoomOn;
+        case 'inside/ac_living_room':
+          return widget.model.isACLivingRoomOn;
+        case 'inside/ac_bedroom1':
+          return widget.model.isACBedroom1On;
+        case 'inside/ac_bedroom2':
+          return widget.model.isACBedroom2On;
+        default:
+          return userDevice.device.isOn;
+      }
+    }
+
+    // Check if this is an outdoor device (ESP32)
+    switch (topic) {
+      case 'khoasmarthome/led_gate':
+        return widget.model.isLightOn; // LED Gate state
+      case 'khoasmarthome/led_around':
+        return widget.model.isACON; // LED Around state (using AC variable)
+      case 'khoasmarthome/motor':
+        return widget.model.currentGateLevel > 0; // Gate is open if level > 0
+      default:
+        // For custom user devices, use stored state
+        return userDevice.device.isOn;
+    }
+  }
+
+  /// Update ViewModel state when user device is controlled from quick controls
+  void _updateViewModelState(UserAddedDevice userDevice, bool newState) {
+    final topic = userDevice.device.mqttTopic;
+    
+    // Update indoor device states
+    if (topic.startsWith('inside/')) {
+      switch (topic) {
+        case 'inside/kitchen_light':
+          widget.model.setKitchenLight(newState);
+          break;
+        case 'inside/living_room_light':
+          widget.model.setLivingRoomLight(newState);
+          break;
+        case 'inside/bedroom_light':
+          widget.model.setBedroomLight(newState);
+          break;
+        case 'inside/corner_bedroom_light':
+          widget.model.setCornerBedroomLight(newState);
+          break;
+        case 'inside/yard_bedroom_light':
+          widget.model.setYardBedroomLight(newState);
+          break;
+        case 'inside/worship_room_light':
+          widget.model.setWorshipRoomLight(newState);
+          break;
+        case 'inside/hallway_light':
+          widget.model.setHallwayLight(newState);
+          break;
+        case 'inside/balcony_light':
+          widget.model.setBalconyLight(newState);
+          break;
+        case 'inside/fan_living_room':
+          widget.model.setFanLivingRoom(newState);
+          break;
+        case 'inside/ac_living_room':
+          widget.model.setACLivingRoom(newState);
+          break;
+        case 'inside/ac_bedroom1':
+          widget.model.setACBedroom1(newState);
+          break;
+        case 'inside/ac_bedroom2':
+          widget.model.setACBedroom2(newState);
+          break;
+      }
+    }
+
+    // Update outdoor device states
+    switch (topic) {
+      case 'khoasmarthome/led_gate':
+        // Update LED Gate state using the toggle method
+        if (newState != widget.model.isLightOn) {
+          widget.model.lightSwitch();
+        }
+        break;
+      case 'khoasmarthome/led_around':
+        // Update LED Around state using the toggle method
+        if (newState != widget.model.isACON) {
+          widget.model.toggleLed2();
+        }
+        break;
+      case 'khoasmarthome/motor':
+        // Update gate state
+        if (newState && widget.model.currentGateLevel == 0) {
+          // Open gate
+          widget.model.toggleMotor();
+        } else if (!newState && widget.model.currentGateLevel > 0) {
+          // Close gate  
+          widget.model.toggleMotor();
+        }
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -370,6 +514,9 @@ class _BodyState extends State<Body> {
                 ],
               ),
             ),
+
+            // Active Devices Widget - OPTIMIZED: Không cần real-time, check đơn giản
+            ActiveDevicesWidgetOptimized(model: widget.model),
 
             // Quick Controls Section - Thứ hai
             Container(
@@ -640,10 +787,13 @@ class _BodyState extends State<Body> {
 
   /// Build a device card that looks exactly like DarkContainer
   Widget _buildUserDeviceCard(UserAddedDevice userDevice) {
+    // Get real-time state using the same logic as room controls
+    final realTimeState = _getUserDeviceRealTimeState(userDevice);
+    
     return InkWell(
       onTap: () async {
         // Toggle device state
-        final newState = !userDevice.device.isOn;
+        final newState = !realTimeState;
         final success = await _deviceManager.updateDeviceState(
           userDevice.device.name,
           newState,
@@ -651,6 +801,9 @@ class _BodyState extends State<Body> {
 
         if (success) {
           await _loadUserDevices();
+          
+          // Force state synchronization in ViewModel for real-time update
+          _updateViewModelState(userDevice, newState);
         }
       },
       child: Container(
@@ -658,7 +811,7 @@ class _BodyState extends State<Body> {
         height: getProportionateScreenHeight(140),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: userDevice.device.isOn
+          color: realTimeState
               ? (Theme.of(context).brightness == Brightness.dark
                   ? const Color(0xFF2D3748)
                   : const Color.fromARGB(255, 182, 174, 255))
@@ -689,14 +842,14 @@ class _BodyState extends State<Body> {
                     width: 45, // Slightly smaller
                     height: 45,
                     decoration: BoxDecoration(
-                      color: userDevice.device.isOn
+                      color: realTimeState
                           ? userDevice.device.color.withOpacity(0.15) // Use device color with transparency
                           : (Theme.of(context).brightness == Brightness.dark
                               ? const Color(0xFF1A202C)
                               : Colors.grey.withOpacity(0.1)),
                       borderRadius: BorderRadius.circular(22.5), // More standard circular border
                     ),
-                    child: _buildUserDeviceIcon(userDevice),
+                    child: _buildUserDeviceIcon(userDevice, realTimeState),
                   ),
                   // Delete button (instead of star)
                   GestureDetector(
@@ -718,7 +871,7 @@ class _BodyState extends State<Body> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: userDevice.device.isOn
+                      color: realTimeState
                           ? (Theme.of(context).brightness == Brightness.dark
                               ? Colors.white
                               : Colors.white)
@@ -736,7 +889,7 @@ class _BodyState extends State<Body> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: userDevice.device.isOn
+                        color: realTimeState
                             ? Colors.white.withOpacity(0.8)
                             : Theme.of(context).textTheme.bodySmall!.color,
                         fontSize: 10, // Smaller room name
@@ -750,10 +903,10 @@ class _BodyState extends State<Body> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    userDevice.device.isOn ? 'Bật' : 'Tắt',
+                    realTimeState ? 'Bật' : 'Tắt',
                     textAlign: TextAlign.left,
                     style: TextStyle(
-                      color: userDevice.device.isOn
+                      color: realTimeState
                           ? Colors.white
                           : Theme.of(context).textTheme.bodyMedium!.color,
                       fontSize: 11, // Smaller status text
@@ -764,7 +917,7 @@ class _BodyState extends State<Body> {
                   GestureDetector(
                     onTap: () async {
                       // Toggle device state
-                      final newState = !userDevice.device.isOn;
+                      final newState = !realTimeState;
                       final success = await _deviceManager.updateDeviceState(
                         userDevice.device.name,
                         newState,
@@ -772,6 +925,9 @@ class _BodyState extends State<Body> {
 
                       if (success) {
                         await _loadUserDevices();
+                        
+                        // Force state synchronization in ViewModel for real-time update
+                        _updateViewModelState(userDevice, newState);
                       }
                     },
                     child: Container(
@@ -780,13 +936,13 @@ class _BodyState extends State<Body> {
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        color: userDevice.device.isOn
+                        color: realTimeState
                             ? const Color.fromARGB(255, 66, 135, 255)
                             : const Color(0xffd6d6d6),
                       ),
                       child: Row(
                         children: [
-                          userDevice.device.isOn
+                          realTimeState
                               ? const Spacer()
                               : const SizedBox(),
                           Container(
@@ -857,6 +1013,7 @@ class _BodyState extends State<Body> {
                   itemCount: _userDevices.length,
                   itemBuilder: (context, index) {
                     final userDevice = _userDevices[index];
+                    final realTimeState = _getUserDeviceRealTimeState(userDevice);
                     return Card(
                       margin: EdgeInsets.only(bottom: 8),
                       child: ListTile(
@@ -888,7 +1045,7 @@ class _BodyState extends State<Body> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Switch(
-                              value: userDevice.device.isOn,
+                              value: realTimeState,
                               onChanged: (value) async {
                                 final success =
                                     await _deviceManager.updateDeviceState(
@@ -897,6 +1054,9 @@ class _BodyState extends State<Body> {
                                 );
                                 if (success) {
                                   await _loadUserDevices();
+                                  
+                                  // Update ViewModel state for synchronization
+                                  _updateViewModelState(userDevice, value);
                                 }
                               },
                               activeColor: userDevice.device.color,

@@ -189,29 +189,25 @@ class RoomCard extends StatelessWidget {
             margin: EdgeInsets.only(left: getProportionateScreenWidth(2)),
             padding: EdgeInsets.all(getProportionateScreenWidth(3)),
             decoration: BoxDecoration(
+              // FIXED: LED Around logic ngược - isACON=true nghĩa là tắt đèn
               color: model.isACON 
-                  ? Colors.blue.withOpacity(0.2) 
-                  : (Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.grey[800] 
-                      : Colors.grey[200]),
+                  ? Colors.red.withOpacity(0.2)  // ON = Tắt đèn (màu đỏ)
+                  : Colors.lightBlue.withOpacity(0.2), // OFF = Mở đèn (màu xanh)
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
                 color: model.isACON 
-                    ? Colors.blue 
-                    : (Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.grey[600]! 
-                        : Colors.grey[400]!),
+                    ? Colors.red  // ON = Tắt đèn (viền đỏ)
+                    : Colors.lightBlue, // OFF = Mở đèn (viền xanh)
                 width: 1,
               ),
             ),
             child: Icon(
               Icons.lightbulb_outline,
               size: 14,
+              // FIXED: LED Around hiển thị màu đúng theo trạng thái thực tế
               color: model.isACON 
-                  ? Colors.blue[700] 
-                  : (Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.grey[400] 
-                      : Colors.grey[500]),
+                  ? Colors.red[700]  // ON = Tắt đèn (màu đỏ)
+                  : Colors.lightBlue[700], // OFF = Mở đèn (màu xanh)
             ),
           ),            ),
           ],
