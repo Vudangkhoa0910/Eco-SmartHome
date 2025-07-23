@@ -462,12 +462,16 @@ class MqttService {
   }
 
   void controlLedAround(bool isOn) {
-    final command = isOn ? 'ON' : 'OFF';
+    // 🔧 FIX: Đảo ngược logic cho LED Around vì hardware kết nối ngược
+    // Gửi OFF để đèn sáng, gửi ON để đèn tắt
+    final command = isOn ? 'OFF' : 'ON';
     publishDeviceCommand(topicLedAround, command);
     
     // Log device state to Firebase asynchronously (HEAVILY THROTTLED)
     if (_enableFirebase && _shouldWriteDeviceState() && isOn != (_lastLightStates['led_around'] ?? false)) {
-      _batchService.writeDeviceStateOptimized('led_around', command, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
+      // Ghi log với trạng thái UI thực tế (isOn), không phải command đã đảo
+      final logCommand = isOn ? 'ON' : 'OFF';
+      _batchService.writeDeviceStateOptimized('led_around', logCommand, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
           .catchError((error) {
             print('⚠️ Firebase LED Around error: $error');
             return false;
@@ -632,10 +636,12 @@ class MqttService {
       String deviceName = _extractDeviceNameFromTopic(topic);
       bool deviceState = (message.toUpperCase() == 'ON' || message.toUpperCase() == 'TRUE');
       
-      // 🔧 FIX: Đảo logic cho yard_main_light để khớp với hardware thực tế
-      // Note: led_around không cần đảo ở đây vì sẽ xử lý trong UI
+      // 🔧 FIX: Đảo logic cho một số device để khớp với hardware thực tế
       if (deviceName == 'yard_main_light') {
         deviceState = !deviceState;  // Đảo ngược logic từ ESP32
+        print('🔧 Device $deviceName Status Inverted: ESP32=${message} -> UI=${deviceState ? 'ON' : 'OFF'}');
+      } else if (deviceName == 'led_around') {
+        deviceState = !deviceState;  // Đảo ngược logic cho LED Around
         print('🔧 Device $deviceName Status Inverted: ESP32=${message} -> UI=${deviceState ? 'ON' : 'OFF'}');
       }
       
