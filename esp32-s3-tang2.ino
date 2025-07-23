@@ -96,11 +96,8 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 #define TOPIC_HALLWAY "inside/hallway_light"
 #define TOPIC_BALCONY "inside/balcony_light"
 
-// Quạt và điều hòa topics
-#define TOPIC_FAN_LIVING_ROOM "inside/fan_living_room"
-#define TOPIC_AC_LIVING_ROOM "inside/ac_living_room"
-#define TOPIC_AC_BEDROOM1 "inside/ac_bedroom1"
-#define TOPIC_AC_BEDROOM2 "inside/ac_bedroom2"
+// Quạt và điều hòa topics - GỘP VÀO 1 TOPIC
+#define TOPIC_CLIMATE_CONTROL "inside/climate_control"
 
 // Device status sync topics
 #define TOPIC_STATUS_REQUEST "inside/device_status/request"
@@ -221,13 +218,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Điều khiển đèn trong nhà (rơ le active LOW)
   if (String(topic) == TOPIC_KITCHEN) {
+    Serial.printf("🍳 [KITCHEN] Received command '%s' -> Pin %d\n", message.c_str(), LED_KITCHEN_PIN);
     digitalWrite(LED_KITCHEN_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("🍳 [KITCHEN] Pin %d set to %s (Relay %s)\n", LED_KITCHEN_PIN, 
+                  (message == "ON" ? "LOW" : "HIGH"), (message == "ON" ? "ON" : "OFF"));
     // Send status update after device control
     delay(100); // Small delay to ensure relay has switched
     publishDeviceStatus();
   }
   else if (String(topic) == TOPIC_LIVING_ROOM) {
+    Serial.printf("🛋️ [LIVING] Received command '%s' -> Pin %d\n", message.c_str(), LED_LIVING_ROOM_PIN);
     digitalWrite(LED_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
+    Serial.printf("🛋️ [LIVING] Pin %d set to %s (Relay %s)\n", LED_LIVING_ROOM_PIN, 
+                  (message == "ON" ? "LOW" : "HIGH"), (message == "ON" ? "ON" : "OFF"));
     delay(100);
     publishDeviceStatus();
   }
@@ -261,42 +264,88 @@ void callback(char* topic, byte* payload, unsigned int length) {
     delay(100);
     publishDeviceStatus();
   }
-  // 🔧 New device controls
-  else if (String(topic) == TOPIC_FAN_LIVING_ROOM) {
-    Serial.printf("🌀 [FAN] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
-    Serial.printf("🌀 [FAN] Pin %d current state: %s\n", FAN_LIVING_ROOM_PIN, digitalRead(FAN_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
-    digitalWrite(FAN_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
-    Serial.printf("🌀 [FAN] Pin %d new state: %s\n", FAN_LIVING_ROOM_PIN, digitalRead(FAN_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
-    delay(100);
-    publishDeviceStatus();
-    Serial.printf("🌀 [FAN] Status published successfully\n");
-  }
-  else if (String(topic) == TOPIC_AC_LIVING_ROOM) {
-    Serial.printf("❄️ [AC-LIVING] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
-    Serial.printf("❄️ [AC-LIVING] Pin %d current state: %s\n", AC_LIVING_ROOM_PIN, digitalRead(AC_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
-    digitalWrite(AC_LIVING_ROOM_PIN, message == "ON" ? LOW : HIGH);
-    Serial.printf("❄️ [AC-LIVING] Pin %d new state: %s\n", AC_LIVING_ROOM_PIN, digitalRead(AC_LIVING_ROOM_PIN) == HIGH ? "HIGH" : "LOW");
-    delay(100);
-    publishDeviceStatus();
-    Serial.printf("❄️ [AC-LIVING] Status published successfully\n");
-  }
-  else if (String(topic) == TOPIC_AC_BEDROOM1) {
-    Serial.printf("❄️ [AC-BEDROOM1] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
-    Serial.printf("❄️ [AC-BEDROOM1] Pin %d current state: %s\n", AC_BEDROOM1_PIN, digitalRead(AC_BEDROOM1_PIN) == HIGH ? "HIGH" : "LOW");
-    digitalWrite(AC_BEDROOM1_PIN, message == "ON" ? LOW : HIGH);
-    Serial.printf("❄️ [AC-BEDROOM1] Pin %d new state: %s\n", AC_BEDROOM1_PIN, digitalRead(AC_BEDROOM1_PIN) == HIGH ? "HIGH" : "LOW");
-    delay(100);
-    publishDeviceStatus();
-    Serial.printf("❄️ [AC-BEDROOM1] Status published successfully\n");
-  }
-  else if (String(topic) == TOPIC_AC_BEDROOM2) {
-    Serial.printf("❄️ [AC-BEDROOM2] Received command: '%s' for topic: '%s'\n", message.c_str(), topic);
-    Serial.printf("❄️ [AC-BEDROOM2] Pin %d current state: %s\n", AC_BEDROOM2_PIN, digitalRead(AC_BEDROOM2_PIN) == HIGH ? "HIGH" : "LOW");
-    digitalWrite(AC_BEDROOM2_PIN, message == "ON" ? LOW : HIGH);
-    Serial.printf("❄️ [AC-BEDROOM2] Pin %d new state: %s\n", AC_BEDROOM2_PIN, digitalRead(AC_BEDROOM2_PIN) == HIGH ? "HIGH" : "LOW");
-    delay(100);
-    publishDeviceStatus();
-    Serial.printf("❄️ [AC-BEDROOM2] Status published successfully\n");
+  // 🌟 Handle combined climate control topic (AC + Fan)
+  else if (String(topic) == TOPIC_CLIMATE_CONTROL) {
+    Serial.printf("� [CLIMATE] Received message: '%s'\n", message.c_str());
+    
+    // Parse JSON message: {"device": "ac_living_room", "command": "ON"}
+    // More robust JSON parsing with detailed debugging
+    Serial.printf("🔍 [DEBUG] Checking JSON structure...\n");
+    Serial.printf("🔍 [DEBUG] Contains '{': %s\n", message.indexOf("{") >= 0 ? "YES" : "NO");
+    Serial.printf("🔍 [DEBUG] Contains '}': %s\n", message.indexOf("}") >= 0 ? "YES" : "NO");
+    Serial.printf("🔍 [DEBUG] Contains 'device': %s\n", message.indexOf("device") >= 0 ? "YES" : "NO");
+    Serial.printf("🔍 [DEBUG] Contains 'command': %s\n", message.indexOf("command") >= 0 ? "YES" : "NO");
+    
+    if (message.indexOf("{") >= 0 && message.indexOf("}") >= 0 && 
+        message.indexOf("device") >= 0 && message.indexOf("command") >= 0) {
+      
+      // Find "device":"value" pattern
+      int deviceKeyPos = message.indexOf("\"device\":");
+      int deviceValueStart = message.indexOf("\"", deviceKeyPos + 9) + 1; // Skip "device":
+      int deviceValueEnd = message.indexOf("\"", deviceValueStart);
+      
+      // Find "command":"value" pattern  
+      int commandKeyPos = message.indexOf("\"command\":");
+      int commandValueStart = message.indexOf("\"", commandKeyPos + 10) + 1; // Skip "command":
+      int commandValueEnd = message.indexOf("\"", commandValueStart);
+      
+      Serial.printf("🔍 [DEBUG] Device key pos:%d, value start:%d, end:%d\n", 
+                    deviceKeyPos, deviceValueStart, deviceValueEnd);
+      Serial.printf("🔍 [DEBUG] Command key pos:%d, value start:%d, end:%d\n", 
+                    commandKeyPos, commandValueStart, commandValueEnd);
+      
+      if (deviceKeyPos >= 0 && deviceValueStart > deviceKeyPos && deviceValueEnd > deviceValueStart &&
+          commandKeyPos >= 0 && commandValueStart > commandKeyPos && commandValueEnd > commandValueStart) {
+        
+        String device = message.substring(deviceValueStart, deviceValueEnd);
+        String command = message.substring(commandValueStart, commandValueEnd);
+        
+        Serial.printf("🌟 [CLIMATE] ✅ Parsed - Device: '%s', Command: '%s'\n", device.c_str(), command.c_str());
+        
+        // Control specific device
+        bool deviceFound = false;
+        if (device == "fan_living_room") {
+          Serial.printf("🌀 [FAN] ✅ Controlling fan: %s -> Pin %d\n", command.c_str(), FAN_LIVING_ROOM_PIN);
+          digitalWrite(FAN_LIVING_ROOM_PIN, command == "ON" ? LOW : HIGH);
+          Serial.printf("🌀 [FAN] Pin %d set to %s (Relay %s)\n", FAN_LIVING_ROOM_PIN, 
+                        (command == "ON" ? "LOW" : "HIGH"), (command == "ON" ? "ON" : "OFF"));
+          deviceFound = true;
+        }
+        else if (device == "ac_living_room") {
+          Serial.printf("❄️ [AC-LIVING] ✅ Controlling AC: %s -> Pin %d\n", command.c_str(), AC_LIVING_ROOM_PIN);
+          digitalWrite(AC_LIVING_ROOM_PIN, command == "ON" ? LOW : HIGH);
+          Serial.printf("❄️ [AC-LIVING] Pin %d set to %s (Relay %s)\n", AC_LIVING_ROOM_PIN, 
+                        (command == "ON" ? "LOW" : "HIGH"), (command == "ON" ? "ON" : "OFF"));
+          deviceFound = true;
+        }
+        else if (device == "ac_bedroom1") {
+          Serial.printf("❄️ [AC-BEDROOM1] ✅ Controlling AC: %s -> Pin %d\n", command.c_str(), AC_BEDROOM1_PIN);
+          digitalWrite(AC_BEDROOM1_PIN, command == "ON" ? LOW : HIGH);
+          Serial.printf("❄️ [AC-BEDROOM1] Pin %d set to %s (Relay %s)\n", AC_BEDROOM1_PIN, 
+                        (command == "ON" ? "LOW" : "HIGH"), (command == "ON" ? "ON" : "OFF"));
+          deviceFound = true;
+        }
+        else if (device == "ac_bedroom2") {
+          Serial.printf("❄️ [AC-BEDROOM2] ✅ Controlling AC: %s -> Pin %d\n", command.c_str(), AC_BEDROOM2_PIN);
+          digitalWrite(AC_BEDROOM2_PIN, command == "ON" ? LOW : HIGH);
+          Serial.printf("❄️ [AC-BEDROOM2] Pin %d set to %s (Relay %s)\n", AC_BEDROOM2_PIN, 
+                        (command == "ON" ? "LOW" : "HIGH"), (command == "ON" ? "ON" : "OFF"));
+          deviceFound = true;
+        }
+        
+        if (deviceFound) {
+          delay(100);
+          publishDeviceStatus();
+          Serial.printf("✅ [CLIMATE] Device '%s' controlled successfully\n", device.c_str());
+        } else {
+          Serial.printf("⚠️ [CLIMATE] Unknown device: '%s'\n", device.c_str());
+        }
+      } else {
+        Serial.printf("❌ [CLIMATE] Failed to parse device/command from: '%s'\n", message.c_str());
+      }
+    } else {
+      Serial.printf("❌ [CLIMATE] Not a valid JSON format: '%s'\n", message.c_str());
+    }
   }
 }
 
@@ -322,16 +371,10 @@ void reconnect() {
         client.subscribe(TOPIC_BALCONY);
         client.subscribe(TOPIC_STATUS_REQUEST);  // Subscribe to status request topic
         
-        // Subscribe to fan and AC topics
-        Serial.println("🔌 Subscribing to new device topics...");
-        client.subscribe(TOPIC_FAN_LIVING_ROOM);
-        Serial.printf("✅ Subscribed to: %s\n", TOPIC_FAN_LIVING_ROOM);
-        client.subscribe(TOPIC_AC_LIVING_ROOM);
-        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_LIVING_ROOM);
-        client.subscribe(TOPIC_AC_BEDROOM1);
-        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_BEDROOM1);
-        client.subscribe(TOPIC_AC_BEDROOM2);
-        Serial.printf("✅ Subscribed to: %s\n", TOPIC_AC_BEDROOM2);
+        // Subscribe to climate control topic (AC + Fan combined)
+        Serial.println("🌟 Subscribing to combined climate control topic...");
+        bool climateSub = client.subscribe(TOPIC_CLIMATE_CONTROL);
+        Serial.printf("❄️🌀 Climate control subscription (%s): %s\n", TOPIC_CLIMATE_CONTROL, climateSub ? "✅ SUCCESS" : "❌ FAILED");
         
         // Send initial device status after connection
         delay(1000); // Wait for subscription to be established
@@ -406,6 +449,17 @@ void setup() {
   Serial.println("   💡 Tầng 1: Bếp, Phòng khách, Phòng ngủ");
   Serial.println("   💡 Tầng 2: Phòng ngủ góc, Phòng ngủ sân, Phòng thờ, Hành lang, Ban công");
   Serial.println("   🔌 INA219 & OLED trên I2C");
+  
+  // 🔍 Debug: Check initial pin states
+  Serial.println("\n🔍 [DEBUG] Initial Pin States (HIGH=OFF/3.3V, LOW=ON/0V):");
+  Serial.printf("  🍳 Kitchen (Pin %d): %s\n", LED_KITCHEN_PIN, digitalRead(LED_KITCHEN_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  🛋️ Living Room (Pin %d): %s\n", LED_LIVING_ROOM_PIN, digitalRead(LED_LIVING_ROOM_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  🛏️ Bedroom (Pin %d): %s\n", LED_BEDROOM_PIN, digitalRead(LED_BEDROOM_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  🌀 Fan Living (Pin %d): %s\n", FAN_LIVING_ROOM_PIN, digitalRead(FAN_LIVING_ROOM_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  ❄️ AC Living (Pin %d): %s\n", AC_LIVING_ROOM_PIN, digitalRead(AC_LIVING_ROOM_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  ❄️ AC Bed1 (Pin %d): %s\n", AC_BEDROOM1_PIN, digitalRead(AC_BEDROOM1_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.printf("  ❄️ AC Bed2 (Pin %d): %s\n", AC_BEDROOM2_PIN, digitalRead(AC_BEDROOM2_PIN) ? "HIGH/OFF" : "LOW/ON");
+  Serial.println();
 }
 
 void loop() {

@@ -58,7 +58,8 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       final MqttServiceSimple mqttService = getIt<MqttServiceSimple>();
       if (mqttService.isConnected) {
         mqttService.requestIndoorDeviceStatus();
-        print('🏠 Requested indoor device status sync for ${widget.floor.name}');
+        print(
+            '🏠 Requested indoor device status sync for ${widget.floor.name}');
       }
     } catch (e) {
       print('❌ Error requesting indoor device status sync: $e');
@@ -519,11 +520,8 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       'inside/hallway_light', // Đèn hành lang
       'inside/balcony_light', // Đèn ban công lớn
 
-      // Quạt và điều hòa
-      'inside/fan_living_room', // Quạt tầng 1 phòng khách
-      'inside/ac_living_room', // Điều hòa tầng 1 phòng khách
-      'inside/ac_bedroom1', // Điều hòa tầng 2 phòng ngủ 1
-      'inside/ac_bedroom2', // Điều hòa tầng 2 phòng ngủ 2
+      // Climate control (AC + Fan combined)
+      'inside/climate_control', // Quạt và điều hòa gộp chung
 
       // Legacy topics for compatibility
       'khoasmarthome/living_room_light', // Đèn phòng khách (legacy)
@@ -537,18 +535,19 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
 
   bool _getDeviceState(SmartDevice device) {
     // Extract device id from MQTT topic for device state service
-    String deviceId = _extractDeviceId(device.mqttTopic);
+    String deviceId = _extractDeviceId(device.mqttTopic, device);
 
     // 🔄 PRIORITY: Check DeviceStateService first for synchronized state from ESP32
     if (_deviceStateService.currentStates.containsKey(deviceId)) {
       bool syncedState = _deviceStateService.getDeviceState(deviceId);
-      
+
       // 🔧 FIX: Đảo logic cho led_around vì ESP32 dùng logic âm (LOW=ON, HIGH=OFF)
       if (deviceId == 'led_around') {
-        syncedState = !syncedState;  // Đảo ngược từ ESP32 logic
-        print('🔧 LED Around UI State: ESP32=${!syncedState} -> UI=$syncedState');
+        syncedState = !syncedState; // Đảo ngược từ ESP32 logic
+        print(
+            '🔧 LED Around UI State: ESP32=${!syncedState} -> UI=$syncedState');
       }
-      
+
       print('🔄 Using synced state for $deviceId: $syncedState (from ESP32)');
       return syncedState;
     }
@@ -601,15 +600,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
       case 'inside/balcony_light':
         return _model.isBalconyLightOn; // State riêng cho đèn ban công
 
-      // Quạt và điều hòa
-      case 'inside/fan_living_room':
-        return _model.isFanLivingRoomOn; // State cho quạt phòng khách
-      case 'inside/ac_living_room':
-        return _model.isACLivingRoomOn; // State cho điều hòa phòng khách
-      case 'inside/ac_bedroom1':
-        return _model.isACBedroom1On; // State cho điều hòa phòng ngủ 1
-      case 'inside/ac_bedroom2':
-        return _model.isACBedroom2On; // State cho điều hòa phòng ngủ 2
+      // Climate control - không cần getters riêng vì sử dụng device state service
 
       // Legacy topics for backward compatibility
       case 'khoasmarthome/living_room_light':
@@ -631,7 +622,24 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   }
 
   // Helper function to extract device ID from MQTT topic
-  String _extractDeviceId(String mqttTopic) {
+  String _extractDeviceId(String mqttTopic, [SmartDevice? device]) {
+    // 🌟 Special handling for climate control devices - use device-specific IDs
+    if (mqttTopic == 'inside/climate_control' && device != null) {
+      if (device.type == 'fan' && device.name.contains('phòng khách')) {
+        return 'fan_living_room';
+      } else if (device.type == 'air_conditioner') {
+        if (device.name.contains('phòng khách')) {
+          return 'ac_living_room';
+        } else if (device.name.contains('phòng ngủ 1')) {
+          return 'ac_bedroom1';
+        } else if (device.name.contains('phòng ngủ 2')) {
+          return 'ac_bedroom2';
+        }
+      }
+      // Fallback for climate devices using name hash
+      return 'climate_control_${device.type}_${device.name.hashCode.abs()}';
+    }
+
     switch (mqttTopic) {
       case 'khoasmarthome/led_gate':
         return 'led_gate';
@@ -653,15 +661,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         return 'hallway_light';
       case 'inside/balcony_light':
         return 'balcony_light';
-      // Quạt và điều hòa
-      case 'inside/fan_living_room':
-        return 'fan_living_room';
-      case 'inside/ac_living_room':
-        return 'ac_living_room';
-      case 'inside/ac_bedroom1':
-        return 'ac_bedroom1';
-      case 'inside/ac_bedroom2':
-        return 'ac_bedroom2';
+      // Climate control mapping không cần vì sử dụng device state service
       default:
         // Extract from topic format: prefix/device_name or prefix/device_name/status
         final parts = mqttTopic.split('/');
@@ -670,7 +670,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   }
 
   void _toggleDevice(SmartDevice device) {
-    String deviceId = _extractDeviceId(device.mqttTopic);
+    String deviceId = _extractDeviceId(device.mqttTopic, device);
     bool currentState = _getDeviceState(device);
     bool newState = !currentState;
 
@@ -705,33 +705,71 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         case 'inside/balcony_light':
           _model.setBalconyLight(newState);
           break;
-        // Quạt và điều hòa
-        case 'inside/fan_living_room':
-          _model.setFanLivingRoom(newState);
-          break;
-        case 'inside/ac_living_room':
-          _model.setACLivingRoom(newState);
-          break;
-        case 'inside/ac_bedroom1':
-          _model.setACBedroom1(newState);
-          break;
-        case 'inside/ac_bedroom2':
-          _model.setACBedroom2(newState);
-          break;
+        // Climate control devices handled through climate_control topic and device state service
       }
       try {
         final mqttServiceSimple = getIt<MqttServiceSimple>();
         if (mqttServiceSimple.isConnected) {
           final command = newState ? 'ON' : 'OFF';
-          mqttServiceSimple.publishIndoorDeviceCommand(device.mqttTopic, command);
-          print('🏠 UI: ${device.name} = $newState via Indoor MQTT');
+
+          // 🌟 Special handling for climate control devices
+          if (device.mqttTopic == 'inside/climate_control') {
+            // Determine device type from device name/type
+            if (device.type == 'fan' && device.name.contains('phòng khách')) {
+              mqttServiceSimple.publishFanLivingRoomCommand(command);
+              print('🌀 UI: Fan Living Room = $newState via Climate Control');
+            } else if (device.type == 'air_conditioner') {
+              if (device.name.contains('phòng khách')) {
+                mqttServiceSimple.publishACLivingRoomCommand(command);
+                print('❄️ UI: AC Living Room = $newState via Climate Control');
+              } else if (device.name.contains('phòng ngủ 1')) {
+                mqttServiceSimple.publishACBedroom1Command(command);
+                print('❄️ UI: AC Bedroom1 = $newState via Climate Control');
+              } else if (device.name.contains('phòng ngủ 2')) {
+                mqttServiceSimple.publishACBedroom2Command(command);
+                print('❄️ UI: AC Bedroom2 = $newState via Climate Control');
+              }
+            }
+          } else {
+            // Regular devices use normal topic
+            mqttServiceSimple.publishIndoorDeviceCommand(
+                device.mqttTopic, command);
+            print('🏠 UI: ${device.name} = $newState via Indoor MQTT');
+          }
         } else {
           print('⚠️ MqttServiceSimple not connected, initializing...');
           mqttServiceSimple.initialize().then((_) {
             if (mqttServiceSimple.isConnected) {
               final command = newState ? 'ON' : 'OFF';
-              mqttServiceSimple.publishIndoorDeviceCommand(device.mqttTopic, command);
-              print('🏠 UI: ${device.name} = $newState via Indoor MQTT (after init)');
+
+              // 🌟 Special handling for climate control devices after init
+              if (device.mqttTopic == 'inside/climate_control') {
+                if (device.type == 'fan' &&
+                    device.name.contains('phòng khách')) {
+                  mqttServiceSimple.publishFanLivingRoomCommand(command);
+                  print(
+                      '🌀 UI: Fan Living Room = $newState via Climate Control (after init)');
+                } else if (device.type == 'air_conditioner') {
+                  if (device.name.contains('phòng khách')) {
+                    mqttServiceSimple.publishACLivingRoomCommand(command);
+                    print(
+                        '❄️ UI: AC Living Room = $newState via Climate Control (after init)');
+                  } else if (device.name.contains('phòng ngủ 1')) {
+                    mqttServiceSimple.publishACBedroom1Command(command);
+                    print(
+                        '❄️ UI: AC Bedroom1 = $newState via Climate Control (after init)');
+                  } else if (device.name.contains('phòng ngủ 2')) {
+                    mqttServiceSimple.publishACBedroom2Command(command);
+                    print(
+                        '❄️ UI: AC Bedroom2 = $newState via Climate Control (after init)');
+                  }
+                }
+              } else {
+                mqttServiceSimple.publishIndoorDeviceCommand(
+                    device.mqttTopic, command);
+                print(
+                    '🏠 UI: ${device.name} = $newState via Indoor MQTT (after init)');
+              }
             } else {
               print('❌ Failed to connect MqttServiceSimple');
             }
@@ -741,7 +779,8 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         print('❌ Error controlling indoor device: $e');
         // Fallback: Try using the regular MQTT service if available
         try {
-          _mqttService.publishDeviceCommand(device.mqttTopic, newState ? 'ON' : 'OFF');
+          _mqttService.publishDeviceCommand(
+              device.mqttTopic, newState ? 'ON' : 'OFF');
           print('🔄 Fallback: Using regular MQTT service for ${device.name}');
         } catch (fallbackError) {
           print('❌ Fallback also failed: $fallbackError');

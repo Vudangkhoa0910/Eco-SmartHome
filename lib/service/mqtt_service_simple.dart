@@ -26,7 +26,7 @@ class MqttServiceSimple {
   static const String topicMotor = 'khoasmarthome/motor';
   static const String topicGateLevel = 'khoasmarthome/gate_level';
   static const String topicGateStatus = 'khoasmarthome/gate_status';
-  
+
   // Device status topics
   static const String topicDeviceStatus = 'khoasmarthome/device_status';
   static const String topicLedGateStatus = 'khoasmarthome/led_gate/status';
@@ -35,7 +35,8 @@ class MqttServiceSimple {
 
   // Indoor device status sync topics (ESP32-S3 Indoor)
   static const String topicIndoorStatusRequest = 'inside/device_status/request';
-  static const String topicIndoorStatusResponse = 'inside/device_status/response';
+  static const String topicIndoorStatusResponse =
+      'inside/device_status/response';
 
   MqttServerClient? _client;
   bool _isConnected = false;
@@ -55,7 +56,7 @@ class MqttServiceSimple {
 
   // Firebase services
   final FirebaseBatchService _batchService = FirebaseBatchService();
-  
+
   // Device state service
   final DeviceStateService _deviceStateService = DeviceStateService();
 
@@ -79,10 +80,11 @@ class MqttServiceSimple {
       _indoorDeviceStatusController.stream;
   bool get isConnected => _isConnected;
   int get currentGateLevel => _currentGateLevel;
-  
+
   // Device state getters
   DeviceStateService get deviceStateService => _deviceStateService;
-  Stream<Map<String, bool>> get deviceStateStream => _deviceStateService.stateStream;
+  Stream<Map<String, bool>> get deviceStateStream =>
+      _deviceStateService.stateStream;
 
   // Initialize MQTT
   Future<void> initialize() async {
@@ -124,13 +126,13 @@ class MqttServiceSimple {
 
     // Initialize device states
     _deviceStateService.initializeDefaultStates();
-    
+
     // Initialize gate state when connected
     initializeGateState();
-    
+
     // Request all device status from ESP32
     _requestAllDeviceStatus();
-    
+
     // Request indoor device status from ESP32-S3 Indoor
     Future.delayed(const Duration(seconds: 2), () {
       requestIndoorDeviceStatus();
@@ -234,21 +236,25 @@ class MqttServiceSimple {
       _deviceStateService.parseDeviceStatusJson(message);
       return;
     }
-    
+
     // Handle indoor device status response
     if (topic == topicIndoorStatusResponse) {
       _handleIndoorDeviceStatus(message);
       return;
     }
-    
+
     // Handle individual device status
     if (topic == topicLedGateStatus) {
-      _deviceStateService.updateDeviceState('led_gate', message.toUpperCase() == 'ON', source: 'ESP32');
+      _deviceStateService.updateDeviceState(
+          'led_gate', message.toUpperCase() == 'ON',
+          source: 'ESP32');
       return;
     }
-    
+
     if (topic == topicLedAroundStatus) {
-      _deviceStateService.updateDeviceState('led_around', message.toUpperCase() == 'ON', source: 'ESP32');
+      _deviceStateService.updateDeviceState(
+          'led_around', message.toUpperCase() == 'ON',
+          source: 'ESP32');
       return;
     }
 
@@ -351,26 +357,26 @@ class MqttServiceSimple {
 
   void _handleIndoorDeviceStatus(String statusMessage) {
     try {
-      final Map<String, dynamic> statusData = 
+      final Map<String, dynamic> statusData =
           Map<String, dynamic>.from(json.decode(statusMessage) as Map);
-      
+
       final Map<String, bool> deviceStates = {};
-      
+
       // Parse each device status
       statusData.forEach((key, value) {
         if (key != 'timestamp' && value is bool) {
           deviceStates[key] = value;
           // Update device state service for individual devices
-          _deviceStateService.updateDeviceState(key, value, source: 'ESP32-Indoor');
+          _deviceStateService.updateDeviceState(key, value,
+              source: 'ESP32-Indoor');
         }
       });
-      
+
       // Emit combined status
       _indoorDeviceStatusController.add(deviceStates);
-      
+
       print('🏠 Indoor device status updated: ${deviceStates.length} devices');
       print('📊 Status: $deviceStates');
-      
     } catch (e) {
       print('❌ Error parsing indoor device status: $e');
     }
@@ -513,23 +519,23 @@ class MqttServiceSimple {
   void controlLed2(bool isOn) => controlLedAround(isOn);
 
   // ========== ENHANCED GATE CONTROL WITH FIREBASE STATE SYNC ==========
-  
+
   /// Enhanced gate control with relative movement based on Firebase state
   Future<bool> moveGateRelative(int relativePercent) async {
     try {
       final gateService = GateStateService();
       final result = await gateService.moveGateRelative(relativePercent);
-      
+
       if (!result.success) {
         print('❌ Gate control failed: ${result.message}');
         return false;
       }
 
       print('🚪 ${result.message}');
-      
+
       // Send MQTT command with new target level
       await publishGateControl(result.targetLevel);
-      
+
       return true;
     } catch (e) {
       print('❌ Error in relative gate movement: $e');
@@ -542,17 +548,17 @@ class MqttServiceSimple {
     try {
       final gateService = GateStateService();
       final result = await gateService.moveGateAbsolute(targetPercent);
-      
+
       if (!result.success) {
         print('❌ Gate control failed: ${result.message}');
         return false;
       }
 
       print('🚪 ${result.message}');
-      
+
       // Send MQTT command with target level
       await publishGateControl(result.targetLevel);
-      
+
       return true;
     } catch (e) {
       print('❌ Error in absolute gate movement: $e');
@@ -561,31 +567,31 @@ class MqttServiceSimple {
   }
 
   /// Convenience methods for common gate operations
-  Future<bool> openGateMore(int additionalPercent) => 
+  Future<bool> openGateMore(int additionalPercent) =>
       moveGateRelative(additionalPercent);
-  
-  Future<bool> closeGatePartially(int reducePercent) => 
+
+  Future<bool> closeGatePartially(int reducePercent) =>
       moveGateRelative(-reducePercent);
-  
+
   Future<bool> openGateFully() => moveGateAbsolute(100);
-  
+
   Future<bool> closeGateCompletely() => moveGateAbsolute(0);
 
   // Request all device status from ESP32
   Future<void> _requestAllDeviceStatus() async {
     if (!_isConnected || _client == null) return;
-    
+
     try {
       // Wait a bit for ESP32 to be ready
       await Future.delayed(const Duration(milliseconds: 1000));
-      
+
       print('📡 Requesting all device status from ESP32...');
       await _client!.publishMessage(
         topicStatusRequest,
         MqttQos.atLeastOnce,
         MqttClientPayloadBuilder().addString('ALL_DEVICES').payload!,
       );
-      
+
       // Also request individual device status
       await Future.delayed(const Duration(milliseconds: 500));
       await _client!.publishMessage(
@@ -593,14 +599,14 @@ class MqttServiceSimple {
         MqttQos.atLeastOnce,
         MqttClientPayloadBuilder().addString('LED_GATE').payload!,
       );
-      
+
       await Future.delayed(const Duration(milliseconds: 200));
       await _client!.publishMessage(
         topicStatusRequest,
         MqttQos.atLeastOnce,
         MqttClientPayloadBuilder().addString('LED_AROUND').payload!,
       );
-      
+
       print('✅ Device status requests sent');
     } catch (e) {
       print('❌ Error requesting device status: $e');
@@ -610,11 +616,11 @@ class MqttServiceSimple {
   // Public method to request device status
   Future<void> requestDeviceStatus([String? specificDevice]) async {
     if (!_isConnected || _client == null) return;
-    
+
     try {
       String command = specificDevice ?? 'ALL_DEVICES';
       print('📡 Requesting device status: $command');
-      
+
       await _client!.publishMessage(
         topicStatusRequest,
         MqttQos.atLeastOnce,
@@ -628,16 +634,16 @@ class MqttServiceSimple {
   // Request indoor device status
   Future<void> requestIndoorDeviceStatus() async {
     if (!_isConnected || _client == null) return;
-    
+
     try {
       print('🏠 Requesting indoor device status...');
-      
+
       await _client!.publishMessage(
         topicIndoorStatusRequest,
         MqttQos.atLeastOnce,
         MqttClientPayloadBuilder().addString('get_all_status').payload!,
       );
-      
+
       print('✅ Indoor device status request sent');
     } catch (e) {
       print('❌ Error requesting indoor device status: $e');
@@ -645,33 +651,35 @@ class MqttServiceSimple {
   }
 
   // Publish command to indoor device
-  Future<void> publishIndoorDeviceCommand(String deviceTopic, String command) async {
+  Future<void> publishIndoorDeviceCommand(
+      String deviceTopic, String command) async {
     if (!_isConnected || _client == null) {
       print('❌ MQTT not connected, cannot send: $deviceTopic = $command');
       return;
     }
-    
+
     try {
       print('🏠 Publishing indoor device command: $deviceTopic = $command');
-      
+
       // 🔍 Special debugging for AC topics
       if (deviceTopic.contains('ac_')) {
         print('❄️ [AC-DEBUG] Sending AC command: $deviceTopic = $command');
         print('❄️ [AC-DEBUG] MQTT connected: $_isConnected');
         print('❄️ [AC-DEBUG] Client: ${_client != null ? 'exists' : 'null'}');
       }
-      
+
       await _client!.publishMessage(
         deviceTopic,
         MqttQos.atLeastOnce,
         MqttClientPayloadBuilder().addString(command).payload!,
       );
-      
+
       print('✅ Indoor device command sent: $deviceTopic = $command');
-      
+
       // 🔍 Additional AC debugging
       if (deviceTopic.contains('ac_')) {
-        print('❄️ [AC-DEBUG] AC command sent successfully: $deviceTopic = $command');
+        print(
+            '❄️ [AC-DEBUG] AC command sent successfully: $deviceTopic = $command');
       }
       // Note: ESP32 will automatically send status after command execution
     } catch (e) {
@@ -679,28 +687,36 @@ class MqttServiceSimple {
     }
   }
 
-  // Specific methods for new devices
+  // Specific methods for new devices - Updated to use combined climate control topic
   Future<void> publishFanLivingRoomCommand(String command) async {
-    print('🌀 [DEBUG] Publishing Fan Living Room command: $command to inside/fan_living_room');
-    await publishIndoorDeviceCommand('inside/fan_living_room', command);
+    print(
+        '🌀 [DEBUG] Publishing Fan Living Room command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "fan_living_room", "command": "$command"}';
+    await publishIndoorDeviceCommand('inside/climate_control', jsonMessage);
     print('🌀 [DEBUG] Fan Living Room command sent successfully');
   }
 
   Future<void> publishACLivingRoomCommand(String command) async {
-    print('❄️ [DEBUG] Publishing AC Living Room command: $command to inside/ac_living_room');
-    await publishIndoorDeviceCommand('inside/ac_living_room', command);
+    print(
+        '❄️ [DEBUG] Publishing AC Living Room command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_living_room", "command": "$command"}';
+    await publishIndoorDeviceCommand('inside/climate_control', jsonMessage);
     print('❄️ [DEBUG] AC Living Room command sent successfully');
   }
 
   Future<void> publishACBedroom1Command(String command) async {
-    print('❄️ [DEBUG] Publishing AC Bedroom1 command: $command to inside/ac_bedroom1');
-    await publishIndoorDeviceCommand('inside/ac_bedroom1', command);
+    print(
+        '❄️ [DEBUG] Publishing AC Bedroom1 command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_bedroom1", "command": "$command"}';
+    await publishIndoorDeviceCommand('inside/climate_control', jsonMessage);
     print('❄️ [DEBUG] AC Bedroom1 command sent successfully');
   }
 
   Future<void> publishACBedroom2Command(String command) async {
-    print('❄️ [DEBUG] Publishing AC Bedroom2 command: $command to inside/ac_bedroom2');
-    await publishIndoorDeviceCommand('inside/ac_bedroom2', command);
+    print(
+        '❄️ [DEBUG] Publishing AC Bedroom2 command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_bedroom2", "command": "$command"}';
+    await publishIndoorDeviceCommand('inside/climate_control', jsonMessage);
     print('❄️ [DEBUG] AC Bedroom2 command sent successfully');
   }
 
