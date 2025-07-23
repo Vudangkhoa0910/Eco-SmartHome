@@ -4,8 +4,7 @@ import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/provider/getit.dart';
-import 'package:smart_home/service/mqtt_service.dart';
-import 'package:smart_home/service/mqtt_service_simple.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/device_state_service.dart';
 import 'package:smart_home/src/widgets/gate_device_control_widget.dart';
 
@@ -26,7 +25,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   late AnimationController _animationController;
   String? _expandedRoomName;
   final HomeScreenViewModel _model = getIt<HomeScreenViewModel>();
-  final MqttService _mqttService = getIt<MqttService>();
+  final MqttUnifiedService _mqttService = getIt<MqttUnifiedService>();
   final DeviceStateService _deviceStateService = DeviceStateService();
 
   late StreamSubscription _deviceStateSubscription;
@@ -55,7 +54,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
   void _requestIndoorDeviceStatusSync() {
     // Get MQTT service and request indoor device status for real-time sync
     try {
-      final MqttServiceSimple mqttService = getIt<MqttServiceSimple>();
+      final MqttUnifiedService mqttService = getIt<MqttUnifiedService>();
       if (mqttService.isConnected) {
         mqttService.requestIndoorDeviceStatus();
         print(
@@ -541,13 +540,6 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
     if (_deviceStateService.currentStates.containsKey(deviceId)) {
       bool syncedState = _deviceStateService.getDeviceState(deviceId);
 
-      // 🔧 FIX: Đảo logic cho led_around vì ESP32 dùng logic âm (LOW=ON, HIGH=OFF)
-      if (deviceId == 'led_around') {
-        syncedState = !syncedState; // Đảo ngược từ ESP32 logic
-        print(
-            '🔧 LED Around UI State: ESP32=${!syncedState} -> UI=$syncedState');
-      }
-
       print('🔄 Using synced state for $deviceId: $syncedState (from ESP32)');
       return syncedState;
     }
@@ -573,11 +565,11 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
 
     // For legacy devices, keep existing logic as fallback
     switch (device.mqttTopic) {
-      // ESP32 Dev (outdoor) devices
+      // ESP32 Dev (outdoor) devices - FIXED: Bỏ đảo trạng thái vì đã sửa logic ESP32
       case 'khoasmarthome/led1':
-        return !_model.isLightOn; // Đảo trạng thái vì ESP32 dùng cực âm
+        return _model.isLightOn; // Không đảo nữa
       case 'khoasmarthome/led2':
-        return !_model.isACON; // Đảo trạng thái vì ESP32 dùng cực âm
+        return _model.isACON; // Không đảo nữa - ESP32 đã xử lý logic ngược
 
       // ESP32-S3 (indoor) devices - Floor 1
       case 'inside/kitchen_light':
@@ -708,7 +700,7 @@ class _HouseFloorScreenState extends State<HouseFloorScreen>
         // Climate control devices handled through climate_control topic and device state service
       }
       try {
-        final mqttServiceSimple = getIt<MqttServiceSimple>();
+        final mqttServiceSimple = getIt<MqttUnifiedService>();
         if (mqttServiceSimple.isConnected) {
           final command = newState ? 'ON' : 'OFF';
 

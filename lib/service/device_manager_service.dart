@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
-import 'package:smart_home/service/mqtt_service_simple.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
 
 class DeviceManagerService {
@@ -14,7 +14,7 @@ class DeviceManagerService {
 
   static const String _devicesKey = 'user_added_devices';
   final FirebaseDataService _firebaseService = FirebaseDataService();
-  final MqttServiceSimple _mqttService = MqttServiceSimple();
+  final MqttUnifiedService _mqttService = MqttUnifiedService();
 
   // Cache for user-added devices
   List<UserAddedDevice> _userDevices = [];

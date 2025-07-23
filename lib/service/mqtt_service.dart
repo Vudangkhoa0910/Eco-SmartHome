@@ -462,14 +462,11 @@ class MqttService {
   }
 
   void controlLedAround(bool isOn) {
-    // 🔧 FIX: Đảo ngược logic cho LED Around vì hardware kết nối ngược
-    // Gửi OFF để đèn sáng, gửi ON để đèn tắt
-    final command = isOn ? 'OFF' : 'ON';
+    final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand(topicLedAround, command);
     
     // Log device state to Firebase asynchronously (HEAVILY THROTTLED)
     if (_enableFirebase && _shouldWriteDeviceState() && isOn != (_lastLightStates['led_around'] ?? false)) {
-      // Ghi log với trạng thái UI thực tế (isOn), không phải command đã đảo
       final logCommand = isOn ? 'ON' : 'OFF';
       _batchService.writeDeviceStateOptimized('led_around', logCommand, metadata: {'room': 'garden', 'type': 'light', 'zone': 'around'})
           .catchError((error) {
@@ -635,15 +632,6 @@ class MqttService {
       // Extract device name from topic
       String deviceName = _extractDeviceNameFromTopic(topic);
       bool deviceState = (message.toUpperCase() == 'ON' || message.toUpperCase() == 'TRUE');
-      
-      // 🔧 FIX: Đảo logic cho một số device để khớp với hardware thực tế
-      if (deviceName == 'yard_main_light') {
-        deviceState = !deviceState;  // Đảo ngược logic từ ESP32
-        print('🔧 Device $deviceName Status Inverted: ESP32=${message} -> UI=${deviceState ? 'ON' : 'OFF'}');
-      } else if (deviceName == 'led_around') {
-        deviceState = !deviceState;  // Đảo ngược logic cho LED Around
-        print('🔧 Device $deviceName Status Inverted: ESP32=${message} -> UI=${deviceState ? 'ON' : 'OFF'}');
-      }
       
       // Update device state service for synchronization
       if (deviceName.isNotEmpty) {
@@ -911,17 +899,16 @@ class MqttService {
     _logIndoorDeviceState('balcony_light', command, 'floor_2', 'balcony', 20.0);
   }
 
-  // 🔧 FIX: Method điều khiển đèn sân chính với logic đảo ngược
+  // Method điều khiển đèn sân chính
   void controlYardMainLight(bool isOn) {
-    // 🚨 INVERTED LOGIC: Hardware thực tế ngược với software expectation
-    final command = isOn ? 'OFF' : 'ON';  // Đảo logic để khớp với hardware
+    final command = isOn ? 'ON' : 'OFF';
     publishDeviceCommand('khoasmarthome/yard_main_light', command);
-    print('🔧 Yard Main Light: UI=${isOn ? 'ON' : 'OFF'} -> Hardware=${command}');
+    print('� Yard Main Light: ${isOn ? 'ON' : 'OFF'}');
     
-    // Log device state with original UI state (not inverted command)
+    // Log device state to Firebase
     if (_enableFirebase && _shouldWriteDeviceState()) {
       _batchService.writeDeviceStateOptimized('yard_main_light', isOn ? 'ON' : 'OFF', 
-          metadata: {'room': 'yard', 'type': 'light', 'zone': 'main_yard', 'inverted': true})
+          metadata: {'room': 'yard', 'type': 'light', 'zone': 'main_yard'})
           .catchError((error) {
             print('⚠️ Firebase Yard Main Light error: $error');
             return false;

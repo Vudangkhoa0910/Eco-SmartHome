@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:intl/intl.dart';
 
 class FirebaseDataService {

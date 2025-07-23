@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/service/zone_management_service.dart';
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/src/screens/analytics_screen/firebase_analytics_screen.dart';
 
@@ -14,7 +14,7 @@ class ZoneManagementScreen extends StatefulWidget {
 
 class _ZoneManagementScreenState extends State<ZoneManagementScreen> {
   final ZoneManagementService _zoneService = getIt<ZoneManagementService>();
-  final MqttService _mqttService = getIt<MqttService>();
+  final MqttUnifiedService _mqttService = getIt<MqttUnifiedService>();
   
   @override
   void initState() {

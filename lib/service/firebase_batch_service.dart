@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 
 /// Service tối ưu hóa Firebase writes bằng cách batch operations và throttling
 class FirebaseBatchService {

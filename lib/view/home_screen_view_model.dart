@@ -4,8 +4,7 @@ import 'dart:async';
 import 'package:smart_home/provider/base_model.dart';
 import 'package:smart_home/provider/getit.dart';
 import 'package:smart_home/service/weather_service.dart';
-import 'package:smart_home/service/mqtt_service.dart';
-import 'package:smart_home/service/mqtt_service_simple.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/electricity_bill_service.dart';
 import 'package:smart_home/service/zone_management_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
@@ -18,8 +17,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class HomeScreenViewModel extends BaseModel {
   //-------------SERVICES-------------//
   final WeatherService _weatherService = getIt<WeatherService>();
-  final MqttService _mqttService = getIt<MqttService>();
-  final MqttServiceSimple _mqttServiceSimple = getIt<MqttServiceSimple>();
+  final MqttUnifiedService _mqttService = getIt<MqttUnifiedService>();
   final ElectricityBillService _billService = getIt<ElectricityBillService>();
   final ZoneManagementService _zoneService = getIt<ZoneManagementService>();
   final GateStateService _gateService = GateStateService();
@@ -109,6 +107,7 @@ class HomeScreenViewModel extends BaseModel {
   bool get isGateMoving => _isGateMoving;
   String get gateStatusText => _gateStatusText;
   ElectricityBillService get billService => _billService;
+  MqttUnifiedService get mqttServiceSimple => _mqttService; // Compatibility getter
   String get currentDate {
     try {
       // Sử dụng locale en_US đã được initialize
@@ -244,8 +243,13 @@ class HomeScreenViewModel extends BaseModel {
 
     // Listen to indoor device status from ESP32-S3
     _indoorDeviceStatusSubscription = 
-        _mqttServiceSimple.indoorDeviceStatusStream.listen((deviceStates) {
+        _mqttService.indoorDeviceStatusStream.listen((deviceStates) {
       _updateIndoorDeviceStates(deviceStates);
+    });
+
+    // Listen to device state changes for UI synchronization
+    _mqttService.deviceStateStream.listen((deviceStates) {
+      _synchronizeDeviceStates(deviceStates);
     });
 
     // Force update UI after setup
@@ -312,6 +316,31 @@ class HomeScreenViewModel extends BaseModel {
       print('🏠 Updated indoor device states from ESP32-S3: ${deviceStates.length} devices');
     } catch (e) {
       print('❌ Error updating indoor device states: $e');
+    }
+  }
+
+  /// Synchronize UI variables with actual device states from MQTT
+  void _synchronizeDeviceStates(Map<String, bool> deviceStates) {
+    try {
+      deviceStates.forEach((deviceKey, isOn) {
+        switch (deviceKey) {
+          case 'led_gate':
+            isLightOn = isOn;
+            break;
+          case 'led_around':
+            // FIXED: Sync LED Around state with isACON variable
+            isACON = isOn;
+            break;
+          case 'yard_main_light':
+            isFanON = isOn; // Fan variable used for yard main light
+            break;
+        }
+      });
+      
+      notifyListeners();
+      print('🔄 Synchronized device states: LED Gate=$isLightOn, LED Around=$isACON, Yard Main Light=$isFanON');
+    } catch (e) {
+      print('❌ Error synchronizing device states: $e');
     }
   }
 
@@ -506,7 +535,7 @@ class HomeScreenViewModel extends BaseModel {
   // Quạt tầng 1 phòng khách
   void toggleFanLivingRoom() {
     isFanLivingRoomOn = !isFanLivingRoomOn;
-    _mqttServiceSimple.publishFanLivingRoomCommand(isFanLivingRoomOn ? 'ON' : 'OFF');
+    _mqttService.publishFanLivingRoomCommand(isFanLivingRoomOn ? 'ON' : 'OFF');
     notifyListeners();
   }
 
@@ -518,7 +547,7 @@ class HomeScreenViewModel extends BaseModel {
   // Điều hòa tầng 1 phòng khách
   void toggleACLivingRoom() {
     isACLivingRoomOn = !isACLivingRoomOn;
-    _mqttServiceSimple.publishACLivingRoomCommand(isACLivingRoomOn ? 'ON' : 'OFF');
+    _mqttService.publishACLivingRoomCommand(isACLivingRoomOn ? 'ON' : 'OFF');
     notifyListeners();
   }
 
@@ -530,7 +559,7 @@ class HomeScreenViewModel extends BaseModel {
   // Điều hòa tầng 2 phòng ngủ 1
   void toggleACBedroom1() {
     isACBedroom1On = !isACBedroom1On;
-    _mqttServiceSimple.publishACBedroom1Command(isACBedroom1On ? 'ON' : 'OFF');
+    _mqttService.publishACBedroom1Command(isACBedroom1On ? 'ON' : 'OFF');
     notifyListeners();
   }
 
@@ -542,7 +571,7 @@ class HomeScreenViewModel extends BaseModel {
   // Điều hòa tầng 2 phòng ngủ 2
   void toggleACBedroom2() {
     isACBedroom2On = !isACBedroom2On;
-    _mqttServiceSimple.publishACBedroom2Command(isACBedroom2On ? 'ON' : 'OFF');
+    _mqttService.publishACBedroom2Command(isACBedroom2On ? 'ON' : 'OFF');
     notifyListeners();
   }
 

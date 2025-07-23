@@ -1,7 +1,6 @@
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/weather_service.dart';
-import 'package:smart_home/service/mqtt_service.dart';
-import 'package:smart_home/service/mqtt_service_simple.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
 import 'package:smart_home/service/electricity_bill_service.dart';
 import 'package:smart_home/service/zone_management_service.dart';
@@ -25,8 +24,7 @@ void setupLocator() {
     // Services - Register as singletons to ensure single instance
     getIt.registerLazySingleton<NavigationService>(() => NavigationService());
     getIt.registerLazySingleton<WeatherService>(() => WeatherService());
-    getIt.registerLazySingleton<MqttService>(() => MqttService());
-    getIt.registerLazySingleton<MqttServiceSimple>(() => MqttServiceSimple());
+    getIt.registerLazySingleton<MqttUnifiedService>(() => MqttUnifiedService());
     getIt.registerLazySingleton<FirebaseDataService>(() => FirebaseDataService());
     getIt.registerLazySingleton<ElectricityBillService>(() => ElectricityBillService());
     getIt.registerLazySingleton<ZoneManagementService>(() => ZoneManagementService());
@@ -41,7 +39,7 @@ void setupLocator() {
     getIt.registerFactory<AnalyticsViewModel>(() => AnalyticsViewModel());
     getIt.registerFactory<ProfileViewModel>(() => ProfileViewModel());
     
-    print('✅ GetIt services registered successfully, including DeviceStateService');
+    print('✅ GetIt services registered successfully with MqttUnifiedService and DeviceStateService');
     print('✅ DeviceStateService registered: ${getIt.isRegistered<DeviceStateService>()}');
   } catch (e) {
     print('❌ Error setting up locator: $e');

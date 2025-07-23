@@ -1,5 +1,5 @@
 import 'package:http/http.dart' as http;
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 
 class InfluxDBService {
   static const String _baseUrl = 'https://us-east-1-1.aws.cloud2.influxdata.com';

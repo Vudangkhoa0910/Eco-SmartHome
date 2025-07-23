@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:smart_home/config/size_config.dart';
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/gate_state_service.dart';
 import 'package:smart_home/provider/getit.dart';
 
@@ -23,7 +23,7 @@ class GateDeviceControlWidget extends StatefulWidget {
 }
 
 class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
-  final MqttService _mqttService = getIt<MqttService>();
+  final MqttUnifiedService _mqttService = getIt<MqttUnifiedService>();
   final GateStateService _gateService = GateStateService();
 
   int _currentLevel = 0;
@@ -648,13 +648,8 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         direction: direction,
       );
 
-      // Send enhanced MQTT command to ESP32 with direction info
-      await _mqttService.publishGateControlWithDirection(
-        currentLevel: _currentLevel,
-        targetLevel: targetLevel,
-        direction: direction,
-        command: command,
-      );
+      // Send gate control command to ESP32
+      await _mqttService.publishGateControl(targetLevel);
 
       print('🚪 Gate command sent: $command → $targetLevel%');
       print('🔄 Waiting for MQTT status update...');
@@ -695,13 +690,8 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         direction: null, // No direction for stop
       );
 
-      // Send enhanced MQTT stop command to ESP32
-      await _mqttService.publishGateControlWithDirection(
-        currentLevel: _currentLevel,
-        targetLevel: _currentLevel,
-        direction: null,
-        command: 'STOP',
-      );
+      // Send stop command to ESP32
+      _mqttService.publishDeviceCommand('khoasmarthome/motor', 'STOP');
 
       setDialogState(() {
         _isMoving = false;

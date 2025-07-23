@@ -5,7 +5,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:smart_home/service/firebase_data_service.dart';
-import 'package:smart_home/service/mqtt_service.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/gemini_service.dart';
 import 'package:smart_home/view/rooms_view_model.dart';
@@ -28,7 +28,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
   // Firebase services
   final FirebaseDataService _firebaseData = getIt<FirebaseDataService>();
-  final MqttService _mqttService = getIt<MqttService>();
+  final MqttUnifiedService _mqttService = getIt<MqttUnifiedService>();
   final RoomsViewModel _roomsViewModel = getIt<RoomsViewModel>();
 
   // Current user

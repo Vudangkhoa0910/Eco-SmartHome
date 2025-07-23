@@ -5,7 +5,7 @@ import 'package:smart_home/provider/theme_provider.dart';
 import 'package:smart_home/routes/routes.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/theme_service.dart';
-import 'package:smart_home/service/mqtt_service_simple.dart';
+import 'package:smart_home/service/mqtt_unified_service.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -48,7 +48,7 @@ void main() async {
   
   // Initialize MQTT service
   try {
-    final mqttService = getIt<MqttServiceSimple>();
+    final mqttService = getIt<MqttUnifiedService>();
     await mqttService.initialize();
     print('MQTT service initialized and connected');
   } catch (e) {
