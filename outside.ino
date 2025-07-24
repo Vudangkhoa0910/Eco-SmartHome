@@ -63,6 +63,10 @@ WYp+G+xOvUe8a7hrA6/L/mVO+Z6gUxbBAnmu
 #define DHT_PIN 23
 #define DHT_TYPE DHT11
 
+// I2C Device Addresses
+#define OLED_ADDRESS 0x3C
+#define INA219_ADDRESS 0x40
+
 // Motor cổng (giữ nguyên)
 #define MOTOR_FORWARD_PIN 26
 #define MOTOR_REVERSE_PIN 27
@@ -120,12 +124,13 @@ bool awningOpen = false;
 #define TOPIC_BATHROOM    "khoasmarthome/bathroom_light"
 
 DHT dht(DHT_PIN, DHT_TYPE);
-Adafruit_INA219 ina219;
+Adafruit_INA219 ina219(INA219_ADDRESS);  // Khởi tạo với địa chỉ I2C
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
-// OLED Display 1.3 inch (128x64) - SH1106 driver
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+// OLED Display 1.3 inch (128x64) - Sử dụng địa chỉ 0x3C
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+bool oledFound = false;
 
 unsigned long lastMsg = 0;
 #define MSG_INTERVAL 5000
@@ -154,6 +159,67 @@ unsigned long gateLevelTimes[5] = {
   5250,  // 75% = 5.25s  
   7000   // 100% = 7s
 };
+
+// I2C Scanner để kiểm tra thiết bị
+void scanI2C() {
+  Serial.println("🔍 Scanning I2C devices...");
+  int deviceCount = 0;
+  
+  for (byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();
+    
+    if (error == 0) {
+      Serial.printf("✅ I2C device found at 0x%02X\n", address);
+      deviceCount++;
+      
+      if (address == OLED_ADDRESS) {
+        Serial.println("   -> OLED Display detected");
+      } else if (address == INA219_ADDRESS) {
+        Serial.println("   -> INA219 Power Monitor detected");
+      }
+    }
+  }
+  
+  if (deviceCount == 0) {
+    Serial.println("❌ No I2C devices found");
+  } else {
+    Serial.printf("📡 Total I2C devices found: %d\n", deviceCount);
+  }
+  Serial.println();
+}
+
+// Khởi tạo OLED an toàn
+bool initOLED() {
+  Serial.println("🖥️ Initializing OLED...");
+  
+  // Kiểm tra OLED có tồn tại không
+  Wire.beginTransmission(OLED_ADDRESS);
+  byte error = Wire.endTransmission();
+  
+  if (error != 0) {
+    Serial.printf("❌ OLED not found at 0x%02X\n", OLED_ADDRESS);
+    return false;
+  }
+  
+  // Khởi tạo OLED
+  if (!u8g2.begin()) {
+    Serial.println("❌ OLED initialization failed");
+    return false;
+  }
+  
+  Serial.println("✅ OLED initialized successfully");
+  
+  // Hiển thị màn hình khởi động
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+  u8g2.drawStr(20, 35, "SMART HOME");
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.drawStr(30, 50, "Starting...");
+  u8g2.sendBuffer();
+  
+  return true;
+}
 
 void setup_wifi() {
   WiFi.begin(ssid, password);
@@ -451,6 +517,11 @@ void reconnect() {
 
 // Hàm cập nhật hiển thị OLED
 void updateOLED(float voltage, float current, float power, float temperature, float humidity) {
+  // Kiểm tra OLED có sẵn sàng không
+  if (!oledFound) {
+    return; // Thoát nếu OLED không hoạt động
+  }
+  
   u8g2.clearBuffer();
   
   // Tiêu đề "SMART HOME" - căn giữa
@@ -548,20 +619,32 @@ void setup() {
   ledGateState = false;    // OFF
   ledAroundState = false;  // OFF
 
-  // Cấu hình cảm biến (giữ nguyên)
-  Wire.begin(32, 33);  // INA219 SDA, SCL
-  ina219.begin();
+  // Cấu hình cảm biến và I2C
+  Wire.begin(21, 22);  // SDA=21, SCL=22 (chân I2C mặc định ESP32)
+  Serial.println("🔧 I2C Bus initialized (SDA=21, SCL=22)");
+  
+  // Quét các thiết bị I2C
+  scanI2C();
+  
+  // Khởi tạo INA219 (đã có địa chỉ trong constructor)
+  if (!ina219.begin()) {
+    Serial.printf("❌ INA219 initialization failed at 0x%02X\n", INA219_ADDRESS);
+  } else {
+    Serial.printf("✅ INA219 initialized at 0x%02X\n", INA219_ADDRESS);
+  }
+  
+  // Khởi tạo DHT11
   dht.begin();
+  Serial.println("✅ DHT11 initialized");
 
   // Khởi tạo OLED Display
-  u8g2.begin();
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB10_tr);
-  u8g2.drawStr(20, 35, "SMART HOME");
-  u8g2.setFont(u8g2_font_6x10_tr);
-  u8g2.drawStr(30, 50, "Starting...");
-  u8g2.sendBuffer();
-  delay(2000);
+  oledFound = initOLED();
+  if (oledFound) {
+    Serial.println("📺 OLED Display ready");
+    delay(2000); // Hiển thị màn hình khởi động 2 giây
+  } else {
+    Serial.println("⚠️ OLED Display not available - continuing without display");
+  }
 
   setup_wifi();
   syncTime();
@@ -682,8 +765,10 @@ void loop() {
     client.publish(TOPIC_POWER, String(power, 2).c_str());
     Serial.printf("🔋 V: %.2fV, I: %.2fmA, P: %.2fmW\n", busV, current, power);
     
-    // Cập nhật OLED Display với thông tin mới nhất
-    updateOLED(busV, current, power, t, h);
+    // Cập nhật OLED Display với thông tin mới nhất (chỉ khi OLED hoạt động)
+    if (oledFound) {
+      updateOLED(busV, current, power, t, h);
+    }
     
     // 🚨 PERIODIC GATE STATUS - Send gate status every 5 seconds to ensure Flutter stays updated
     publishGateStatus();
