@@ -1,6 +1,6 @@
 import 'package:smart_home/src/screens/set_event_screen/set_event_screen.dart';
 import 'package:smart_home/src/screens/edit_profile/edit_profile.dart';
- import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
+import 'package:smart_home/src/screens/auth_screen/auth_screen.dart';
 import 'package:smart_home/src/screens/device_connection_screen/device_connection_screen.dart';
 import 'package:smart_home/src/screens/settings_screen/settings_screen.dart';
 import 'package:smart_home/src/screens/electricity_settings/electricity_settings_screen.dart';
@@ -22,7 +22,8 @@ import 'package:smart_home/src/screens/savings_screen/savings_screen.dart';
 
 final Map<String, WidgetBuilder> routes = {
   EditProfile.routeName: (context) => const EditProfile(),
-  ElectricitySettingsScreen.routeName: (context) => const ElectricitySettingsScreen(),
+  ElectricitySettingsScreen.routeName: (context) =>
+      const ElectricitySettingsScreen(),
   HomeScreen.routeName: (context) => const HomeScreen(),
   AuthScreen.routeName: (context) => const AuthScreen(),
   DeviceConnectionScreen.routeName: (context) => const DeviceConnectionScreen(),
@@ -35,7 +36,8 @@ final Map<String, WidgetBuilder> routes = {
   RoomsScreen.routeName: (context) => const RoomsScreen(),
   AIVoiceScreen.routeName: (context) => const AIVoiceScreen(),
   AnalyticsScreen.routeName: (context) => const AnalyticsScreen(),
-  AIAnalyticsDetailScreen.routeName: (context) => const AIAnalyticsDetailScreen(),
+  AIAnalyticsDetailScreen.routeName: (context) =>
+      const AIAnalyticsDetailScreen(),
   ProfileScreen.routeName: (context) => const ProfileScreen(),
   AboutUs.routeName: (context) => const AboutUs(),
   '/qr-scanner': (context) => const QRScannerScreen(),

@@ -5,6 +5,7 @@ import 'package:smart_home/domain/entities/house_structure.dart';
 import 'package:smart_home/src/screens/house_floor/house_floor_screen.dart';
 import 'package:smart_home/service/theme_service.dart';
 import 'package:smart_home/src/widgets/theme_color_picker.dart';
+import 'package:smart_home/presentation/pages/schedule_management_screen.dart';
 import 'room_card.dart';
 
 class Body extends StatefulWidget {
@@ -21,7 +22,7 @@ class _BodyState extends State<Body> {
     super.initState();
     // Initialize theme service
     ThemeService.instance.initialize();
-    
+
     // Listen to theme changes
     ThemeService.instance.themeNotifier.addListener(_onThemeChanged);
   }
@@ -52,24 +53,46 @@ class _BodyState extends State<Body> {
           maxChildSize: 0.9,
           builder: (context, scrollController) {
             return Container(
+              padding: EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: ThemeColorPicker(
-                  onThemeChanged: (theme) {
-                    setState(() {
-                      // Rebuild with new theme
-                    });
-                  },
-                ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Expanded(
+                    child: ThemeColorPicker(
+                      onThemeChanged: (theme) {
+                        setState(() {
+                          // Rebuild with new theme
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  void _showScheduleManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScheduleManagementScreen(),
+      ),
     );
   }
 
@@ -115,7 +138,7 @@ class _BodyState extends State<Body> {
 
           SizedBox(height: getProportionateScreenHeight(20)),
 
-          // House Area Management - Đây là tính năng từ nút xanh được đưa ra trực tiếp  
+          // House Area Management - Đây là tính năng từ nút xanh được đưa ra trực tiếp
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -126,43 +149,91 @@ class _BodyState extends State<Body> {
                       fontWeight: FontWeight.w600,
                     ),
               ),
-              GestureDetector(
-                onTap: _showThemePicker,
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: ThemeService.instance.currentPalette.gradientColors.take(2).toList(),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ThemeService.instance.currentPalette.primaryColor.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.palette,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Theme',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _showScheduleManagement,
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blueAccent, Colors.blue],
                         ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Lịch trình',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showThemePicker,
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: ThemeService
+                              .instance.currentPalette.gradientColors
+                              .take(2)
+                              .toList(),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThemeService
+                                .instance.currentPalette.primaryColor
+                                .withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.palette,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Theme',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -269,8 +340,8 @@ class _BodyState extends State<Body> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  floor.name.contains('Sân') 
-                      ? Icons.grass 
+                  floor.name.contains('Sân')
+                      ? Icons.grass
                       : floor.name.contains('Tầng 1')
                           ? Icons.home
                           : floor.name.contains('Tầng 2')
@@ -288,7 +359,8 @@ class _BodyState extends State<Body> {
                     Text(
                       floor.name,
                       style: TextStyle(
-                        color: ThemeService.instance.getFloorTextColor(floor.name),
+                        color:
+                            ThemeService.instance.getFloorTextColor(floor.name),
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -296,7 +368,9 @@ class _BodyState extends State<Body> {
                     Text(
                       floor.description,
                       style: TextStyle(
-                        color: ThemeService.instance.getFloorTextColor(floor.name).withOpacity(0.8),
+                        color: ThemeService.instance
+                            .getFloorTextColor(floor.name)
+                            .withOpacity(0.8),
                         fontSize: 12,
                       ),
                     ),
@@ -309,13 +383,15 @@ class _BodyState extends State<Body> {
                             vertical: getProportionateScreenHeight(4),
                           ),
                           decoration: BoxDecoration(
-                            color: ThemeService.instance.getFloorBadgeColor(floor.name),
+                            color: ThemeService.instance
+                                .getFloorBadgeColor(floor.name),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${floor.rooms.length} khu vực',
                             style: TextStyle(
-                              color: ThemeService.instance.getFloorTextColor(floor.name),
+                              color: ThemeService.instance
+                                  .getFloorTextColor(floor.name),
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -328,13 +404,15 @@ class _BodyState extends State<Body> {
                             vertical: getProportionateScreenHeight(4),
                           ),
                           decoration: BoxDecoration(
-                            color: ThemeService.instance.getFloorBadgeColor(floor.name),
+                            color: ThemeService.instance
+                                .getFloorBadgeColor(floor.name),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${floor.totalDevices} thiết bị',
                             style: TextStyle(
-                              color: ThemeService.instance.getFloorTextColor(floor.name),
+                              color: ThemeService.instance
+                                  .getFloorTextColor(floor.name),
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -347,7 +425,9 @@ class _BodyState extends State<Body> {
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: ThemeService.instance.getFloorTextColor(floor.name).withOpacity(0.7),
+                color: ThemeService.instance
+                    .getFloorTextColor(floor.name)
+                    .withOpacity(0.7),
                 size: 16,
               ),
             ],

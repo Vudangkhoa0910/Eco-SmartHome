@@ -6,6 +6,7 @@ import 'package:smart_home/routes/routes.dart';
 import 'package:smart_home/service/navigation_service.dart';
 import 'package:smart_home/service/theme_service.dart';
 import 'package:smart_home/service/mqtt_unified_service.dart';
+import 'package:smart_home/service/schedule_service.dart';
 import 'package:smart_home/src/screens/splash_screen/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -45,7 +46,7 @@ void main() async {
   }
 
   setupLocator();
-  
+
   // Initialize MQTT service
   try {
     final mqttService = getIt<MqttUnifiedService>();
@@ -54,7 +55,16 @@ void main() async {
   } catch (e) {
     print('Failed to initialize MQTT service: $e');
   }
-  
+
+  // Initialize Schedule service
+  try {
+    final scheduleService = getIt<ScheduleService>();
+    await scheduleService.initialize();
+    print('Schedule service initialized');
+  } catch (e) {
+    print('Failed to initialize Schedule service: $e');
+  }
+
   runApp(const MyApp());
 }
 
