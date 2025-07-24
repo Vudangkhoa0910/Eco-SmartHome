@@ -9,6 +9,7 @@ import 'package:smart_home/src/screens/stats_screen/stats_screen.dart';
 import 'package:smart_home/src/screens/rooms_screen/rooms_screen.dart';
 import 'package:smart_home/src/screens/ai_voice_screen/ai_voice_screen.dart';
 import 'package:smart_home/src/screens/analytics_screen/analytics_screen.dart';
+import 'package:smart_home/src/screens/analytics_screen/ai_analytics_detail_screen.dart';
 import 'package:smart_home/src/screens/profile_screen/profile_screen.dart';
 import 'package:smart_home/src/screens/about_screen/about_us_screen.dart';
 import 'package:smart_home/src/screens/qr_scanner_screen.dart';
@@ -34,6 +35,7 @@ final Map<String, WidgetBuilder> routes = {
   RoomsScreen.routeName: (context) => const RoomsScreen(),
   AIVoiceScreen.routeName: (context) => const AIVoiceScreen(),
   AnalyticsScreen.routeName: (context) => const AnalyticsScreen(),
+  AIAnalyticsDetailScreen.routeName: (context) => const AIAnalyticsDetailScreen(),
   ProfileScreen.routeName: (context) => const ProfileScreen(),
   AboutUs.routeName: (context) => const AboutUs(),
   '/qr-scanner': (context) => const QRScannerScreen(),
