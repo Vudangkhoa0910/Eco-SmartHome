@@ -7,6 +7,7 @@
 #include <time.h>
 #include <ESPping.h>
 #include <ESP32Servo.h>
+#include <U8g2lib.h>
 
 // WiFi credentials
 const char* ssid = "iPhone (85)";
@@ -122,6 +123,9 @@ DHT dht(DHT_PIN, DHT_TYPE);
 Adafruit_INA219 ina219;
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
+
+// OLED Display 1.3 inch (128x64) - SH1106 driver
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 unsigned long lastMsg = 0;
 #define MSG_INTERVAL 5000
@@ -445,6 +449,61 @@ void reconnect() {
   }
 }
 
+// Hàm cập nhật hiển thị OLED
+void updateOLED(float voltage, float current, float power, float temperature, float humidity) {
+  u8g2.clearBuffer();
+  
+  // Tiêu đề "SMART HOME" - căn giữa
+  u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawStr(25, 12, "SMART HOME");
+  
+  // Vẽ đường kẻ ngang
+  u8g2.drawHLine(10, 16, 108);
+  
+  // Hiển thị thông tin điện năng
+  u8g2.setFont(u8g2_font_6x10_tr);
+  
+  char voltageStr[20];
+  char currentStr[20];
+  char powerStr[20];
+  char tempStr[20];
+  char humidStr[20];
+  
+  snprintf(voltageStr, sizeof(voltageStr), "Voltage: %.2fV", voltage);
+  snprintf(currentStr, sizeof(currentStr), "Current: %.1fmA", current);
+  snprintf(powerStr, sizeof(powerStr), "Power: %.1fmW", power);
+  snprintf(tempStr, sizeof(tempStr), "Temp: %.1fC", temperature);
+  snprintf(humidStr, sizeof(humidStr), "Humid: %.1f%%", humidity);
+  
+  u8g2.drawStr(2, 28, voltageStr);
+  u8g2.drawStr(2, 38, currentStr);
+  u8g2.drawStr(2, 48, powerStr);
+  u8g2.drawStr(2, 58, tempStr);
+  u8g2.drawStr(68, 58, humidStr);
+  
+  // Hiển thị trạng thái gate
+  char gateStr[20];
+  int gatePercentage = (gateLevel == 0) ? 0 : (gateLevel == 1) ? 25 : (gateLevel == 2) ? 50 : (gateLevel == 3) ? 75 : 100;
+  snprintf(gateStr, sizeof(gateStr), "Gate: %d%%", gatePercentage);
+  u8g2.drawStr(68, 28, gateStr);
+  
+  // Hiển thị trạng thái WiFi và MQTT
+  u8g2.setFont(u8g2_font_4x6_tr);
+  if (WiFi.status() == WL_CONNECTED) {
+    u8g2.drawStr(68, 38, "WiFi: OK");
+  } else {
+    u8g2.drawStr(68, 38, "WiFi: X");
+  }
+  
+  if (client.connected()) {
+    u8g2.drawStr(68, 48, "MQTT: OK");
+  } else {
+    u8g2.drawStr(68, 48, "MQTT: X");
+  }
+  
+  u8g2.sendBuffer();
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -493,6 +552,16 @@ void setup() {
   Wire.begin(32, 33);  // INA219 SDA, SCL
   ina219.begin();
   dht.begin();
+
+  // Khởi tạo OLED Display
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+  u8g2.drawStr(20, 35, "SMART HOME");
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.drawStr(30, 50, "Starting...");
+  u8g2.sendBuffer();
+  delay(2000);
 
   setup_wifi();
   syncTime();
@@ -612,6 +681,9 @@ void loop() {
     client.publish(TOPIC_CURRENT, String(current, 2).c_str());
     client.publish(TOPIC_POWER, String(power, 2).c_str());
     Serial.printf("🔋 V: %.2fV, I: %.2fmA, P: %.2fmW\n", busV, current, power);
+    
+    // Cập nhật OLED Display với thông tin mới nhất
+    updateOLED(busV, current, power, t, h);
     
     // 🚨 PERIODIC GATE STATUS - Send gate status every 5 seconds to ensure Flutter stays updated
     publishGateStatus();
