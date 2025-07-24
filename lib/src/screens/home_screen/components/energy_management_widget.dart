@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:smart_home/config/size_config.dart';
 import 'package:smart_home/view/home_screen_view_model.dart';
 import 'package:smart_home/src/screens/electricity_settings/electricity_settings_screen.dart';
-import 'package:smart_home/src/screens/energy_dashboard/energy_dashboard_screen.dart';
 
 class EnergyManagementWidget extends StatelessWidget {
   const EnergyManagementWidget({Key? key, required this.model, this.isCompact = false}) : super(key: key);
@@ -26,7 +25,7 @@ class EnergyManagementWidget extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const EnergyDashboardScreen(),
+                builder: (context) => const ElectricitySettingsScreen(),
               ),
             );
           },
@@ -65,7 +64,7 @@ class EnergyManagementWidget extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const EnergyDashboardScreen(),
+                      builder: (context) => const ElectricitySettingsScreen(),
                     ),
                   );
                 },
