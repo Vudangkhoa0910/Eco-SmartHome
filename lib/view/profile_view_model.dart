@@ -4,6 +4,9 @@ import 'package:smart_home/provider/base_model.dart';
 import 'package:smart_home/provider/theme_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:smart_home/service/profile_stats_service.dart';
+import 'package:smart_home/service/device_state_service.dart';
+import 'dart:async';
 
 class ProfileViewModel extends BaseModel {
   String _userName = 'Đang tải...';
@@ -13,16 +16,36 @@ class ProfileViewModel extends BaseModel {
   int _totalSavings = 0; // in thousand VND
   bool _isVoiceEnabled = true;
 
+  // Real-time stats services
+  final ProfileStatsService _statsService = ProfileStatsService();
+  final DeviceStateService _deviceStateService = DeviceStateService();
+  StreamSubscription? _deviceStateSubscription;
+
   String get userName => _userName;
   String get userEmail => _userEmail;
-  int get totalDevices => _totalDevices;
-  int get totalRooms => _totalRooms;
-  int get totalSavings => _totalSavings;
+  int get totalDevices => _statsService.getTotalDevices(); // Real-time data
+  int get totalRooms => _statsService.getTotalRooms(); // Real-time data
+  int get totalSavings => _statsService.getEstimatedMonthlySavings(); // Real-time calculation
   bool get isVoiceEnabled => _isVoiceEnabled;
+
+  // Additional real-time stats
+  int get activeDevices => _statsService.getActiveDevices();
+  double get currentPowerConsumption => _statsService.getCurrentPowerConsumption();
+  double get estimatedDailyCost => _statsService.getEstimatedDailyCost();
+  Map<String, int> get activeDevicesByRoom => _statsService.getActiveDevicesByRoom();
 
   // Constructor
   ProfileViewModel() {
     loadProfile();
+    _startListeningToDeviceChanges();
+  }
+
+  /// Start listening to device state changes for real-time updates
+  void _startListeningToDeviceChanges() {
+    _deviceStateSubscription = _deviceStateService.stateStream.listen((states) {
+      // Update UI when device states change
+      notifyListeners();
+    });
   }
 
   bool isDarkMode(BuildContext context) {
@@ -49,26 +72,19 @@ class ProfileViewModel extends BaseModel {
               userData['name'] ??
               'Người dùng';
 
-          // Load statistics if available
-          _totalDevices = userData['totalDevices'] ?? 0;
-          _totalRooms = userData['totalRooms'] ?? 0;
-          _totalSavings = userData['totalSavings'] ?? 0;
+          // Only load user preferences, not device stats (use real-time data instead)
           _isVoiceEnabled = userData['isVoiceEnabled'] ?? true;
         } else {
           // If no document exists, use Firebase Auth data
           _userName = user.displayName ?? 'Người dùng';
-          // Set default values for stats
-          _totalDevices = 0;
-          _totalRooms = 0;
-          _totalSavings = 0;
+          // Use default preferences
+          _isVoiceEnabled = true;
         }
       } else {
         // No user logged in
         _userName = 'Chưa đăng nhập';
         _userEmail = '';
-        _totalDevices = 0;
-        _totalRooms = 0;
-        _totalSavings = 0;
+        _isVoiceEnabled = true;
       }
     } catch (e) {
       print('Error loading profile: $e');
@@ -299,6 +315,12 @@ class ProfileViewModel extends BaseModel {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _deviceStateSubscription?.cancel();
+    super.dispose();
   }
 }
 

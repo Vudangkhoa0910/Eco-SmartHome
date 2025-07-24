@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build and Run Smart Home App",
+			"type": "shell",
+			"command": "flutter run",
+			"group": "build",
+			"isBackground": false,
+			"args": [
+				"--hot",
+				"--debug"
+			],
+			"problemMatcher": [
+				"$dart-flutter"
+			]
+		}
+	]
+}
