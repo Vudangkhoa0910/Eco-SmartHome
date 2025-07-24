@@ -731,9 +731,9 @@ class _BodyState extends State<Body> with TickerProviderStateMixin {
   Widget _buildQuickCommands(BuildContext context) {
     final quickCommands = [
       {'text': 'Mở đèn cổng', 'icon': Icons.lightbulb_outline},
-      {'text': 'Đóng cửa', 'icon': Icons.door_front_door},
-      {'text': 'Bật quạt', 'icon': Icons.air},
-      {'text': 'Tắt tất cả', 'icon': Icons.power_off},
+      {'text': 'Bật đèn hành lang', 'icon': Icons.light},
+      {'text': 'Bật điều hòa phòng khách', 'icon': Icons.ac_unit},
+      {'text': 'Mở cổng', 'icon': Icons.door_front_door},
       {'text': 'Chế độ về nhà', 'icon': Icons.home},
       {'text': 'Chế độ đi ngủ', 'icon': Icons.bedtime},
     ];

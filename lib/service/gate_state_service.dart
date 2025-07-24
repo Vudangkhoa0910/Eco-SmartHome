@@ -197,18 +197,23 @@ class GateStateService {
   // 🚨 CRITICAL: Singleton lock to prevent multiple simultaneous Firebase reads during app startup
   static Future<GateState>? _ongoingFetch;
 
-  /// Lưu trạng thái cổng với cache - 🚨 FIREBASE WRITES DISABLED
+  /// Lưu trạng thái cổng với cache - 🚨 FIREBASE WRITES ENABLED
   Future<bool> saveGateState(GateState gateState) async {
     try {
       // Update cache immediately for responsive UI
       _cachedState = gateState;
       _lastCacheTime = DateTime.now();
       
-      // 🚨 FIREBASE WRITES COMPLETELY DISABLED - Only use cache for real-time UI
-      print('📋 Gate state cached: ${gateState.status.description} (${gateState.level}%) - Firebase write DISABLED');
+      // 🚨 FIREBASE WRITES ENABLED: Save to Firebase for persistence
+      await _firestore
+          .collection(_gateStateCollection)
+          .doc('main_gate')
+          .set(gateState.toMap(), SetOptions(merge: true));
+      
+      print('✅ Gate state saved to Firebase: ${gateState.status.description} (${gateState.level}%)');
       return true;
     } catch (e) {
-      print('❌ Error caching gate state: $e');
+      print('❌ Error saving gate state to Firebase: $e');
       return false;
     }
   }
