@@ -33,6 +33,7 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
 
   // 🚨 TIMEOUT MECHANISM for loading spinner
   Timer? _loadingTimeout;
+  Timer? _dialogTimeout;
 
   // 🚨 DIALOG STATE SYNC: Callback to update dialog when MQTT updates received
   StateSetter? _dialogStateSetter;
@@ -41,10 +42,21 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
   DateTime? _operationStartTime;
   int? _operationTargetLevel;
 
+  // 🚨 STREAM SUBSCRIPTION CLEANUP
+  StreamSubscription<Map<String, dynamic>>? _gateStatusSubscription;
+
   @override
   void initState() {
     super.initState();
     _initializeWidget();
+  }
+
+  @override
+  void dispose() {
+    _loadingTimeout?.cancel();
+    _dialogTimeout?.cancel();
+    _gateStatusSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeWidget() async {
@@ -80,92 +92,99 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
           _currentLevel = currentState.level;
           _isMoving = currentState.isMoving;
         });
-        print(
-            '✅ Loaded gate state: Level=${currentState.level}%, Moving=${currentState.isMoving}');
+        print('✅ Loaded gate state: Level=${currentState.level}%, Moving=${currentState.isMoving}');
       }
     } catch (e) {
       print('❌ Error loading gate state: $e');
-      setState(() {
-        _currentLevel = 0;
-        _isMoving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _currentLevel = 0;
+          _isMoving = false;
+        });
+      }
     }
   }
 
   void _listenToGateState() {
-    _mqttService.gateStatusStream.listen((status) async {
-      if (mounted) {
-        final newLevel = status['level'] ?? 0;
-        final newIsMoving = status['isMoving'] ?? false;
+    _gateStatusSubscription = _mqttService.gateStatusStream.listen((status) async {
+      if (!mounted) return; // 🚨 PREVENT setState after dispose
+      
+      final newLevel = status['level'] ?? 0;
+      final newIsMoving = status['isMoving'] ?? false;
 
-        // 🚨 DEBUG: Log state changes
-        print(
-            '🔄 MQTT update: level=$newLevel, isMoving=$newIsMoving, description=${status['description']}');
-        print('🔄 Current state: level=$_currentLevel, isMoving=$_isMoving');
-
-        // 🚨 REALISTIC LOADING LOGIC: Don't stop loading immediately if operation is in progress
-        bool shouldShowLoading = _isMoving;
-
-        if (_operationStartTime != null && _operationTargetLevel != null) {
-          final elapsed = DateTime.now().difference(_operationStartTime!);
-          final distance = (_operationTargetLevel! - _currentLevel).abs();
-          final expectedDuration = Duration(
-              milliseconds: (distance * 70)); // ~70ms per 1% = 7s for 100%
-
-          print(
-              '🔄 Operation timing: elapsed=${elapsed.inMilliseconds}ms, expected=${expectedDuration.inMilliseconds}ms');
-
-          // Keep loading if we haven't reached expected completion time AND target level
-          if (elapsed < expectedDuration && newLevel != _operationTargetLevel) {
-            shouldShowLoading = true;
-            print('🔄 Keeping loading state: operation still in progress');
-          } else if (newLevel == _operationTargetLevel ||
-              elapsed > Duration(seconds: 8)) {
-            shouldShowLoading = false;
-            _operationStartTime = null;
-            _operationTargetLevel = null;
-            print('🔄 Operation completed or timed out - stopping loading');
-          }
-        } else {
-          // No active operation - use MQTT isMoving directly
-          shouldShowLoading = newIsMoving;
+      // 🚨 PRIORITY ESP32: If ESP32 state differs significantly from current, force Firebase update
+      if ((newLevel - _currentLevel).abs() > 5 && !_isMoving && !newIsMoving) {
+        print('🔄 ESP32 state conflict detected: $_currentLevel% -> $newLevel%. Forcing Firebase sync...');
+        try {
+          await _gateService.saveGateState(GateState.withAutoStatus(
+            level: newLevel,
+            isMoving: newIsMoving,
+            timestamp: DateTime.now(),
+          ));
+          print('✅ Firebase forcefully synced with ESP32 state: $newLevel%');
+        } catch (e) {
+          print('❌ Error force-syncing Firebase: $e');
         }
+      }
 
-        // Update main widget UI
+      // 🚨 DEBUG: Log state changes
+      print('🔄 MQTT update: level=$newLevel, isMoving=$newIsMoving, description=${status['description']}');
+      print('🔄 Current state: level=$_currentLevel, isMoving=$_isMoving');
+
+      // 🚨 REALISTIC LOADING LOGIC: Don't stop loading immediately if operation is in progress
+      bool shouldShowLoading = _isMoving;
+
+      if (_operationStartTime != null && _operationTargetLevel != null) {
+        final elapsed = DateTime.now().difference(_operationStartTime!);
+        final distance = (_operationTargetLevel! - _currentLevel).abs();
+        final expectedDuration = Duration(milliseconds: (distance * 70)); // ~70ms per 1% = 7s for 100%
+
+        print('🔄 Operation timing: elapsed=${elapsed.inMilliseconds}ms, expected=${expectedDuration.inMilliseconds}ms');
+
+        // Keep loading if we haven't reached expected completion time AND target level
+        if (elapsed < expectedDuration && newLevel != _operationTargetLevel) {
+          shouldShowLoading = true;
+          print('🔄 Keeping loading state: operation still in progress');
+        } else if (newLevel == _operationTargetLevel || elapsed > Duration(seconds: 8)) {
+          shouldShowLoading = false;
+          _operationStartTime = null;
+          _operationTargetLevel = null;
+          print('🔄 Operation completed or timed out - stopping loading');
+        }
+      } else {
+        // No active operation - use MQTT isMoving directly
+        shouldShowLoading = newIsMoving;
+      }
+
+      // Update main widget UI - check mounted again before setState
+      if (mounted) {
         setState(() {
           _currentLevel = newLevel;
           _isMoving = shouldShowLoading;
-          _statusText = shouldShowLoading
-              ? 'Đang di chuyển...'
-              : _getGateDescription(newLevel);
+          _statusText = shouldShowLoading ? 'Đang di chuyển...' : _getGateDescription(newLevel);
         });
+      }
 
-        // 🚨 SYNC DIALOG STATE: Update dialog if it's open
-        if (_dialogStateSetter != null) {
-          _dialogStateSetter!(() {
-            print(
-                '🔄 Dialog state synced: level=$newLevel, isMoving=$shouldShowLoading');
-          });
+      // 🚨 SYNC DIALOG STATE: Update dialog if it's open and widget is still mounted
+      _safeSetDialogState(_dialogStateSetter, () {
+        print('🔄 Dialog state synced: level=$newLevel, isMoving=$shouldShowLoading');
+      });
+
+      // 🚨 CANCEL TIMEOUT when operation truly completes
+      if (!shouldShowLoading) {
+        _loadingTimeout?.cancel();
+        _dialogTimeout?.cancel();
+      }
+
+      // Update Firebase with progress using corrected logic
+      try {
+        if (shouldShowLoading) {
+          await _gateService.updateOperationProgress(currentLevel: newLevel);
         } else {
-          print('🔄 No dialog open - skipping dialog sync');
+          await _gateService.completeOperation(finalLevel: newLevel, success: true);
         }
-
-        // 🚨 CANCEL TIMEOUT when operation truly completes
-        if (!shouldShowLoading) {
-          _loadingTimeout?.cancel();
-        }
-
-        // Update Firebase with progress using corrected logic
-        try {
-          if (shouldShowLoading) {
-            await _gateService.updateOperationProgress(currentLevel: newLevel);
-          } else {
-            await _gateService.completeOperation(
-                finalLevel: newLevel, success: true);
-          }
-        } catch (e) {
-          print('❌ Error updating gate progress: $e');
-        }
+      } catch (e) {
+        print('❌ Error updating gate progress: $e');
       }
     });
   }
@@ -544,6 +563,24 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
     );
   }
 
+  /// Safely call setDialogState only if dialog is still open
+  void _safeSetDialogState(StateSetter? setter, VoidCallback callback) {
+    try {
+      // 🚨 TRIPLE CHECK: widget mounted + setter available + dialog context
+      if (mounted && setter != null) {
+        // Wrap callback to prevent errors
+        setter(() {
+          if (mounted) {
+            callback();
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      print('⚠️ Dialog setState error (dialog closed): $e');
+      // Suppress stack trace to reduce console noise
+    }
+  }
+
   void _controlGate(int targetLevel, StateSetter setDialogState) async {
     // Validation: prevent redundant operations
     if (_isMoving) {
@@ -561,24 +598,28 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
     // Prevent opening when already fully open (100%)
     if (_currentLevel >= 100 && targetLevel > _currentLevel) {
       print('❌ Gate already fully open (100%) - cannot open more');
-      setDialogState(() {
+      _safeSetDialogState(setDialogState, () {
         _statusText = 'Cổng đã mở hoàn toàn';
       });
-      setState(() {
-        _statusText = 'Cổng đã mở hoàn toàn';
-      });
+      if (mounted) {
+        setState(() {
+          _statusText = 'Cổng đã mở hoàn toàn';
+        });
+      }
       return;
     }
 
     // Prevent closing when already fully closed (0%)
     if (_currentLevel <= 0 && targetLevel < _currentLevel) {
       print('❌ Gate already fully closed (0%) - cannot close more');
-      setDialogState(() {
+      _safeSetDialogState(setDialogState, () {
         _statusText = 'Cổng đã đóng hoàn toàn';
       });
-      setState(() {
-        _statusText = 'Cổng đã đóng hoàn toàn';
-      });
+      if (mounted) {
+        setState(() {
+          _statusText = 'Cổng đã đóng hoàn toàn';
+        });
+      }
       return;
     }
 
@@ -589,15 +630,17 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
     _operationStartTime = DateTime.now();
     _operationTargetLevel = targetLevel;
 
-    setDialogState(() {
+    _safeSetDialogState(setDialogState, () {
       _isMoving = true;
       _statusText = 'Đang di chuyển đến $targetLevel%...';
     });
 
-    setState(() {
-      _isMoving = true;
-      _statusText = 'Đang di chuyển đến $targetLevel%...';
-    });
+    if (mounted) {
+      setState(() {
+        _isMoving = true;
+        _statusText = 'Đang di chuyển đến $targetLevel%...';
+      });
+    }
 
     // 🚨 START TIMEOUT TIMER to prevent infinite loading
     _loadingTimeout?.cancel(); // Cancel any existing timer
@@ -610,7 +653,7 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         });
         // 🚨 Also update dialog state if open
         if (_dialogStateSetter != null) {
-          _dialogStateSetter!(() {
+          _safeSetDialogState(_dialogStateSetter, () {
             print('⚠️ Dialog timeout - forcing isMoving = false in dialog');
           });
         }
@@ -655,28 +698,33 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       print('🔄 Waiting for MQTT status update...');
     } catch (e) {
       print('❌ Error controlling gate: $e');
-      setDialogState(() {
+      _safeSetDialogState(setDialogState, () {
         _isMoving = false;
         _statusText = 'Lỗi điều khiển cổng';
       });
-      setState(() {
-        _isMoving = false;
-        _statusText = 'Lỗi điều khiển cổng';
-      });
-    }
-
-    // Timeout sau 15 giây
-    Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && _isMoving) {
-        print('⚠️ 15s timeout - stopping loading state');
-        setDialogState(() {
-          _isMoving = false;
-          _statusText = 'Hết thời gian chờ - Kiểm tra kết nối';
-        });
+      if (mounted) {
         setState(() {
           _isMoving = false;
-          _statusText = 'Hết thời gian chờ - Kiểm tra kết nối';
+          _statusText = 'Lỗi điều khiển cổng';
         });
+      }
+    }
+
+    // Start dialog timeout timer (cancel any existing one)
+    _dialogTimeout?.cancel();
+    _dialogTimeout = Timer(const Duration(seconds: 15), () {
+      if (mounted && _isMoving) {
+        print('⚠️ 15s timeout - stopping loading state');
+        if (mounted) {
+          _safeSetDialogState(setDialogState, () {
+            _isMoving = false;
+            _statusText = 'Hết thời gian chờ - Kiểm tra kết nối';
+          });
+          setState(() {
+            _isMoving = false;
+            _statusText = 'Hết thời gian chờ - Kiểm tra kết nối';
+          });
+        }
       }
     });
   }
@@ -693,14 +741,16 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
       // Send stop command to ESP32
       _mqttService.publishDeviceCommand('khoasmarthome/motor', 'STOP');
 
-      setDialogState(() {
+      _safeSetDialogState(setDialogState, () {
         _isMoving = false;
         _statusText = 'Đã dừng tại $_currentLevel%';
       });
-      setState(() {
-        _isMoving = false;
-        _statusText = 'Đã dừng tại $_currentLevel%';
-      });
+      if (mounted) {
+        setState(() {
+          _isMoving = false;
+          _statusText = 'Đã dừng tại $_currentLevel%';
+        });
+      }
 
       print('🛑 Gate stopped at $_currentLevel%');
     } catch (e) {
@@ -709,12 +759,14 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
   }
 
   void _refreshStatus(StateSetter setDialogState) async {
-    setDialogState(() {
+    _safeSetDialogState(setDialogState, () {
       _statusText = 'Đang cập nhật...';
     });
-    setState(() {
-      _statusText = 'Đang cập nhật...';
-    });
+    if (mounted) {
+      setState(() {
+        _statusText = 'Đang cập nhật...';
+      });
+    }
 
     try {
       _mqttService.publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
@@ -885,11 +937,5 @@ class _GateDeviceControlWidgetState extends State<GateDeviceControlWidget> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _loadingTimeout?.cancel(); // 🚨 Clean up timer
-    super.dispose();
   }
 }

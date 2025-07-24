@@ -62,6 +62,13 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       'room_id': '1',
       'device_id': '2'
     },
+    'đèn hành lang': {
+      'type': 'light', 
+      'mqtt_id': 'led_hallway', 
+      'device': 'Đèn hành lang',
+      'room_id': '1',
+      'device_id': '3'
+    },
     'đèn phòng khách': {
       'type': 'light',
       'mqtt_id': 'led_living',
@@ -126,6 +133,29 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       'device': 'TV',
       'room_id': '1',
       'device_id': '2'
+    },
+
+    // Điều hòa
+    'điều hòa phòng khách': {
+      'type': 'ac',
+      'mqtt_id': 'ac_living',
+      'device': 'Điều hòa phòng khách',
+      'room_id': '1',
+      'device_id': '8'
+    },
+    'điều hòa phòng ngủ': {
+      'type': 'ac',
+      'mqtt_id': 'ac_bedroom',
+      'device': 'Điều hòa phòng ngủ',
+      'room_id': '2',
+      'device_id': '9'
+    },
+    'ac': {
+      'type': 'ac',
+      'mqtt_id': 'ac_living',
+      'device': 'Điều hòa',
+      'room_id': '1',
+      'device_id': '8'
     },
 
     // Motor/Cửa - More alternatives for gate
@@ -287,7 +317,9 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
             // Auto-process command when speech naturally ends
             if (_isListening && _recognizedText.isNotEmpty) {
               print('🔄 Speech naturally ended, auto-processing command: $_recognizedText');
-              _autoStopAndProcess();
+              _isListening = false;
+              notifyListeners();
+              _processCommand(_recognizedText);
             } else {
               _isListening = false;
               notifyListeners();
@@ -348,7 +380,7 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
   // Start listening (theo code tham khảo)
   Future<void> startListening() async {
-    print('=== Start Listening (New Logic) ===');
+    print('=== Start Listening (Toggle Logic) ===');
 
     if (!_speechEnabled) {
       print('Speech not enabled, trying to initialize...');
@@ -366,25 +398,11 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
     }
 
     if (!_isListening) {
+      // Start listening
       _isListening = true;
       _recognizedText = '';
       _aiResponse = '';
       notifyListeners();
-
-      // Start auto-stop timer for 1.5 seconds
-      _autoStopTimer?.cancel();
-      _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
-        if (_isListening && _recognizedText.isNotEmpty) {
-          print('🕐 Timer auto-stopping and processing command after 1.5s with text: $_recognizedText');
-          _autoStopAndProcess();
-        } else if (_isListening) {
-          print('🕐 Timer auto-stopping without text after 1.5s');
-          _isListening = false;
-          _autoStopTimer?.cancel();
-          notifyListeners();
-          _speechToText.stop();
-        }
-      });
 
       try {
         await _speechToText.listen(
@@ -392,20 +410,9 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
             _recognizedText = result.recognizedWords;
             print('Recognized: $_recognizedText');
             notifyListeners();
-            
-            // If we have final results and some text, restart the auto-stop timer
-            if (result.finalResult && _recognizedText.isNotEmpty) {
-              _autoStopTimer?.cancel();
-              _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
-                if (_isListening) {
-                  print('🕐 Final result timer auto-stopping and processing command with: $_recognizedText');
-                  _autoStopAndProcess();
-                }
-              });
-            }
           },
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 3),
+          listenFor: const Duration(seconds: 60), // Increased duration
+          pauseFor: const Duration(seconds: 5),
           partialResults: true,
           localeId: 'vi-VN',
           cancelOnError: false,
@@ -416,17 +423,19 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       } catch (e) {
         print('Listen error: $e');
         _isListening = false;
-        _autoStopTimer?.cancel();
         notifyListeners();
       }
+    } else {
+      // Stop listening and process command
+      await stopListening();
     }
   }
 
-  // Stop listening (theo code tham khảo)
+  // Stop listening
   Future<void> stopListening() async {
     if (_isListening) {
       _isListening = false;
-      _autoStopTimer?.cancel(); // Cancel auto-stop timer
+      _autoStopTimer?.cancel(); // Cancel auto-stop timer if exists
       notifyListeners();
       await _speechToText.stop();
 
@@ -436,21 +445,6 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
       if (_recognizedText.isNotEmpty) {
         _processCommand(_recognizedText);
       }
-    }
-  }
-
-  // Auto-stop and process command (for timer auto-execution)
-  Future<void> _autoStopAndProcess() async {
-    if (_isListening && _recognizedText.isNotEmpty) {
-      _isListening = false;
-      _autoStopTimer?.cancel(); // Cancel auto-stop timer
-      notifyListeners();
-      await _speechToText.stop();
-
-      print('🔄 Auto-stopped listening and processing command: $_recognizedText');
-
-      // Automatically process the command
-      _processCommand(_recognizedText);
     }
   }
 
@@ -574,6 +568,34 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
         case 'led_around':
           print('💡 AI Voice: Controlling around LED - ${isOn ? 'ON' : 'OFF'}');
           _mqttService.controlLedAround(isOn);
+          break;
+        case 'led_hallway':
+          print('💡 AI Voice: Controlling hallway light - ${isOn ? 'ON' : 'OFF'}');
+          _mqttService.controlHallwayLight(isOn);
+          break;
+        case 'led_living':
+          print('💡 AI Voice: Controlling living room light - ${isOn ? 'ON' : 'OFF'}');
+          _mqttService.controlLivingRoomLight(isOn);
+          break;
+        case 'led_bedroom':
+          print('💡 AI Voice: Controlling bedroom light - ${isOn ? 'ON' : 'OFF'}');
+          _mqttService.controlBedroomLight(isOn);
+          break;
+        case 'led_kitchen':
+          print('💡 AI Voice: Controlling kitchen light - ${isOn ? 'ON' : 'OFF'}');
+          _mqttService.controlKitchenLight(isOn);
+          break;
+        case 'fan_living':
+          print('🌀 AI Voice: Controlling living room fan - ${isOn ? 'ON' : 'OFF'}');
+          await _mqttService.publishFanLivingRoomCommand(isOn ? 'ON' : 'OFF');
+          break;
+        case 'ac_living':
+          print('❄️ AI Voice: Controlling living room AC - ${isOn ? 'ON' : 'OFF'}');
+          await _mqttService.publishACLivingRoomCommand(isOn ? 'ON' : 'OFF');
+          break;
+        case 'ac_bedroom':
+          print('❄️ AI Voice: Controlling bedroom AC - ${isOn ? 'ON' : 'OFF'}');
+          await _mqttService.publishACBedroom1Command(isOn ? 'ON' : 'OFF');
           break;
         case 'motor_main':
         case 'motor_gate':
@@ -821,14 +843,15 @@ class AIVoiceViewModel extends BaseModel with WidgetsBindingObserver {
 
     // Lệnh không nhận diện được
     print('❌ AI Voice: Command not recognized - Action: "$action", Device: "$device"');
-    return 'Xin lỗi, tôi không hiểu lệnh này. Vui lòng thử lại với các lệnh như "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ". 🤔';
+    return 'Xin lỗi, tôi không hiểu lệnh này. Vui lòng thử lại với các lệnh như "Mở đèn phòng khách", "Bật điều hòa phòng khách" hoặc "Chế độ về nhà". 🤔';
   }
 
   String _handleNightMode() {
     return '''Đã kích hoạt chế độ đi ngủ! 🌙
-• Tắt tất cả đèn trừ đèn ngủ
-• Giảm nhiệt độ điều hòa xuống 24°C  
-• Tắt TV và loa
+• Tắt tất cả đèn trừ đèn phòng ngủ
+• Bật điều hòa phòng ngủ ở 24°C  
+• Tắt TV và quạt phòng khách
+• Tắt đèn cổng và xung quanh
 • Kích hoạt camera an ninh
 Chúc bạn ngủ ngon! 😴''';
   }
@@ -836,7 +859,8 @@ Chúc bạn ngủ ngon! 😴''';
   String _handleHomeMode() {
     return '''Chào mừng bạn về nhà! 🏡
 • Bật đèn phòng khách và hành lang
-• Đặt điều hòa ở 26°C
+• Bật đèn cổng và xung quanh
+• Mở điều hòa phòng khách ở 26°C
 • Bật quạt phòng khách
 • Mở cổng tự động
 Chúc bạn một buổi tối vui vẻ! 😊''';
@@ -855,17 +879,22 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
   void _executeNightMode() {
     try {
       print('🌙 AI Voice: Executing night mode...');
-      // Tắt hầu hết đèn, chỉ giữ đèn ngủ
+      // Tắt hầu hết đèn, chỉ giữ đèn phòng ngủ
       _controlDeviceByVoice('đèn phòng khách', 'off');
       _controlDeviceByVoice('đèn bếp', 'off');
       _controlDeviceByVoice('đèn cổng', 'off');
       _controlDeviceByVoice('đèn xung quanh', 'off');
+      _controlDeviceByVoice('đèn hành lang', 'off');
       
       // Bật đèn phòng ngủ với độ sáng thấp
       _controlDeviceByVoice('đèn phòng ngủ', 'on');
       
+      // Bật điều hòa phòng ngủ
+      _controlDeviceByVoice('điều hòa phòng ngủ', 'on');
+      
       // Tắt TV và thiết bị giải trí
       _controlDeviceByVoice('tivi', 'off');
+      _controlDeviceByVoice('quạt phòng khách', 'off');
       
       print('✅ AI Voice: Night mode executed successfully');
     } catch (e) {
@@ -881,9 +910,13 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       _controlDeviceByVoice('đèn phòng khách', 'on');
       _controlDeviceByVoice('đèn cổng', 'on');
       _controlDeviceByVoice('đèn xung quanh', 'on');
+      _controlDeviceByVoice('đèn hành lang', 'on');
       
       // Bật quạt phòng khách
       _controlDeviceByVoice('quạt phòng khách', 'on');
+      
+      // Bật điều hòa phòng khách
+      _controlDeviceByVoice('điều hòa phòng khách', 'on');
       
       // Mở cổng (nếu có)
       _controlDeviceByVoice('cổng', 'on');
@@ -1271,207 +1304,212 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
   }
 
   Widget _buildSettingsTab(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Voice Settings
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.mic, color: Colors.white70),
-                  title: const Text('Độ nhạy micro',
-                      style: TextStyle(color: Colors.white)),
-                  trailing:
-                      const Text('Cao', style: TextStyle(color: Colors.blue)),
-                  onTap: () {},
-                ),
-                const Divider(color: Colors.white24),
-                ListTile(
-                  leading: const Icon(Icons.language, color: Colors.white70),
-                  title: const Text('Ngôn ngữ',
-                      style: TextStyle(color: Colors.white)),
-                  trailing: const Text('Tiếng Việt',
-                      style: TextStyle(color: Colors.blue)),
-                  onTap: () {},
-                ),
-                const Divider(color: Colors.white24),
-                ListTile(
-                  leading: const Icon(Icons.volume_up, color: Colors.white70),
-                  title: const Text('Âm lượng phản hồi',
-                      style: TextStyle(color: Colors.white)),
-                  trailing: const Text('Trung bình',
-                      style: TextStyle(color: Colors.blue)),
-                  onTap: () {},
-                ),
-                const Divider(color: Colors.white24),
-                ListTile(
-                  leading: Icon(
-                    _speechEnabled ? Icons.mic : Icons.mic_off,
-                    color: _speechEnabled ? Colors.green : Colors.red,
+    return SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Voice Settings
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.mic, color: Colors.white70),
+                    title: const Text('Độ nhạy micro',
+                        style: TextStyle(color: Colors.white)),
+                    trailing:
+                        const Text('Cao', style: TextStyle(color: Colors.blue)),
+                    onTap: () {},
                   ),
-                  title: const Text('Trạng thái nhận diện giọng nói',
-                      style: TextStyle(color: Colors.white)),
-                  trailing: Text(
-                    _speechEnabled ? 'Hoạt động' : 'Không khả dụng',
+                  const Divider(color: Colors.white24),
+                  ListTile(
+                    leading: const Icon(Icons.language, color: Colors.white70),
+                    title: const Text('Ngôn ngữ',
+                        style: TextStyle(color: Colors.white)),
+                    trailing: const Text('Tiếng Việt',
+                        style: TextStyle(color: Colors.blue)),
+                    onTap: () {},
+                  ),
+                  const Divider(color: Colors.white24),
+                  ListTile(
+                    leading: const Icon(Icons.volume_up, color: Colors.white70),
+                    title: const Text('Âm lượng phản hồi',
+                        style: TextStyle(color: Colors.white)),
+                    trailing: const Text('Trung bình',
+                        style: TextStyle(color: Colors.blue)),
+                    onTap: () {},
+                  ),
+                  const Divider(color: Colors.white24),
+                  ListTile(
+                    leading: Icon(
+                      _speechEnabled ? Icons.mic : Icons.mic_off,
+                      color: _speechEnabled ? Colors.green : Colors.red,
+                    ),
+                    title: const Text('Trạng thái nhận diện giọng nói',
+                        style: TextStyle(color: Colors.white)),
+                    trailing: Text(
+                      _speechEnabled ? 'Hoạt động' : 'Không khả dụng',
+                      style: TextStyle(
+                          color: _speechEnabled ? Colors.green : Colors.red),
+                    ),
+                    onTap: () async {
+                      if (!_speechEnabled) {
+                        await _initSpeech();
+                      } else {
+                        // Test speech recognition
+                        if (_speechToText.isAvailable) {
+                          _showTestSpeechDialog(context);
+                        }
+                      }
+                    },
+                  ),
+                  const Divider(color: Colors.white24),
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt, color: Colors.white70),
+                    title: const Text('Quyền Camera',
+                        style: TextStyle(color: Colors.white)),
+                    trailing: FutureBuilder<PermissionStatus>(
+                      future: Permission.camera.status,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          final isGranted = snapshot.data!.isGranted;
+                          return Text(
+                            isGranted ? 'Đã cấp' : 'Chưa cấp',
+                            style: TextStyle(
+                                color: isGranted ? Colors.green : Colors.red),
+                          );
+                        }
+                        return const Text('Đang kiểm tra...',
+                            style: TextStyle(color: Colors.grey));
+                      },
+                    ),
+                    onTap: () async {
+                      final granted =
+                          await PermissionHelper.requestCameraPermission();
+                      if (!granted) {
+                        await PermissionHelper.showPermissionDialog(
+                            context, 'Camera');
+                      }
+                      // Refresh UI after permission change
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        (context as Element).markNeedsBuild();
+                      });
+                    },
+                  ),
+                  const Divider(color: Colors.white24),
+                  ListTile(
+                    leading: const Icon(Icons.mic, color: Colors.white70),
+                    title: const Text('Quyền Microphone',
+                        style: TextStyle(color: Colors.white)),
+                    trailing: FutureBuilder<PermissionStatus>(
+                      future: Permission.microphone.status,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          final isGranted = snapshot.data!.isGranted;
+                          return Text(
+                            isGranted ? 'Đã cấp' : 'Chưa cấp',
+                            style: TextStyle(
+                                color: isGranted ? Colors.green : Colors.red),
+                          );
+                        }
+                        return const Text('Đang kiểm tra...',
+                            style: TextStyle(color: Colors.grey));
+                      },
+                    ),
+                    onTap: () async {
+                      final granted =
+                          await PermissionHelper.requestMicrophonePermission();
+                      if (!granted) {
+                        await PermissionHelper.showPermissionDialog(
+                            context, 'Microphone');
+                      }
+                      // Refresh UI after permission change
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        (context as Element).markNeedsBuild();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Statistics
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Thống kê:',
                     style: TextStyle(
-                        color: _speechEnabled ? Colors.green : Colors.red),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
                   ),
-                  onTap: () async {
-                    if (!_speechEnabled) {
-                      await _initSpeech();
-                    } else {
-                      // Test speech recognition
-                      if (_speechToText.isAvailable) {
-                        _showTestSpeechDialog(context);
-                      }
-                    }
-                  },
-                ),
-                const Divider(color: Colors.white24),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt, color: Colors.white70),
-                  title: const Text('Quyền Camera',
-                      style: TextStyle(color: Colors.white)),
-                  trailing: FutureBuilder<PermissionStatus>(
-                    future: Permission.camera.status,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        final isGranted = snapshot.data!.isGranted;
-                        return Text(
-                          isGranted ? 'Đã cấp' : 'Chưa cấp',
-                          style: TextStyle(
-                              color: isGranted ? Colors.green : Colors.red),
-                        );
-                      }
-                      return const Text('Đang kiểm tra...',
-                          style: TextStyle(color: Colors.grey));
-                    },
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Lệnh đã thực hiện',
+                          _commandHistory.length.toString(),
+                          Icons.history,
+                          Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Tin nhắn chat',
+                          _chatMessages.length.toString(),
+                          Icons.chat,
+                          Colors.green,
+                        ),
+                      ),
+                    ],
                   ),
-                  onTap: () async {
-                    final granted =
-                        await PermissionHelper.requestCameraPermission();
-                    if (!granted) {
-                      await PermissionHelper.showPermissionDialog(
-                          context, 'Camera');
-                    }
-                    // Refresh UI after permission change
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      (context as Element).markNeedsBuild();
-                    });
-                  },
-                ),
-                const Divider(color: Colors.white24),
-                ListTile(
-                  leading: const Icon(Icons.mic, color: Colors.white70),
-                  title: const Text('Quyền Microphone',
-                      style: TextStyle(color: Colors.white)),
-                  trailing: FutureBuilder<PermissionStatus>(
-                    future: Permission.microphone.status,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        final isGranted = snapshot.data!.isGranted;
-                        return Text(
-                          isGranted ? 'Đã cấp' : 'Chưa cấp',
-                          style: TextStyle(
-                              color: isGranted ? Colors.green : Colors.red),
-                        );
-                      }
-                      return const Text('Đang kiểm tra...',
-                          style: TextStyle(color: Colors.grey));
-                    },
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Lệnh tùy chỉnh',
+                          _customCommands.length.toString(),
+                          Icons.tune,
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Thiết bị kết nối',
+                          _availableZonesAndDevices.length.toString(),
+                          Icons.device_hub,
+                          Colors.purple,
+                        ),
+                      ),
+                    ],
                   ),
-                  onTap: () async {
-                    final granted =
-                        await PermissionHelper.requestMicrophonePermission();
-                    if (!granted) {
-                      await PermissionHelper.showPermissionDialog(
-                          context, 'Microphone');
-                    }
-                    // Refresh UI after permission change
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      (context as Element).markNeedsBuild();
-                    });
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Statistics
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Thống kê:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        'Lệnh đã thực hiện',
-                        _commandHistory.length.toString(),
-                        Icons.history,
-                        Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Tin nhắn chat',
-                        _chatMessages.length.toString(),
-                        Icons.chat,
-                        Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        'Lệnh tùy chỉnh',
-                        _customCommands.length.toString(),
-                        Icons.tune,
-                        Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Thiết bị kết nối',
-                        _availableZonesAndDevices.length.toString(),
-                        Icons.device_hub,
-                        Colors.purple,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+            
+            // Add some bottom padding to ensure no overflow
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
@@ -1763,7 +1801,7 @@ Cảm ơn bạn đã bảo vệ môi trường! 🌱''';
       builder: (context) => AlertDialog(
         title: const Text('Test nhận diện giọng nói'),
         content: const Text(
-            'Nhận diện giọng nói đã được kích hoạt. Bạn có thể thử nói "Mở đèn phòng khách" hoặc "Tắt quạt phòng ngủ".'),
+            'Nhận diện giọng nói đã được kích hoạt. Bạn có thể thử nói "Mở đèn cổng", "Bật điều hòa phòng khách" hoặc "Chế độ về nhà".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

@@ -55,15 +55,17 @@ class MqttUnifiedService {
   static const String topicLivingRoomLight = 'inside/living_room_light';
   static const String topicBedroomLight = 'inside/bedroom_light';
   
-  // Floor 2 devices
-  static const String topicCornerBedroomLight = 'inside/corner_bedroom_light';
-  static const String topicYardBedroomLight = 'inside/yard_bedroom_light';
+  // Floor 2 devices - Combined topic for corner and yard bedroom
+  static const String topicBedroom2Lights = 'inside/bedroom2_lights';
   static const String topicWorshipRoomLight = 'inside/worship_room_light';
   static const String topicHallwayLight = 'inside/hallway_light';
   static const String topicBalconyLight = 'inside/balcony_light';
 
   // Climate control topics - Combined AC and Fan
   static const String topicClimateControl = 'inside/climate_control';
+
+  // Schedule control topic - NEW
+  static const String topicScheduleControl = 'inside/schedule_control';
 
   MqttServerClient? _client;
   bool _isConnected = false;
@@ -170,22 +172,15 @@ class MqttUnifiedService {
     // Initialize device states
     _deviceStateService.initializeDefaultStates();
     
-    // Wait a bit for connection to fully stabilize before sending requests
-    Future.delayed(const Duration(seconds: 1), () {
-      if (_isConnected && _client?.connectionStatus?.state == MqttConnectionState.connected) {
-        // Initialize gate state when connected
-        initializeGateState();
-        
-        // Request all device status from ESP32
-        _requestAllDeviceStatus();
-      }
-    });
+    // Initialize gate state when connected
+    initializeGateState();
     
-    // Request indoor device status from ESP32-S3 Indoor with additional delay
-    Future.delayed(const Duration(seconds: 3), () {
-      if (_isConnected && _client?.connectionStatus?.state == MqttConnectionState.connected) {
-        requestIndoorDeviceStatus();
-      }
+    // Request all device status from ESP32
+    _requestAllDeviceStatus();
+    
+    // Request indoor device status from ESP32-S3 Indoor
+    Future.delayed(const Duration(seconds: 2), () {
+      requestIndoorDeviceStatus();
     });
   }
 
@@ -222,11 +217,14 @@ class MqttUnifiedService {
       '$topicKitchenLight/status',
       '$topicLivingRoomLight/status',
       '$topicBedroomLight/status',
-      '$topicCornerBedroomLight/status',
-      '$topicYardBedroomLight/status',
+      '$topicBedroom2Lights/status',  // Combined status for corner + yard bedroom
       '$topicWorshipRoomLight/status',
       '$topicHallwayLight/status',
       '$topicBalconyLight/status',
+      
+      // Climate control and schedule control - No need to subscribe, only publish
+      // topicClimateControl, // Only for publishing to ESP32
+      // topicScheduleControl, // Only for publishing to ESP32
     ];
 
     for (String topic in topics) {
@@ -344,111 +342,42 @@ class MqttUnifiedService {
 
   void _handleGateStatus(String statusMessage) {
     try {
-      print('🔍 [DEBUG] Parsing gate status: "$statusMessage"');
-      
-      // Handle ESP32 format: "25:false:LEVEL_25" or "Level 25:STOPPED" or "0:STOPPED"
       final parts = statusMessage.split(':');
-      
-      if (parts.length >= 3) {
-        // New ESP32 format: "25:false:LEVEL_25" (percentage:isMoving:description)
-        final percentage = int.tryParse(parts[0]) ?? 0;
-        final isMovingStr = parts[1].toLowerCase().trim();
-        final isMoving = isMovingStr == 'true' || isMovingStr.contains('moving') || isMovingStr.contains('running');
-        
-        // Convert percentage to level value for internal storage
-        int levelValue = 0;
-        if (percentage <= 0) {
-          levelValue = 0;
-        } else if (percentage <= 33) {
-          levelValue = 1;
-        } else if (percentage <= 66) {
-          levelValue = 2;
-        } else {
-          levelValue = 3;
+      if (parts.length >= 2) {
+        final level = int.tryParse(parts[0]) ?? 0;
+        final status = parts[1];
+
+        _currentGateLevel = level;
+        _gateStateController.add(level);
+
+        // Convert ESP32 level to percentage for UI
+        int percentage;
+        switch (level) {
+          case 0:
+            percentage = 0;
+            break;
+          case 1:
+            percentage = 25;
+            break;
+          case 2:
+            percentage = 50;
+            break;
+          case 3:
+            percentage = 100;
+            break;
+          default:
+            percentage = 0;
         }
-        
-        _currentGateLevel = levelValue;
-        _gateStateController.add(levelValue);
 
         _gateStatusController.add({
           'level': percentage,
-          'isMoving': isMoving,
-          'description': _getGateDescription(percentage, isMoving),
+          'isMoving': status.contains('MOVING') || status.contains('RUNNING'),
+          'description':
+              _getGateDescription(percentage, status.contains('MOVING')),
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
 
-        print('🚪 Gate status updated: Level $levelValue -> $percentage% (moving: $isMoving)');
-        
-      } else if (parts.length >= 2) {
-        // Handle different formats
-        if (statusMessage.toLowerCase().contains('level')) {
-          // Format: "Level 25:STOPPED" or "Level 25"
-          final levelPart = parts[0].toLowerCase().replaceAll('level', '').trim();
-          final level = int.tryParse(levelPart) ?? 0;
-          final status = parts.length > 1 ? parts[1] : 'STOPPED';
-          
-          // If ESP32 sends percentage directly, use it
-          int percentage = level;
-          int levelValue = 0;
-          
-          // Convert percentage to level value for internal storage
-          if (percentage <= 0) {
-            levelValue = 0;
-          } else if (percentage <= 33) {
-            levelValue = 1;
-          } else if (percentage <= 66) {
-            levelValue = 2;
-          } else {
-            levelValue = 3;
-          }
-          
-          _currentGateLevel = levelValue;
-          _gateStateController.add(levelValue);
-
-          _gateStatusController.add({
-            'level': percentage,
-            'isMoving': status.contains('MOVING') || status.contains('RUNNING'),
-            'description': _getGateDescription(percentage, status.contains('MOVING')),
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          });
-
-          print('🚪 Gate status updated: Level $levelValue -> $percentage% ($status)');
-        } else {
-          // Handle traditional format: "0:STOPPED", "1:STOPPED", etc.
-          final level = int.tryParse(parts[0]) ?? 0;
-          final status = parts[1];
-
-          _currentGateLevel = level;
-          _gateStateController.add(level);
-
-          // Convert ESP32 level to percentage for UI
-          int percentage;
-          switch (level) {
-            case 0:
-              percentage = 0;
-              break;
-            case 1:
-              percentage = 25;
-              break;
-            case 2:
-              percentage = 50;
-              break;
-            case 3:
-              percentage = 100;
-              break;
-            default:
-              percentage = 0;
-          }
-
-          _gateStatusController.add({
-            'level': percentage,
-            'isMoving': status.contains('MOVING') || status.contains('RUNNING'),
-            'description': _getGateDescription(percentage, status.contains('MOVING')),
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          });
-
-          print('🚪 Gate status updated: Level $level -> $percentage% ($status)');
-        }
+        print('🚪 Gate status updated: Level $level -> $percentage% ($status)');
       }
     } catch (e) {
       print('❌ Error parsing gate status: $e');
@@ -510,23 +439,11 @@ class MqttUnifiedService {
   }
 
   void publishDeviceCommand(String topic, String command) {
-    if (!_isConnected || _client == null) {
-      print('❌ MQTT not connected, cannot send: $topic = $command');
-      return;
-    }
-    
-    if (_client!.connectionStatus?.state != MqttConnectionState.connected) {
-      print('❌ MQTT connection state invalid for: $topic = $command (State: ${_client!.connectionStatus?.state})');
-      return;
-    }
-    
-    try {
+    if (_client?.connectionStatus?.state == MqttConnectionState.connected) {
       final builder = MqttClientPayloadBuilder();
       builder.addString(command);
       _client!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
       print('📤 MQTT: $topic = $command');
-    } catch (e) {
-      print('❌ Error publishing MQTT message: $e');
     }
   }
 
@@ -558,36 +475,19 @@ class MqttUnifiedService {
   void controlGateLevel(int level) {
     if (level < 0 || level > 3) return;
 
-    // 🚨 CRITICAL FIX: Convert internal level to percentage for ESP32
-    int percentage = level == 0 ? 0 : level == 1 ? 25 : level == 2 ? 50 : 100;
-    
-    publishDeviceCommand(topicGateLevel, percentage.toString());
-    print('🚪 Điều khiển cổng: Level $level -> $percentage% sent to ESP32');
+    publishDeviceCommand(topicGateLevel, level.toString());
+    print('🚪 Điều khiển cổng đến mức $level');
 
     if (_enableFirebase) {
-      // 🚨 Convert level back to percentage for Firebase storage
-      _saveGateStateToFirebase(percentage);
+      _saveGateStateToFirebase(level);
     }
   }
 
   Future<void> publishGateControl(int percentage,
       {bool shouldRequestStatus = false}) async {
     try {
-      // 🚨 CRITICAL FIX: Send PERCENTAGE directly to ESP32, not internal level
-      // ESP32 expects 0-100% values, NOT 0-3 level values
-
-      if (shouldRequestStatus) {
-        publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
-        print('📡 Requesting gate status from ESP32');
-        return;
-      }
-
-      // 🚨 SEND PERCENTAGE DIRECTLY: ESP32 will convert to internal level
-      publishDeviceCommand(topicGateLevel, percentage.toString());
-      print('🚪 Gate control: $percentage% sent directly to ESP32');
-
-      // Convert percentage to internal level for local tracking
       int level;
+
       if (percentage <= 0) {
         level = 0;
       } else if (percentage <= 33) {
@@ -598,12 +498,20 @@ class MqttUnifiedService {
         level = 3;
       }
 
+      if (shouldRequestStatus) {
+        publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
+        print('📡 Requesting gate status from ESP32');
+        return;
+      }
+
+      publishDeviceCommand(topicGateLevel, level.toString());
+      print('🚪 Gate control: $percentage% -> Level $level sent to ESP32');
+
       _currentGateLevel = level;
       _gateStateController.add(level);
 
       if (_enableFirebase) {
-        // 🚨 FIX: Save ACTUAL percentage received from ESP32, not internal level
-        _saveGateStateToFirebase(percentage);
+        _saveGateStateToFirebase(level);
       }
     } catch (e) {
       print('❌ Error controlling gate: $e');
@@ -641,13 +549,15 @@ class MqttUnifiedService {
 
   void controlCornerBedroomLight(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
-    publishDeviceCommand(topicCornerBedroomLight, command);
+    final payload = '{"device": "corner_bedroom", "command": "$command"}';
+    publishDeviceCommand(topicBedroom2Lights, payload);
     _logIndoorDeviceState('corner_bedroom_light', command, 'floor_2', 'corner_bedroom', 10.0);
   }
 
   void controlYardBedroomLight(bool isOn) {
     final command = isOn ? 'ON' : 'OFF';
-    publishDeviceCommand(topicYardBedroomLight, command);
+    final payload = '{"device": "yard_bedroom", "command": "$command"}';
+    publishDeviceCommand(topicBedroom2Lights, payload);
     _logIndoorDeviceState('yard_bedroom_light', command, 'floor_2', 'yard_bedroom', 10.0);
   }
 
@@ -671,60 +581,47 @@ class MqttUnifiedService {
 
   // ========== ENHANCED INDOOR DEVICE CONTROLS ==========
 
-  /// 🌟 UNIFIED CLIMATE CONTROL: Combined Fan + AC control via single topic
-  /// Sends JSON format: {"device": "device_name", "command": "ON/OFF"}
-  Future<void> publishClimateControlCommand(String deviceName, String command) async {
-    if (!_isConnected || _client == null) {
-      print('❌ MQTT not connected, cannot send climate control command');
-      return;
-    }
-    
-    try {
-      // Create JSON payload for climate control
-      final jsonPayload = '{"device": "$deviceName", "command": "$command"}';
-      
-      print('🌟 [CLIMATE] Publishing command: $jsonPayload to $topicClimateControl');
-      
-      await _client!.publishMessage(
-        topicClimateControl,
-        MqttQos.atLeastOnce,
-        MqttClientPayloadBuilder().addString(jsonPayload).payload!,
-      );
-      
-      print('✅ [CLIMATE] Command sent successfully: $deviceName = $command');
-    } catch (e) {
-      print('❌ Error publishing climate control command: $e');
-    }
-  }
-
-  // 🌀 FAN CONTROLS via unified climate control
   Future<void> publishFanLivingRoomCommand(String command) async {
-    print('🌀 [DEBUG] Publishing Fan Living Room command: $command via unified climate control');
-    await publishClimateControlCommand('fan_living_room', command);
+    print('🌀 [DEBUG] Publishing Fan Living Room command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "fan_living_room", "command": "$command"}';
+    await publishIndoorDeviceCommand(topicClimateControl, jsonMessage);
     print('🌀 [DEBUG] Fan Living Room command sent successfully');
   }
 
-  // ❄️ AC CONTROLS via unified climate control
   Future<void> publishACLivingRoomCommand(String command) async {
-    print('❄️ [DEBUG] Publishing AC Living Room command: $command via unified climate control');
-    await publishClimateControlCommand('ac_living_room', command);
+    print('❄️ [DEBUG] Publishing AC Living Room command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_living_room", "command": "$command"}';
+    await publishIndoorDeviceCommand(topicClimateControl, jsonMessage);
     print('❄️ [DEBUG] AC Living Room command sent successfully');
   }
 
   Future<void> publishACBedroom1Command(String command) async {
-    print('❄️ [DEBUG] Publishing AC Bedroom1 command: $command via unified climate control');
-    await publishClimateControlCommand('ac_bedroom1', command);
+    print('❄️ [DEBUG] Publishing AC Bedroom1 command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_bedroom1", "command": "$command"}';
+    await publishIndoorDeviceCommand(topicClimateControl, jsonMessage);
     print('❄️ [DEBUG] AC Bedroom1 command sent successfully');
   }
 
   Future<void> publishACBedroom2Command(String command) async {
-    print('❄️ [DEBUG] Publishing AC Bedroom2 command: $command via unified climate control');
-    await publishClimateControlCommand('ac_bedroom2', command);
+    print('❄️ [DEBUG] Publishing AC Bedroom2 command: $command to inside/climate_control');
+    String jsonMessage = '{"device": "ac_bedroom2", "command": "$command"}';
+    await publishIndoorDeviceCommand(topicClimateControl, jsonMessage);
     print('❄️ [DEBUG] AC Bedroom2 command sent successfully');
   }
 
-  /// 💡 INDOOR DEVICE COMMAND: For lights and other individual devices
-  /// Climate devices (Fan/AC) should use publishClimateControlCommand instead
+  // ========== SCHEDULE CONTROL METHODS ==========
+
+  // Send schedule control commands to ESP32
+  Future<void> publishScheduleCommand(String scheduleJson) async {
+    print('📅 [DEBUG] Publishing Schedule command: $scheduleJson');
+    await publishIndoorDeviceCommand(topicScheduleControl, scheduleJson);
+    print('📅 [DEBUG] Schedule command sent successfully');
+  }
+
+  Future<void> listSchedulesOnESP32() async {
+    await publishScheduleCommand('LIST_SCHEDULES');
+  }
+
   Future<void> publishIndoorDeviceCommand(String deviceTopic, String command) async {
     if (!_isConnected || _client == null) {
       print('❌ MQTT not connected, cannot send: $deviceTopic = $command');
@@ -749,16 +646,7 @@ class MqttUnifiedService {
   // ========== DEVICE STATUS REQUESTS ==========
 
   Future<void> _requestAllDeviceStatus() async {
-    if (!_isConnected || _client == null) {
-      print('❌ MQTT not connected for device status request');
-      return;
-    }
-    
-    // Double check connection state
-    if (_client!.connectionStatus?.state != MqttConnectionState.connected) {
-      print('❌ MQTT connection state is not connected: ${_client!.connectionStatus?.state}');
-      return;
-    }
+    if (!_isConnected || _client == null) return;
     
     try {
       await Future.delayed(const Duration(milliseconds: 1000));
@@ -808,16 +696,7 @@ class MqttUnifiedService {
   }
 
   Future<void> requestIndoorDeviceStatus() async {
-    if (!_isConnected || _client == null) {
-      print('❌ MQTT not connected for indoor device status request');
-      return;
-    }
-    
-    // Double check connection state
-    if (_client!.connectionStatus?.state != MqttConnectionState.connected) {
-      print('❌ MQTT connection state is not connected: ${_client!.connectionStatus?.state}');
-      return;
-    }
+    if (!_isConnected || _client == null) return;
     
     try {
       print('🏠 Requesting indoor device status...');
@@ -841,7 +720,6 @@ class MqttUnifiedService {
       final gateService = GateStateService();
       final GateState currentState = await gateService.getCurrentGateState();
 
-      // Convert Firebase percentage to internal level
       int level;
       if (currentState.level <= 0) {
         level = 0;
@@ -859,34 +737,15 @@ class MqttUnifiedService {
       _gateStatusController.add({
         'level': currentState.level,
         'isMoving': currentState.isMoving,
-        'description': _getGateDescription(currentState.level, currentState.isMoving),
+        'description':
+            _getGateDescription(currentState.level, currentState.isMoving),
         'timestamp': currentState.timestamp.millisecondsSinceEpoch,
       });
 
-      print('🚪 Gate state initialized from Firebase: ${currentState.level}% (Level $level)');
-      
-      // Send current Firebase state to ESP32 to sync hardware with app state
-      if (currentState.level > 0 && _isConnected && _client?.connectionStatus?.state == MqttConnectionState.connected) {
-        print('🔄 Syncing ESP32 with Firebase state: ${currentState.level}% -> Level $level');
-        publishDeviceCommand(topicGateLevel, level.toString());
-        
-        // Wait a bit then request status to confirm
-        await Future.delayed(const Duration(milliseconds: 1000));
-      } else if (currentState.level > 0) {
-        print('⚠️ Skipping Firebase->ESP32 sync - MQTT not connected');
-      }
-      
-      // Always request current ESP32 status for verification
+      print('🚪 Gate state initialized: ${currentState.level}% (Level $level)');
+
       await Future.delayed(const Duration(milliseconds: 500));
-      
-      // 🚨 WAIT FOR CONNECTION: Only send if truly connected
-      if (_isConnected && _client?.connectionStatus?.state == MqttConnectionState.connected) {
-        publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
-        print('📡 Requesting ESP32 gate status for verification...');
-      } else {
-        print('⚠️ Skipping gate status request - MQTT not fully connected yet');
-      }
-      
+      publishDeviceCommand('khoasmarthome/status_request', 'GATE_STATUS');
     } catch (e) {
       print('❌ Error initializing gate state: $e');
 
@@ -907,9 +766,23 @@ class MqttUnifiedService {
     try {
       final gateService = GateStateService();
 
-      // 🚨 DIRECT PERCENTAGE: ESP32 now sends percentage values directly (0, 25, 50, 75, 100)
-      // No need for legacy level mapping anymore
-      final percentage = level; // Direct usage - ESP32 sends 0, 25, 50, 75, 100
+      int percentage;
+      switch (level) {
+        case 0:
+          percentage = 0;
+          break;
+        case 1:
+          percentage = 25;
+          break;
+        case 2:
+          percentage = 50;
+          break;
+        case 3:
+          percentage = 100;
+          break;
+        default:
+          percentage = 0;
+      }
 
       await gateService.saveGateState(GateState.withAutoStatus(
         level: percentage,
@@ -918,7 +791,7 @@ class MqttUnifiedService {
       ));
 
       _lastDeviceWrite = DateTime.now();
-      print('✅ Gate state saved to Firebase: $percentage% (direct from ESP32)');
+      print('✅ Gate state saved to Firebase: $percentage%');
     } catch (e) {
       print('❌ Error saving gate state to Firebase: $e');
     }
@@ -971,6 +844,54 @@ class MqttUnifiedService {
   /// Compatibility method for device_manager_service.dart
   Future<void> moveGateAbsolute(int percentage) async {
     await publishGateControl(percentage);
+  }
+
+  // ========== SCHEDULE CONTROL ==========
+  
+  /// Send schedule command to ESP32-S3 Indoor
+  Future<void> sendScheduleCommand(String action, Map<String, dynamic> scheduleData) async {
+    if (!_isConnected || _client == null) {
+      print('❌ Cannot send schedule command: MQTT is not connected');
+      return;
+    }
+
+    try {
+      String payload;
+      
+      if (action == 'add') {
+        // ESP32 expects: ADD_SCHEDULE:{schedule_json}
+        final scheduleJson = jsonEncode(scheduleData);
+        payload = 'ADD_SCHEDULE:$scheduleJson';
+      } else if (action == 'remove') {
+        // ESP32 expects: REMOVE_SCHEDULE:{"id":"schedule_id"}
+        final scheduleId = scheduleData['id'] ?? '';
+        payload = 'REMOVE_SCHEDULE:{"id":"$scheduleId"}';
+      } else {
+        print('❌ Unknown schedule action: $action');
+        return;
+      }
+      
+      final builder = MqttClientPayloadBuilder();
+      builder.addString(payload);
+      
+      _client!.publishMessage(topicScheduleControl, MqttQos.atLeastOnce, builder.payload!);
+      
+      print('📅 Schedule command sent: $action');
+      print('📝 Payload: $payload');
+      
+    } catch (e) {
+      print('❌ Error sending schedule command: $e');
+    }
+  }
+
+  /// Add schedule to ESP32-S3
+  Future<void> addSchedule(Map<String, dynamic> scheduleData) async {
+    await sendScheduleCommand('add', scheduleData);
+  }
+
+  /// Remove schedule from ESP32-S3
+  Future<void> removeSchedule(Map<String, dynamic> scheduleData) async {
+    await sendScheduleCommand('remove', scheduleData);
   }
 
   // ========== CLEANUP ==========
